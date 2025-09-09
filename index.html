@@ -92,7 +92,7 @@
             opacity: 1;
         }
     </style>
-  <!-- Google tag (gtag.js) -->
+ <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-5C9YVR0W01"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -208,7 +208,8 @@
 
         <footer class="text-center mt-12 text-sm text-slate-500">
             <p>&copy; <span id="currentYear"></span> Student Pathway Dashboard. For informational purposes only.</p>
-            <p>Always verify eligibility criteria with official sources.</p>
+            <p class="font-semibold text-sky-300 mt-2">Updated as at June 2025</p>
+            <p class="mt-2">Always verify eligibility criteria with official sources.</p>
             <p class="mt-1">Based on Full SBB Post-Sec Options w.e.f. 2027 S4/5 Cohort (Affecting: 2025 S1 & S2 Full SBB) document.</p>
         </footer>
     </div>
@@ -542,7 +543,8 @@
                 // 1. Filter for subjects that are "passes" in their original G3, G2, or G1 level, AND map to G1 equivalent
                 const allPassingSubjectsG1Equiv = currentStudentSubjects.filter(s => {
                     if (s.level === "G3") {
-                        return getNumericGrade(s.grade, "G3") <= G3_TO_NUMERIC_RAW["D7"]; // D7 or better for G3 pass
+                        // MODIFIED: G3 pass for ITE is E8 or better
+                        return getNumericGrade(s.grade, "G3") <= G3_TO_NUMERIC_RAW["E8"]; 
                     } else if (s.level === "G2") {
                         return getNumericGrade(s.grade, "G2") <= G2_TO_NUMERIC_RAW["5"]; // 5 or better for G2 pass
                     } else if (s.level === "G1") {
@@ -721,7 +723,14 @@
                     ...s,
                     numericOriginalGrade: getNumericGrade(s.grade, s.level),
                     category: getSubjectById(s.subjectId)?.category
-                })).filter(s => { // Filter for passing grades based on original level
+                })).filter(s => { 
+                    // MODIFIED: Exclude G1 Mother Tongue subjects for PFP and ITE Yr 2 Hnitec
+                    const isG1MotherTongue = s.level === "G1" && SUBJECT_CATEGORIES_DEF.MT_ALL.includes(s.category);
+                    if (isG1MotherTongue) {
+                        return false;
+                    }
+
+                    // Filter for passing grades based on original level
                     if (s.level === "G3") return getNumericGrade(s.grade, "G3") <= G3_TO_NUMERIC_RAW["D7"];
                     if (s.level === "G2") return getNumericGrade(s.grade, "G2") <= G2_TO_NUMERIC_RAW["5"];
                     if (s.level === "G1") return getNumericGrade(s.grade, "G1") <= G1_TO_NUMERIC_RAW_ITE["D"];
@@ -1001,7 +1010,8 @@
                 const allPassingSubjectsG1Equiv = currentStudentSubjects.filter(s => {
                     // Check if subject is a "pass" in its original level
                     if (s.level === "G3") {
-                        return getNumericGrade(s.grade, "G3") <= G3_TO_NUMERIC_RAW["D7"]; // D7 or better for G3 pass
+                        // MODIFIED: G3 pass for ITE is E8 or better
+                        return getNumericGrade(s.grade, "G3") <= G3_TO_NUMERIC_RAW["E8"]; 
                     } else if (s.level === "G2") {
                         return getNumericGrade(s.grade, "G2") <= G2_TO_NUMERIC_RAW["5"]; // 5 or better for G2 pass
                     } else if (s.level === "G1") {
@@ -1073,7 +1083,7 @@
                 } else if (requirements.type === "2_G3_ONLY") {
                     const g3Passes = currentStudentSubjects.filter(s => s.level === "G3" && G3_GRADES_OPTIONS.includes(s.grade) && getNumericGrade(s.grade, "G3") <= requirements.req_g3_grade);
                     const g3CountCheck = g3Passes.length >= requirements.req_g3_count;
-                    details.push({ merId: 'g3_passes_count', text: `${requirements.req_g3_count} G3 passes (Grade ${G3_GRADES_OPTIONS[requirements.req_g3_grade -1]} or better)`, met: g3CountCheck });
+                    details.push({ merId: 'g3_passes_count', text: `${requirements.req_g3_count} G3 passes (Grade ${G3_GRADES_OPTIONS[requirements.req_g3_grade - 1]} or better)`, met: g3CountCheck });
                     if (!g3CountCheck) metCriteria = false;
                 }
 
@@ -1149,7 +1159,8 @@
                 // Filter for subjects that are "passes" in their original G3, G2, or G1 level.
                 const passingOriginalSubjects = currentStudentSubjects.filter(s => {
                     if (s.level === "G3") {
-                        return getNumericGrade(s.grade, "G3") <= G3_TO_NUMERIC_RAW["D7"]; // D7 or better for G3 pass
+                        // MODIFIED: G3 pass for ITE is E8 or better
+                        return getNumericGrade(s.grade, "G3") <= G3_TO_NUMERIC_RAW["E8"];
                     } else if (s.level === "G2") {
                         return getNumericGrade(s.grade, "G2") <= G2_TO_NUMERIC_RAW["5"]; // 5 or better for G2 pass
                     } else if (s.level === "G1") {
@@ -1611,8 +1622,8 @@
                         let groupHeaderHtml = `<h3 class="text-xl font-semibold text-sky-300 mb-4 border-b border-slate-700 pb-2">${group}</h3>`;
                         if (group === "JC/MI") groupHeaderHtml += `<ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: Gross Aggregate (L1R4) & <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Net Aggregate (L1R4)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of L1R4 minus bonus points.</span></span></li></ul>`;
                         else if (group === "Polytechnic Year 1") groupHeaderHtml += `<ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: <span class="tooltip">Net Aggregate (ELR2B2)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of ELR2B2 minus bonus points.</span></span> & <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Net Aggregate (ELR2B2)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of ELR2B2 minus bonus points.</span></span></li></ul>`;
-                        else if (group === "PFP") groupHeaderHtml += `<ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: <span class="tooltip">Gross Aggregate (ELMAB3)<sup><small>i</small></sup><span class="tooltiptext">Gross Aggregate is the sum of ELMAB3.</span></span> & <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Net Aggregate (ELMAB3)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of ELMAB3 minus bonus points.</span></span></li></ul>`;
-                        else if (group === "ITE Year 2 Higher Nitec") groupHeaderHtml += `<ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: Gross Aggregate (ELMAB3) & <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Net Aggregate (ELMAB3)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of ELMAB3 minus bonus points.</span></span></li></ul>`;
+                        else if (group === "PFP") groupHeaderHtml += `<ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: <span class="tooltip">Gross Aggregate (ELMAB3)<sup><small>i</small></sup><span class="tooltiptext">Gross Aggregate is the sum of ELMAB3. G1 Mother Tongue cannot be used.</span></span> & <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Net Aggregate (ELMAB3)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of ELMAB3 minus bonus points.</span></span></li></ul>`;
+                        else if (group === "ITE Year 2 Higher Nitec") groupHeaderHtml += `<ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: Gross Aggregate (ELMAB3) & <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements. G1 Mother Tongue cannot be used.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Net Aggregate (ELMAB3)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of ELMAB3 minus bonus points.</span></span></li></ul>`;
                         else if (group === "ITE Year 1 Higher Nitec") groupHeaderHtml += `<ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Aggregate score<sup><small>i</small></sup><span class="tooltiptext">Aggregate score is the sum of 4 G1 subjects (including Pre-requisite subjects if applicable) minus bonus points.</span></span></li></ul>`;
                         groupSection.innerHTML = groupHeaderHtml;
                         const cardsContainer = document.createElement('div'); cardsContainer.className = 'grid md:grid-cols-2 lg:col-span-3 gap-6';
@@ -1642,7 +1653,7 @@
                             const descriptionItemHtml = pathway.description ? `<li class="mt-2 pt-2 text-slate-400 italic">${pathway.description}</li>` : '';
                             let pathwayNameDisplay = pathway.name;
                             if (pathway.tooltipText) pathwayNameDisplay = `<span class="tooltip">${pathway.name}<sup><small>i</small></sup><span class="tooltiptext">${pathway.tooltipText}</span></span>`;
-                            else if (pathway.group === "ITE Year 1 Higher Nitec" && pathway.id !== "ite_hnitec_yr1_biz_services_2") pathwayNameDisplay = `<span class="tooltip">${pathway.name}<sup><small>i</small></sup><span class="tooltiptext">Pass refers to Grade A-D for G1 Subject or Grade 1-5 for G2 Subject.</span></span>`;
+                            else if (pathway.group === "ITE Year 1 Higher Nitec" && pathway.id !== "ite_hnitec_yr1_biz_services_2") pathwayNameDisplay = `<span class="tooltip">${pathway.name}<sup><small>i</small></sup><span class="tooltiptext">Pass refers to Grade A-D for G1 Subject, Grade 1-5 for G2 Subject, or Grade 1-8 for G3 Subject.</span></span>`;
                             
                             const subjectsUsedHtml = pathway.subjectsUsed && pathway.subjectsUsed.length > 0
                                 ? `<h5 class="text-sm font-semibold text-sky-300 mt-3 mb-1">Subjects considered for calculation:</h5><ul class="list-disc list-inside mt-1 pl-2 text-slate-300 space-y-1">${pathway.subjectsUsed.map(s => {
@@ -1708,3 +1719,4 @@
     </script>
 </body>
 </html>
+
