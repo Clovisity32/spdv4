@@ -92,7 +92,7 @@
             opacity: 1;
         }
     </style>
- <!-- Google tag (gtag.js) -->
+  <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-5C9YVR0W01"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -539,7 +539,8 @@
                 return { ...subject, g1EquivGrade, numericG1EquivGrade };
             };
 
-            const calculateBest4G1Equivalent = (currentStudentSubjects, forcedIncludeSubjects = []) => {
+            const calculateBest4G1Equivalent = (currentStudentSubjects, forcedIncludeSubjects = [], useG1GradeE = false) => {
+                const g1MaxGradeForPass = useG1GradeE ? "E" : "D";
                 // 1. Filter for subjects that are "passes" in their original G3, G2, or G1 level, AND map to G1 equivalent
                 const allPassingSubjectsG1Equiv = currentStudentSubjects.filter(s => {
                     if (s.level === "G3") {
@@ -548,7 +549,7 @@
                     } else if (s.level === "G2") {
                         return getNumericGrade(s.grade, "G2") <= G2_TO_NUMERIC_RAW["5"]; // 5 or better for G2 pass
                     } else if (s.level === "G1") {
-                        return G1_GRADES_OPTIONS.includes(s.grade) && getNumericGrade(s.grade, "G1") <= G1_TO_NUMERIC_RAW_ITE["D"]; // A-D for G1 pass
+                        return G1_GRADES_OPTIONS.includes(s.grade) && getNumericGrade(s.grade, "G1") <= G1_TO_NUMERIC_RAW_ITE[g1MaxGradeForPass];
                     }
                     return false; // Not a recognized level or not a pass
                 }).map(s => {
@@ -731,7 +732,7 @@
                     }
 
                     // Filter for passing grades based on original level
-                    if (s.level === "G3") return getNumericGrade(s.grade, "G3") <= G3_TO_NUMERIC_RAW["D7"];
+                    if (s.level === "G3") return getNumericGrade(s.grade, "G3") <= G3_TO_NUMERIC_RAW["E8"]; // Allow E8 for PFP 'other' subjects
                     if (s.level === "G2") return getNumericGrade(s.grade, "G2") <= G2_TO_NUMERIC_RAW["5"];
                     if (s.level === "G1") return getNumericGrade(s.grade, "G1") <= G1_TO_NUMERIC_RAW_ITE["D"];
                     return false;
@@ -1006,8 +1007,8 @@
                 let subjectsForAggregate = [];
                 const usedForAggregateIds = new Set(); 
             
-                // Filter for subjects that are "passes" in their original G3, G2, or G1 level, AND map to G1 equivalent
-                const allPassingSubjectsG1Equiv = currentStudentSubjects.filter(s => {
+                // Filter for subjects that are MER "passes" (G1 grade D or better)
+                const allPassingSubjectsG1EquivForMer = currentStudentSubjects.filter(s => {
                     // Check if subject is a "pass" in its original level
                     if (s.level === "G3") {
                         // MODIFIED: G3 pass for ITE is E8 or better
@@ -1015,7 +1016,7 @@
                     } else if (s.level === "G2") {
                         return getNumericGrade(s.grade, "G2") <= G2_TO_NUMERIC_RAW["5"]; // 5 or better for G2 pass
                     } else if (s.level === "G1") {
-                        return G1_GRADES_OPTIONS.includes(s.grade) && getNumericGrade(s.grade, "G1") <= G1_TO_NUMERIC_RAW_ITE["D"]; // A-D for G1 pass
+                        return G1_GRADES_OPTIONS.includes(s.grade) && getNumericGrade(s.grade, "G1") <= G1_TO_NUMERIC_RAW_ITE["D"]; // A-D for G1 MER pass
                     }
                     return false; // Not a recognized level or not a pass
                 }).map(s => {
@@ -1036,12 +1037,12 @@
             
                     if (requirements.req_g1g2_main_cats.includes(SUBJECT_CATEGORIES_DEF.EL[0]) &&
                         requirements.req_g1g2_main_cats.includes(SUBJECT_CATEGORIES_DEF.MATH_PURE[0])) {
-                        elPass = allPassingSubjectsG1Equiv.find(s => s.subjectId === "EL"); // Use subjectId for EL directly
+                        elPass = allPassingSubjectsG1EquivForMer.find(s => s.subjectId === "EL"); // Use subjectId for EL directly
                         elCheck = !!elPass;
                         details.push({ merId: 'el_g1g2_pass', text: `English (G1/G2 pass)`, met: elCheck });
                         if (!elCheck) metCriteria = false; else if (elPass) usedForMerPrereqIds.add(elPass.subjectId);
             
-                        mathPass = allPassingSubjectsG1Equiv.find(s => 
+                        mathPass = allPassingSubjectsG1EquivForMer.find(s => 
                             SUBJECT_CATEGORIES_DEF.MATH_PURE.includes(getSubjectById(s.subjectId)?.category) &&
                             !usedForMerPrereqIds.has(s.subjectId)
                         );
@@ -1049,7 +1050,7 @@
                         details.push({ merId: 'math_g1g2_pass', text: `Mathematics (G1/G2 pass)`, met: mathCheck });
                         if (!mathCheck) metCriteria = false; else if (mathPass) usedForMerPrereqIds.add(mathPass.subjectId);
                     } else { 
-                        const filteredAndSortedCandidates = allPassingSubjectsG1Equiv.filter(s => {
+                        const filteredAndSortedCandidates = allPassingSubjectsG1EquivForMer.filter(s => {
                             const subjectCategory = getSubjectById(s.subjectId)?.category;
                             const isMainCat = requirements.req_g1g2_main_cats.some(cat => 
                                 SUBJECT_CATEGORIES_DEF[cat] && Array.isArray(SUBJECT_CATEGORIES_DEF[cat]) 
@@ -1075,8 +1076,8 @@
                         details.push({ merId: mainSubjectMerId, text: mainSubjectDisplayText, met: mainSubjectCheck });
                         if (!mainSubjectCheck) metCriteria = false; else if (mainSubjectPass) usedForMerPrereqIds.add(mainSubjectPass.subjectId);
                     }
-                    // For the remaining subjects, filter the *G1 equivalent* subjects
-                    const remainingPassingSubjectsG1Equiv = allPassingSubjectsG1Equiv.filter(s => !usedForMerPrereqIds.has(s.subjectId));
+                    // For the remaining subjects, filter the *G1 equivalent* subjects for MER pass
+                    const remainingPassingSubjectsG1Equiv = allPassingSubjectsG1EquivForMer.filter(s => !usedForMerPrereqIds.has(s.subjectId));
                     const actualOtherCountCheck = remainingPassingSubjectsG1Equiv.length >= otherPassesRequired;
                     details.push({ merId: 'other_g1g2_passes', text: `${otherPassesRequired} other distinct G1/G2 pass(es)`, met: actualOtherCountCheck });
                     if (!actualOtherCountCheck) metCriteria = false; 
@@ -1088,17 +1089,18 @@
                 }
 
                 if (requirements.type === "3_G1G2_ONLY" && requirements.pre_requisite_subject_ids) {
+                    // Find prerequisite subjects from the MER-passing pool
                     requirements.pre_requisite_subject_ids.forEach(prereqId => {
                         let foundPrereqSub = null;
                         let roleForPrereq = '';
                         if (prereqId === "EL") {
-                            foundPrereqSub = allPassingSubjectsG1Equiv.find(s => s.subjectId === "EL" && !usedForAggregateIds.has(s.subjectId));
+                            foundPrereqSub = allPassingSubjectsG1EquivForMer.find(s => s.subjectId === "EL" && !usedForAggregateIds.has(s.subjectId));
                             roleForPrereq = 'EL (Prereq)';
                         } else if (prereqId === "MATH") {
-                            foundPrereqSub = allPassingSubjectsG1Equiv.find(s => SUBJECT_CATEGORIES_DEF.MATH_PURE.includes(getSubjectById(s.subjectId)?.category) && !usedForAggregateIds.has(s.subjectId));
+                            foundPrereqSub = allPassingSubjectsG1EquivForMer.find(s => SUBJECT_CATEGORIES_DEF.MATH_PURE.includes(getSubjectById(s.subjectId)?.category) && !usedForAggregateIds.has(s.subjectId));
                             roleForPrereq = 'Math (Prereq)';
                         } else if (prereqId === "MATH_OR_SCIENCE") {
-                            foundPrereqSub = allPassingSubjectsG1Equiv.filter(s => {
+                            foundPrereqSub = allPassingSubjectsG1EquivForMer.filter(s => {
                                 const cat = getSubjectById(s.subjectId)?.category;
                                 const subjId = s.subjectId; 
                                 const isMath = SUBJECT_CATEGORIES_DEF.MATH_PURE.includes(cat);
@@ -1115,21 +1117,13 @@
                         }
                     });
 
-                    const remainingSlots = 4 - subjectsForAggregate.length;
-                    if (remainingSlots > 0) {
-                        const otherBestSubjects = allPassingSubjectsG1Equiv // Use the G1 equivalent subjects
-                            .filter(s => !usedForAggregateIds.has(s.subjectId))
-                            .sort((a, b) => a.numericG1EquivGrade - b.numericG1EquivGrade) // Sort by G1 equivalent grade
-                            .slice(0, remainingSlots);
-                        otherBestSubjects.forEach(s => {
-                            subjectsForAggregate.push({...s, role: `B${subjectsForAggregate.filter(sub => sub.role && sub.role.startsWith('B')).length + 1}`}); 
-                            usedForAggregateIds.add(s.subjectId);
-                        });
-                    }
-                    subjectsForAggregate = subjectsForAggregate.slice(0, 4);
+                    // Use calculateBest4G1Equivalent to find the best 4, including the prerequisites, allowing G1 Grade E for other subjects
+                    const best4Calc = calculateBest4G1Equivalent(currentStudentSubjects, subjectsForAggregate, true);
+                    subjectsForAggregate = best4Calc.subjects;
+                    
                 } else { 
-                    // This block will also use calculateBest4G1Equivalent correctly.
-                    const best4Calc = calculateBest4G1Equivalent(currentStudentSubjects);
+                    // This block is for pathways without specific prerequisites, so we just find the best 4, allowing G1 Grade E
+                    const best4Calc = calculateBest4G1Equivalent(currentStudentSubjects, [], true);
                     subjectsForAggregate = best4Calc.subjects;
                 }
             
@@ -1177,8 +1171,8 @@
                     details.push({ merId: 'sec_completion', text: `Requires completion of Singapore-Cambridge Secondary Education Certificate (with at least ${pathwayRequirements?.min_total_subjects || 'N/A'} subjects, found ${currentStudentSubjects.length}).`, met: false });
                 }
             
-                // Calculate best 4 from passing original subjects
-                const best4Calc = calculateBest4G1Equivalent(currentStudentSubjects);
+                // Calculate best 4, allowing G1 Grade E to be included
+                const best4Calc = calculateBest4G1Equivalent(currentStudentSubjects, [], true);
                 best4Score = best4Calc.score;
                 best4Subjects = best4Calc.subjects;
             
@@ -1719,4 +1713,5 @@
     </script>
 </body>
 </html>
+
 
