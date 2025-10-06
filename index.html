@@ -92,7 +92,7 @@
             opacity: 1;
         }
     </style>
-  <!-- Google tag (gtag.js) -->
+ <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-5C9YVR0W01"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -134,6 +134,7 @@
                     <label for="school" class="block text-sm font-medium text-sky-300 mb-1">School</label>
                     <select id="school" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100">
                         <option value="Yuhua Secondary School">Yuhua Secondary School</option>
+                        <option value="Broadrick Secondary School">Broadrick Secondary School</option>
                         <option value="School A">School A</option>
                     </select>
                 </div>
@@ -499,6 +500,8 @@
             const SCHOOL_A_LEVEL_RESTRICTIONS = { "AM": ["G3"], "BIO": ["G3"], "CHEM": ["G3"], "MUSIC": ["G3"], "PHY": ["G3"], "MOB_ROBOTICS": ["G1"], "DT": ["G2", "G3"], "NFS": ["G2", "G3"], "EBS": ["G1"], "DS": ["G3"], "LIT_CHI": ["G3"], "LIT_MAL": ["G3"], "LIT_TAM": ["G3"], "MS_CHI": ["G3"], "MS_ENG": ["G3"] };
             const YUHUA_SECONDARY_SCHOOL_SUBJECT_IDS = [ "AM", "ART", "BIO", "CHEM", "COMB_HUM", "COMB_SCI", "COMP", "DT", "EBS", "EL", "MATH", "MOB_ROBOTICS", "MUSIC", "NFS", "PHY", "POA", "MT", "HMT" ];
             const YUHUA_SECONDARY_SCHOOL_LEVEL_RESTRICTIONS = { "AM": ["G3"], "BIO": ["G3"], "CHEM": ["G3"], "MUSIC": ["G3"], "PHY": ["G3"], "MOB_ROBOTICS": ["G1"], "DT": ["G2", "G3"], "NFS": ["G2", "G3"], "EBS": ["G1"] };
+            const BROADRICK_SECONDARY_SCHOOL_SUBJECT_IDS = [ "AM", "ART", "BIO", "CHEM", "COMB_HUM", "COMB_SCI", "DT", "EL", "MATH", "MUSIC", "NFS", "PHY", "POA", "MT", "HMT" ];
+            const BROADRICK_SECONDARY_SCHOOL_LEVEL_RESTRICTIONS = { "AM": ["G3"], "BIO": ["G3"], "CHEM": ["G3"], "MUSIC": ["G3"], "PHY": ["G3"], "DT": ["G2", "G3"], "NFS": ["G2", "G3"] };
 
 
             // --- Utility Functions ---
@@ -1504,9 +1507,15 @@
             const populateSubjectDropdown = () => {
                 subjectSelect.innerHTML = '<option value="">Select Subject</option>'; 
                 let subjectsToDisplay = [], currentSchoolSubjectIds = [];
-                if (selectedSchool === "Yuhua Secondary School") currentSchoolSubjectIds = YUHUA_SECONDARY_SCHOOL_SUBJECT_IDS;
-                else if (selectedSchool === "School A") currentSchoolSubjectIds = SCHOOL_A_SUBJECT_IDS;
-                else currentSchoolSubjectIds = ALL_SUBJECTS_LIST.map(s => s.id); 
+                if (selectedSchool === "Yuhua Secondary School") {
+                    currentSchoolSubjectIds = YUHUA_SECONDARY_SCHOOL_SUBJECT_IDS;
+                } else if (selectedSchool === "Broadrick Secondary School") {
+                    currentSchoolSubjectIds = BROADRICK_SECONDARY_SCHOOL_SUBJECT_IDS;
+                } else if (selectedSchool === "School A") {
+                    currentSchoolSubjectIds = SCHOOL_A_SUBJECT_IDS;
+                } else {
+                    currentSchoolSubjectIds = ALL_SUBJECTS_LIST.map(s => s.id);
+                }
                 subjectsToDisplay = ALL_SUBJECTS_LIST.filter(subject => currentSchoolSubjectIds.includes(subject.id));
                 subjectsToDisplay.forEach(subject => { const option = document.createElement('option'); option.value = subject.id; option.textContent = subject.name; subjectSelect.appendChild(option); });
                 subjectSelect.value = (editingIndex !== null && studentSubjects[editingIndex]) ? studentSubjects[editingIndex].subjectId : "";
@@ -1519,8 +1528,13 @@
                 let applicableLevels = []; 
                 if (selectedSubject) {
                     let currentLevelRestrictions = {};
-                    if (selectedSchool === "Yuhua Secondary School") currentLevelRestrictions = YUHUA_SECONDARY_SCHOOL_LEVEL_RESTRICTIONS;
-                    else if (selectedSchool === "School A") currentLevelRestrictions = SCHOOL_A_LEVEL_RESTRICTIONS;
+                    if (selectedSchool === "Yuhua Secondary School") {
+                        currentLevelRestrictions = YUHUA_SECONDARY_SCHOOL_LEVEL_RESTRICTIONS;
+                    } else if (selectedSchool === "Broadrick Secondary School") {
+                        currentLevelRestrictions = BROADRICK_SECONDARY_SCHOOL_LEVEL_RESTRICTIONS;
+                    } else if (selectedSchool === "School A") {
+                        currentLevelRestrictions = SCHOOL_A_LEVEL_RESTRICTIONS;
+                    }
                     if (currentLevelRestrictions[selectedSubject.id]) applicableLevels = currentLevelRestrictions[selectedSubject.id];
                     else applicableLevels = [...GRADE_LEVELS]; 
                 } else {
@@ -1572,8 +1586,13 @@
                     let applicableLevelsForRow = []; const subjectInfoForRow = getSubjectById(s.subjectId);
                     if (subjectInfoForRow) {
                         let currentLevelRestrictions = {};
-                        if (selectedSchool === "Yuhua Secondary School") currentLevelRestrictions = YUHUA_SECONDARY_SCHOOL_LEVEL_RESTRICTIONS;
-                        else if (selectedSchool === "School A") currentLevelRestrictions = SCHOOL_A_LEVEL_RESTRICTIONS;
+                        if (selectedSchool === "Yuhua Secondary School") {
+                            currentLevelRestrictions = YUHUA_SECONDARY_SCHOOL_LEVEL_RESTRICTIONS;
+                        } else if (selectedSchool === "Broadrick Secondary School") {
+                            currentLevelRestrictions = BROADRICK_SECONDARY_SCHOOL_LEVEL_RESTRICTIONS;
+                        } else if (selectedSchool === "School A") {
+                            currentLevelRestrictions = SCHOOL_A_LEVEL_RESTRICTIONS;
+                        }
                         if (currentLevelRestrictions[subjectInfoForRow.id]) applicableLevelsForRow = currentLevelRestrictions[subjectInfoForRow.id];
                         else applicableLevelsForRow = [...GRADE_LEVELS];
                     } else applicableLevelsForRow = [...GRADE_LEVELS];
@@ -1713,5 +1732,7 @@
     </script>
 </body>
 </html>
+
+
 
 
