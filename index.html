@@ -2966,7 +2966,45 @@
               seenMerIds.add(detail.text);
             }
           });
-          return { merMet: overallMerMet, merDetails: uniqueMerDetails };
+          let conditionalAdmission = false;
+          if (pathway.group === "JC/MI" && !overallMerMet) {
+            const grossScore = pathway.grossScore;
+            const grossThreshold = pathway.requirements?.grossL1R4;
+            console.log(
+              "[CA DEBUG]",
+              pathway.name,
+              "group=" + pathway.group,
+              "grossScore=" + grossScore,
+              "grossThreshold=" + grossThreshold,
+              "overallMerMet=" + overallMerMet,
+            );
+            if (
+              grossScore !== undefined &&
+              grossScore !== Infinity &&
+              grossThreshold &&
+              grossScore <= grossThreshold
+            ) {
+              const simpleCaThreshold = grossThreshold <= 16 ? 12 : 15;
+              if (grossScore <= simpleCaThreshold) {
+                conditionalAdmission = true;
+                console.log(
+                  "[CA DEBUG] → conditionalAdmission=true (simple threshold)",
+                );
+              } else {
+                const rSubjects = (
+                  subjectsUsedForScoreCalculation || []
+                ).filter((s) => ["R1", "R2", "R3", "R4"].includes(s.role));
+                conditionalAdmission =
+                  rSubjects.length === 4 &&
+                  rSubjects.every((s) => s.numericGrade <= 2);
+              }
+            }
+          }
+          return {
+            merMet: overallMerMet,
+            merDetails: uniqueMerDetails,
+            conditionalAdmission,
+          };
         };
 
         const calculateAllPathwaysStatus = (subjects) => {
@@ -3057,7 +3095,13 @@
               netScore: result.netScore,
               scoreDetails: result.details,
               merCheck: merCheckResult,
-              isEligible: scoreMet && merCheckResult.merMet,
+              isEligible:
+                scoreMet &&
+                (merCheckResult.merMet || merCheckResult.conditionalAdmission),
+              isCA:
+                scoreMet &&
+                !merCheckResult.merMet &&
+                !!merCheckResult.conditionalAdmission,
               subjectsUsed: result.subjectsUsed,
             });
           });
@@ -3483,7 +3527,8 @@
               groupedPathways[group].forEach((pathway) => {
                 const card = document.createElement("div");
                 const isEligible = pathway.isEligible;
-                card.className = `p-5 rounded-lg shadow-lg border ${isEligible ? "bg-emerald-800/30 border-emerald-600" : "bg-red-800/30 border-red-600"} transition-all hover:shadow-xl hover:scale-[1.02]`;
+                const isCA = pathway.isCA;
+                card.className = `p-5 rounded-lg shadow-lg border ${isCA ? "bg-amber-800/30 border-amber-500" : isEligible ? "bg-emerald-800/30 border-emerald-600" : "bg-red-800/30 border-red-600"} transition-all hover:shadow-xl hover:scale-[1.02]`;
                 let scoreText = "";
                 if (pathway.group === "ITE Year 1 Higher Nitec") {
                   if (!isEligible) {
@@ -3556,7 +3601,7 @@
                         .join("")}</ul>`
                     : `<h5 class="text-sm font-semibold text-sky-300 mt-3 mb-1">Subjects considered for calculation:</h5><p class="text-slate-300 text-sm pl-2">No subjects met criteria or not applicable.</p>`;
 
-                card.innerHTML = `<h3 class="text-xl font-semibold mb-2 flex items-center">${isEligible ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-emerald-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-red-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z"></path></svg>'} ${pathwayNameDisplay}</h3><p class="text-sm mb-1 font-medium ${isEligible ? "text-emerald-300" : "text-red-300"}">Status: ${isEligible ? 'Eligible <span class="tooltip">(subject to MER)<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span>' : "Not Eligible"}</p>${scoreText}<details class="text-xs mt-2"><summary class="cursor-pointer text-sky-400 hover:text-sky-300">Details & Reasons</summary><div class="mt-2"><h5 class="text-sm font-semibold text-sky-300 mb-1">Requirements:</h5><ul class="list-disc list-inside mt-1 pl-2 text-slate-300 space-y-1">${requirementsList}${descriptionItemHtml}</ul></div>${subjectsUsedHtml}</details>`;
+                card.innerHTML = `<h3 class="text-xl font-semibold mb-2 flex items-center">${isCA ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-amber-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg>' : isEligible ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-emerald-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-red-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z"></path></svg>'} ${pathwayNameDisplay}</h3><p class="text-sm mb-1 font-medium ${isCA ? "text-amber-300" : isEligible ? "text-emerald-300" : "text-red-300"}">Status: ${isCA ? 'Eligible <span class="tooltip">(Conditional Admission)<sup><small>i</small></sup><span class="tooltiptext">Score qualifies for Conditional Admission. You may still be considered even though MER is not fully met. Consider re-sitting to fulfil MER requirements.</span></span>' : isEligible ? 'Eligible <span class="tooltip">(subject to MER)<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span>' : "Not Eligible"}</p>${scoreText}<details class="text-xs mt-2"><summary class="cursor-pointer text-sky-400 hover:text-sky-300">Details & Reasons</summary><div class="mt-2"><h5 class="text-sm font-semibold text-sky-300 mb-1">Requirements:</h5><ul class="list-disc list-inside mt-1 pl-2 text-slate-300 space-y-1">${requirementsList}${descriptionItemHtml}</ul></div>${subjectsUsedHtml}</details>`;
                 cardsContainer.appendChild(card);
               });
               if (allNotEligibleInGroup && groupSection.children.length <= 1) {
