@@ -108,3 +108,13 @@ Eligible groups sort before not-eligible groups; original insertion order preser
 **`mer: {}` always fails** — In `checkMerRequirements`, an empty MER object causes `pathway.mer && pathway.mer.el_g2 && condition` to short-circuit to `undefined` → `overallMerMet = false` → pathway always shows Not Eligible. For pathways with no real MER requirement use `mer: { el_g2: "6", math_am_g2: "6" }` (grade 6 = worst passing grade, so condition is always true for any valid student).
 
 **Screenshot element IDs** — `#school` (use value `"School A"` for the test school), `#subject`, `#level`, `#grade`, `#addUpdateSubjectBtn`. School must be selected first and given 300 ms before selecting a subject.
+
+**Conditional Admission masks MER-failure tests** — `checkMerRequirements` sets `conditionalAdmission = true` for JC/MI when `merMet = false` but gross ≤ 12 (JC, threshold ≤ 16) or ≤ 15 (MI, threshold > 16), OR when all 4 R-subjects score ≤ 2. A test expecting MER-failure → `isEligible = false` must use gross > 15 AND at least one R-subject grade > 2 to stay clear of both CA paths.
+
+**`isCA` flag on pathway results** — `calculateAllPathwaysStatus` returns `isCA: true` per entry when the student is eligible via conditional admission rather than a clean MER pass. Use it in tests to distinguish the two eligibility states.
+
+## Changelog
+
+| Date    | Section Updated          | What Changed                                                                                                                   |
+| ------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-06 | Known Gotchas + Commands | Added `run_invariant_tests.js` (123 assertions across 3 phases); `window.__spdTest` hook; CA masking gotcha + `isCA` flag docs |
