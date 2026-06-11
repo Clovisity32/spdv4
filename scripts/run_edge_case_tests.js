@@ -1821,6 +1821,103 @@ function ok(cond, id, msg) {
         ok(false, "SUG-03", "PFP-Hum not found in any suggestion pathways");
       }
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Phase 14: ITE 2-Year Nitec
+    // ════════════════════════════════════════════════════════════════════════
+    console.log("\n── Phase 14: ITE 2-Year Nitec ──");
+
+    // 2YN-01: Basic eligibility — all G3 standard grades
+    // ELMAB3 = EL(C6→G2 2) + MA(C6→G2 2) + BIO(C6→G2 2) + HIST(B4→G2 2) + GEOG(B4→G2 2) = 10 ≤ 99
+    await reset(page);
+    await addMany(page, [
+      ["EL", "G3", "C6"],
+      ["MATH", "G3", "C6"],
+      ["BIO", "G3", "C6"],
+      ["HIST", "G3", "B4"],
+      ["GEOG", "G3", "B4"],
+    ]);
+    {
+      const r = await getResult(page, "ITE 2-Year Nitec");
+      ok(
+        r.isEligible,
+        "2YN-01",
+        "ITE 2-Year Eligible (score=10 ≤ 99, MER met)",
+      );
+      ok(r.gross === 10, "2YN-01", `gross=10 expected 10 (actual:${r.gross})`);
+    }
+
+    // 2YN-02: G3 F9 included in ELMAB3 (unlike PFP/Poly where F9 is excluded)
+    // BIO F9 → G2 5; score = 2+2+5+2+2 = 13
+    await reset(page);
+    await addMany(page, [
+      ["EL", "G3", "C6"],
+      ["MATH", "G3", "C6"],
+      ["BIO", "G3", "F9"],
+      ["HIST", "G3", "B4"],
+      ["GEOG", "G3", "B4"],
+    ]);
+    {
+      const r = await getResult(page, "ITE 2-Year Nitec");
+      ok(
+        r.isEligible,
+        "2YN-02",
+        "ITE 2-Year Eligible (F9 counted in aggregate)",
+      );
+      ok(
+        r.gross === 13,
+        "2YN-02",
+        `gross=13 with F9→G2 5 included (actual:${r.gross})`,
+      );
+    }
+
+    // 2YN-03: G2 grade 6 included in ELMAB3 (unlike PFP where G2 6 is excluded)
+    // DT G2 6 and NFS G2 6 count; score = G2(EL C6→2) + G2(MATH C6→2) + G2(HIST 2) + G2(DT 6) + G2(NFS 6) = 18
+    await reset(page);
+    await addMany(page, [
+      ["EL", "G3", "C6"],
+      ["MATH", "G3", "C6"],
+      ["HIST", "G2", "2"],
+      ["DT", "G2", "6"],
+      ["NFS", "G2", "6"],
+    ]);
+    {
+      const r = await getResult(page, "ITE 2-Year Nitec");
+      ok(
+        r.isEligible,
+        "2YN-03",
+        "ITE 2-Year Eligible (G2 grade 6 counted in aggregate)",
+      );
+      ok(
+        r.gross === 18,
+        "2YN-03",
+        `gross=18 with G2-6 included (actual:${r.gross})`,
+      );
+    }
+
+    // 2YN-04: Not Eligible when English Language is absent
+    // No EL → calculateELMAB3_G2 returns Infinity → scoreMet=false
+    await reset(page);
+    await addMany(page, [
+      ["MATH", "G3", "C6"],
+      ["BIO", "G3", "C6"],
+      ["PHY", "G3", "B4"],
+      ["HIST", "G3", "B4"],
+      ["GEOG", "G3", "B4"],
+    ]);
+    {
+      const r = await getResult(page, "ITE 2-Year Nitec");
+      ok(
+        !r.isEligible,
+        "2YN-04",
+        "ITE 2-Year Not Eligible (no English Language)",
+      );
+      ok(
+        r.gross === null,
+        "2YN-04",
+        `gross=null when EL absent (Score: N/A shown; actual:${r.gross})`,
+      );
+    }
   } finally {
     await browser.close();
 
