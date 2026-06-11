@@ -791,7 +791,7 @@ function ok(cond, id, msg) {
     ]);
     {
       const gen = await getResult(page, "ELR2B2-C)");
-      const nur = await getResult(page, "Nursing");
+      const nur = await getResult(page, "ELR2B2-C) — Nursing");
       ok(
         !gen.isEligible,
         "P-06",
@@ -819,7 +819,7 @@ function ok(cond, id, msg) {
       ["GEOG", "G3", "B4"],
     ]);
     {
-      const nur = await getResult(page, "Nursing");
+      const nur = await getResult(page, "ELR2B2-C) — Nursing");
       ok(
         nur.isEligible,
         "P-07",
@@ -842,7 +842,7 @@ function ok(cond, id, msg) {
       ["GEOG", "G3", "B4"],
     ]);
     {
-      const nur = await getResult(page, "Nursing");
+      const nur = await getResult(page, "ELR2B2-C) — Nursing");
       ok(!nur.isEligible, "P-08", "Nursing Not Eligible (gross=25 > 24)");
       ok(
         nur.gross === 25,
@@ -861,7 +861,7 @@ function ok(cond, id, msg) {
       ["GEOG", "G2", "5"],
     ]);
     {
-      const nur = await getResult(page, "Nursing");
+      const nur = await getResult(page, "ELR2B2-C) — Nursing");
       ok(
         !nur.isEligible,
         "P-09",
