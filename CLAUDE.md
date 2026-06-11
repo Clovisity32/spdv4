@@ -16,12 +16,13 @@
 
 ## Commands
 
-| Task       | Command                                  |
-| ---------- | ---------------------------------------- |
-| Build      | _(none — no build step)_                 |
-| Dev server | _(none — open file directly in browser)_ |
-| Tests      | `node scripts/run_edge_case_tests.js`    |
-| Screenshot | `node scripts/screenshot.js`             |
+| Task            | Command                                  |
+| --------------- | ---------------------------------------- |
+| Build           | _(none — no build step)_                 |
+| Dev server      | _(none — open file directly in browser)_ |
+| Tests           | `node scripts/run_edge_case_tests.js`    |
+| Invariant tests | `node scripts/run_invariant_tests.js`    |
+| Screenshot      | `node scripts/screenshot.js`             |
 
 ## DEV_URL
 

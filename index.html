@@ -3780,6 +3780,13 @@
           });
           updateAllCalculationsAndRender();
         });
+        window.__spdTest = {
+          calculate: (subjects, bonus) => {
+            if (bonus !== undefined) bonusPoints = bonus;
+            return calculateAllPathwaysStatus(subjects);
+          },
+          pathways: PATHWAYS,
+        };
       })();
     </script>
   </body>
