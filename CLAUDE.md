@@ -20,7 +20,8 @@
 | ---------- | ---------------------------------------- |
 | Build      | _(none — no build step)_                 |
 | Dev server | _(none — open file directly in browser)_ |
-| Tests      | _(none — no test suite)_                 |
+| Tests      | `node scripts/run_edge_case_tests.js`    |
+| Screenshot | `node scripts/screenshot.js`             |
 
 ## DEV_URL
 
@@ -75,11 +76,34 @@ One role: **student** — Singapore Sec 4/5 student exploring post-secondary opt
 spdv4/
 ├── index.html              ← entire app lives here
 ├── CLAUDE.md               ← this file
+├── Post_Sec_pathways.md    ← authoritative MOE policy reference (check before adding/changing pathways)
 ├── .gitignore
 ├── .claude/
 │   ├── settings.json
 │   └── commands/
 │       └── screenshot.md
 └── scripts/
-    └── screenshot.js
+    ├── screenshot.js
+    └── run_edge_case_tests.js   ← 135 assertions across 14 phases
 ```
+
+## Pathway Groups (2027 cohort)
+
+Insertion order in `groupedPathways` determines sort tie-breaking:
+
+| Order | Group                   | Calc type                       | Entry route       |
+| ----- | ----------------------- | ------------------------------- | ----------------- |
+| 0     | JC/MI                   | L1R4                            | PSE               |
+| 1     | Polytechnic Year 1      | ELR2B2                          | PSE               |
+| 2     | PFP                     | ELMAB3 ≤ 12                     | PSE               |
+| 3     | ITE 3-Year Higher Nitec | ITE_Hnitec_Specific / Completed | PSE (Year 1 only) |
+
+**Removed from 2027:** "ITE Year 2 Higher Nitec" (Year 2 PSE entry gone — internal acceleration only) and "ITE 2-Year Nitec" ("Nitec" qualification abolished).
+
+Eligible groups sort before not-eligible groups; original insertion order preserved within each tier.
+
+## Known Gotchas
+
+**`mer: {}` always fails** — In `checkMerRequirements`, an empty MER object causes `pathway.mer && pathway.mer.el_g2 && condition` to short-circuit to `undefined` → `overallMerMet = false` → pathway always shows Not Eligible. For pathways with no real MER requirement use `mer: { el_g2: "6", math_am_g2: "6" }` (grade 6 = worst passing grade, so condition is always true for any valid student).
+
+**Screenshot element IDs** — `#school` (use value `"School A"` for the test school), `#subject`, `#level`, `#grade`, `#addUpdateSubjectBtn`. School must be selected first and given 300 ms before selecting a subject.
