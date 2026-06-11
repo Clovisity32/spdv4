@@ -1768,14 +1768,14 @@ function ok(cond, id, msg) {
 
     // ════════════════════════════════════════════════════════════════════════
     // Phase 14: Eligibility-First Group Sort
-    // groupedPathways insertion order: JC/MI(0) Poly(1) PFP(2) ITE-3Yr(3)
+    // groupedPathways insertion order: JC/MI(0) Poly(1) PFP(2) ITE-Yr2(3) ITE-3Yr(4)
     // Groups with ≥1 eligible pathway sort before groups with none; stable within each tier.
     // ════════════════════════════════════════════════════════════════════════
     console.log("\n── Phase 14: Eligibility-First Group Sort ──");
 
     // SORT-01: Eligible group appears before Not-Eligible group in DOM
-    // Profile: EL E8 fails JC/Poly MER → PFP and ITE 3-Year Higher Nitec eligible
-    // Expected: ITE 3-Year Higher Nitec (pos=3, eligible) rendered before JC/MI (pos=0, not eligible)
+    // Profile: EL E8 → ITE Year 2 Applied Sci eligible (G2:4 ≤ MER:4) and ITE 3-Year eligible; PFP not eligible (EL G2:4 > 3)
+    // Expected: ITE 3-Year Higher Nitec (orig=4, eligible) rendered before JC/MI (orig=0, not eligible)
     await reset(page);
     await addMany(page, [
       ["EL", "G3", "E8"],
@@ -1810,7 +1810,7 @@ function ok(cond, id, msg) {
     }
 
     // SORT-03: Among Eligible groups, original insertion order preserved
-    // Profile: EL D7 → PFP-Hum eligible (orig 2) and ITE 3-Year Higher Nitec eligible (orig 3)
+    // Profile: EL D7 → PFP-Hum eligible (orig 2) and ITE 3-Year Higher Nitec eligible (orig 4)
     // Expected: PFP appears before ITE 3-Year Higher Nitec in DOM
     await reset(page);
     await addMany(page, [
@@ -1828,6 +1828,41 @@ function ok(cond, id, msg) {
         iPFP !== -1 && iY3 !== -1 && iPFP < iY3,
         "SORT-03",
         `Eligible "PFP" (pos ${iPFP}) before Eligible "ITE 3-Year Higher Nitec" (pos ${iY3}) — original order preserved`,
+      );
+    }
+
+    // SORT-04: ITE Year 2 (orig=3) before ITE 3-Year (orig=4) when both eligible — original order preserved within eligible tier
+    // Profile same as SORT-01: EL E8 → ITE Year 2 Applied Sci eligible; ITE 3-Year eligible; PFP not eligible
+    {
+      const order = await getGroupOrder(page);
+      const iY2 = order.indexOf("ITE Year 2 Higher Nitec");
+      const iY3 = order.indexOf("ITE 3-Year Higher Nitec");
+      ok(
+        iY2 !== -1 && iY3 !== -1 && iY2 < iY3,
+        "SORT-04",
+        `Eligible "ITE Year 2 Higher Nitec" (pos ${iY2}) before Eligible "ITE 3-Year Higher Nitec" (pos ${iY3}) — original order preserved`,
+      );
+    }
+
+    // SORT-05: ITE Year 2 Not Eligible (score=20 > 19) sorts after eligible ITE 3-Year Higher Nitec
+    // Profile: all 5 subjects G3 E8 (→G2:4 each) → score=20 > 19 → ITE Year 2 Not Eligible
+    // ITE 3-Year: Complete SEC MER met (5 subjects) → Eligible
+    await reset(page);
+    await addMany(page, [
+      ["EL", "G3", "E8"],
+      ["MATH", "G3", "E8"],
+      ["HIST", "G3", "E8"],
+      ["GEOG", "G3", "E8"],
+      ["CHEM", "G3", "E8"],
+    ]);
+    {
+      const order = await getGroupOrder(page);
+      const iY2 = order.indexOf("ITE Year 2 Higher Nitec");
+      const iY3 = order.indexOf("ITE 3-Year Higher Nitec");
+      ok(
+        iY2 !== -1 && iY3 !== -1 && iY3 < iY2,
+        "SORT-05",
+        `Eligible "ITE 3-Year Higher Nitec" (pos ${iY3}) before Not-Eligible "ITE Year 2 Higher Nitec" (pos ${iY2})`,
       );
     }
   } finally {
