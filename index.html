@@ -1062,39 +1062,9 @@
           },
 
           {
-            id: "ite_hnitec_yr2_applied_eng_ict",
-            name: "ITE Year 2 of 3-Yr Higher Nitec - Applied Science, Engineering, Info-Comms Tech",
-            group: "ITE Year 2 Higher Nitec",
-            calcType: "ELMAB3_G2",
-            requirements: { grossELMAB3: 19 },
-            mer: { el_g2: "4", math_am_g2: "4", any_three_other_subj_g2: "5" },
-            description: "",
-          },
-          {
-            id: "ite_hnitec_yr2_biz_hosp",
-            name: "ITE Year 2 of 3-Yr Higher Nitec - Business & Services, Hospitality",
-            group: "ITE Year 2 Higher Nitec",
-            calcType: "ELMAB3_G2",
-            requirements: { grossELMAB3: 19 },
-            mer: { el_g2: "3", math_am_g2: "4", any_three_other_subj_g2: "5" },
-            description: "",
-          },
-
-          {
-            id: "ite_nitec_2yr",
-            name: "ITE 2-Year Nitec",
-            group: "ITE 2-Year Nitec",
-            calcType: "ELMAB3_G2",
-            requirements: { grossELMAB3: 99 },
-            mer: { el_g2: "6", math_am_g2: "6" },
-            description:
-              "Direct application to school. No maximum aggregate cut-off. Course-specific entry criteria apply.",
-          },
-
-          {
             id: "ite_hnitec_yr1_health_sci_1",
             name: "MER (Pass Math or Science)",
-            group: "ITE Year 1 Higher Nitec",
+            group: "ITE 3-Year Higher Nitec",
             calcType: "ITE_Hnitec_Specific",
             requirements: {
               type: "3_G1G2_ONLY",
@@ -1111,7 +1081,7 @@
           {
             id: "ite_hnitec_yr1_health_sci_2",
             name: "MER (Pass EL & Math)",
-            group: "ITE Year 1 Higher Nitec",
+            group: "ITE 3-Year Higher Nitec",
             calcType: "ITE_Hnitec_Specific",
             requirements: {
               type: "3_G1G2_ONLY",
@@ -1128,7 +1098,7 @@
           {
             id: "ite_hnitec_yr1_biz_services_1",
             name: "MER (Pass EL)",
-            group: "ITE Year 1 Higher Nitec",
+            group: "ITE 3-Year Higher Nitec",
             calcType: "ITE_Hnitec_Specific",
             requirements: {
               type: "3_G1G2_ONLY",
@@ -1143,7 +1113,7 @@
           {
             id: "ite_hnitec_yr1_biz_services_2",
             name: "MER (Complete SEC)",
-            group: "ITE Year 1 Higher Nitec",
+            group: "ITE 3-Year Higher Nitec",
             calcType: "ITE_Hnitec_Completed",
             requirements: { min_total_subjects: 4 },
             mer: {},
@@ -1152,7 +1122,7 @@
           {
             id: "ite_hnitec_yr1_engineering_1",
             name: "MER (Pass Math)",
-            group: "ITE Year 1 Higher Nitec",
+            group: "ITE 3-Year Higher Nitec",
             calcType: "ITE_Hnitec_Specific",
             requirements: {
               type: "3_G1G2_ONLY",
@@ -1167,7 +1137,7 @@
           {
             id: "ite_hnitec_yr1_hospitality_1",
             name: "MER (Pass 2G3)",
-            group: "ITE Year 1 Higher Nitec",
+            group: "ITE 3-Year Higher Nitec",
             calcType: "ITE_Hnitec_Specific",
             requirements: {
               type: "2_G3_ONLY",
@@ -1677,7 +1647,6 @@
           pathwayId = null,
         ) => {
           const pathwayConfig = PATHWAYS.find((p) => p.id === pathwayId);
-          const isPFP = pathwayConfig?.group === "PFP";
 
           // Add numericOriginalGrade to all subjects for consistent sorting
           const allSubjectsWithOriginalNumericGrade = currentStudentSubjects
@@ -1687,24 +1656,21 @@
               category: getSubjectById(s.subjectId)?.category,
             }))
             .filter((s) => {
-              // Exclude G1 Mother Tongue for PFP and ITE Yr 2 Hnitec
+              // Exclude G1 Mother Tongue
               const isG1MotherTongue =
                 s.level === "G1" &&
                 SUBJECT_CATEGORIES_DEF.MT_ALL.includes(s.category);
               if (isG1MotherTongue) return false;
 
               if (s.level === "G3") {
-                // PFP: F9 cannot be used. ITE 2-Year: F9 allowed for aggregate (not MER).
-                return isPFP
-                  ? getNumericGrade(s.grade, "G3") <= G3_TO_NUMERIC_RAW["E8"]
-                  : G3_GRADES_OPTIONS.includes(s.grade);
+                // PFP: F9 (grade 9) cannot be used
+                return (
+                  getNumericGrade(s.grade, "G3") <= G3_TO_NUMERIC_RAW["E8"]
+                );
               }
               if (s.level === "G2") {
-                // PFP: grades 5 & 6 cannot be used (max G2=4).
-                // ITE 2-Year: grade 6 allowed for aggregate (not MER).
-                return isPFP
-                  ? getNumericGrade(s.grade, "G2") <= G2_TO_NUMERIC_RAW["4"]
-                  : getNumericGrade(s.grade, "G2") <= G2_TO_NUMERIC_RAW["6"];
+                // PFP: grades 5 & 6 cannot be used (max G2=4)
+                return getNumericGrade(s.grade, "G2") <= G2_TO_NUMERIC_RAW["4"];
               }
               if (s.level === "G1")
                 return (
@@ -1802,28 +1768,6 @@
               subjectsUsedWithRoles.push({ ...s, role: `B${index + 2}` });
               scoreDetailsParts.push(
                 `B${index + 2}(${getSubjectById(s.subjectId)?.name} ${s.level} ${s.level} ${s.grade} (G2 equiv ${getStudentSubjectG2Grade(s)})`,
-              );
-            });
-          } else {
-            // For ITE Year 2 Higher Nitec (also uses ELMAB3_G2 calcType)
-            // Find the best 3 other subjects based on original grade, then get G2 equivalent
-            otherSubjects = allSubjectsWithOriginalNumericGrade
-              .filter((s) => !usedSubjectIds.has(s.subjectId))
-              .sort((a, b) => a.numericOriginalGrade - b.numericOriginalGrade) // Sort by original grade
-              .slice(0, 3);
-
-            if (otherSubjects.length < 3) {
-              return {
-                grossScore: Infinity,
-                netScore: Infinity,
-                details: `Need 3 other subjects (G2 equiv. pass), found ${otherSubjects.length}`,
-                subjectsUsed: [],
-              };
-            }
-            otherSubjects.forEach((s, index) => {
-              subjectsUsedWithRoles.push({ ...s, role: `B${index + 1}` });
-              scoreDetailsParts.push(
-                `B${index + 1}(${getSubjectById(s.subjectId)?.name} ${s.level} ${s.grade} (G2 equiv ${getStudentSubjectG2Grade(s)})`,
               );
             });
           }
@@ -2778,33 +2722,6 @@
                 met: otherTwoSubjCheck,
               });
               if (!otherTwoSubjCheck) overallMerMet = false;
-            } else if (pathway.group === "ITE Year 2 Higher Nitec") {
-              // Find the best 3 other subjects from all student subjects, excluding those *already used for MER checks*
-              const subjectsForOtherThree = currentStudentSubjects.filter(
-                (s) =>
-                  s.subjectId !== elForMer?.subjectId &&
-                  s.subjectId !== mathForMer?.subjectId,
-              );
-              const bestThreeOthers = subjectsForOtherThree
-                .sort(
-                  (a, b) =>
-                    getNumericGrade(getStudentSubjectG2Grade(a), "G2") -
-                    getNumericGrade(getStudentSubjectG2Grade(b), "G2"),
-                )
-                .slice(0, 3);
-              const otherThreeSubjCheck =
-                bestThreeOthers.length >= 3 &&
-                bestThreeOthers.every(
-                  (subj) =>
-                    getNumericGrade(getStudentSubjectG2Grade(subj), "G2") <=
-                    getNumericGrade(pathway.mer.any_three_other_subj_g2, "G2"),
-                );
-              merDetails.push({
-                merId: "other_three_subj_mer",
-                text: `3 other subjects (G2 equiv): Need 3, found ${bestThreeOthers.length} at G2 ≤ ${pathway.mer?.any_three_other_subj_g2 || "N/A"}`,
-                met: otherThreeSubjCheck,
-              });
-              if (!otherThreeSubjCheck) overallMerMet = false;
             }
           }
 
@@ -3462,9 +3379,7 @@
             "JC/MI": [],
             "Polytechnic Year 1": [],
             PFP: [],
-            "ITE Year 2 Higher Nitec": [],
-            "ITE Year 1 Higher Nitec": [],
-            "ITE 2-Year Nitec": [],
+            "ITE 3-Year Higher Nitec": [],
           };
           eligibilityResults.forEach((p) => {
             if (groupedPathways[p.group]) groupedPathways[p.group].push(p);
@@ -3497,12 +3412,8 @@
                 groupHeaderHtml += `<ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: <span class="tooltip">Net Aggregate (ELR2B2)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of ELR2B2 minus bonus points.</span></span> & <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Net Aggregate (ELR2B2)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of ELR2B2 minus bonus points.</span></span></li></ul>`;
               else if (group === "PFP")
                 groupHeaderHtml += `<ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: <span class="tooltip">Gross Aggregate (ELMAB3)<sup><small>i</small></sup><span class="tooltiptext">Gross Aggregate is the sum of ELMAB3. G1 Mother Tongue cannot be used.</span></span> & <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Net Aggregate (ELMAB3)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of ELMAB3 minus bonus points.</span></span></li></ul>`;
-              else if (group === "ITE Year 2 Higher Nitec")
-                groupHeaderHtml += `<ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: Gross Aggregate (ELMAB3) & <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements. G1 Mother Tongue cannot be used.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Net Aggregate (ELMAB3)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of ELMAB3 minus bonus points.</span></span></li></ul>`;
-              else if (group === "ITE Year 1 Higher Nitec")
+              else if (group === "ITE 3-Year Higher Nitec")
                 groupHeaderHtml += `<ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Aggregate score<sup><small>i</small></sup><span class="tooltiptext">Aggregate score is the sum of 4 G1 subjects (including Pre-requisite subjects if applicable) minus bonus points.</span></span></li></ul>`;
-              else if (group === "ITE 2-Year Nitec")
-                groupHeaderHtml += `<ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li>Direct application to school. No maximum aggregate cut-off.</li><li>Course-specific entry criteria apply.</li></ul>`;
               groupSection.innerHTML = groupHeaderHtml;
               const cardsContainer = document.createElement("div");
               cardsContainer.className =
@@ -3513,7 +3424,7 @@
                 const isCA = pathway.isCA;
                 card.className = `p-5 rounded-lg shadow-lg border ${isCA ? "bg-amber-800/30 border-amber-500" : isEligible ? "bg-emerald-800/30 border-emerald-600" : "bg-red-800/30 border-red-600"} transition-all hover:shadow-xl hover:scale-[1.02]`;
                 let scoreText = "";
-                if (pathway.group === "ITE Year 1 Higher Nitec") {
+                if (pathway.group === "ITE 3-Year Higher Nitec") {
                   if (!isEligible) {
                     scoreText = `<p class="text-xs text-slate-400 mb-1">Aggregate score for posting: N/A (Missing prerequisite subjects or grades)</p>`;
                   } else {
@@ -3548,7 +3459,7 @@
                 if (pathway.tooltipText)
                   pathwayNameDisplay = `<span class="tooltip">${pathway.name}<sup><small>i</small></sup><span class="tooltiptext">${pathway.tooltipText}</span></span>`;
                 else if (
-                  pathway.group === "ITE Year 1 Higher Nitec" &&
+                  pathway.group === "ITE 3-Year Higher Nitec" &&
                   pathway.id !== "ite_hnitec_yr1_biz_services_2"
                 )
                   pathwayNameDisplay = `<span class="tooltip">${pathway.name}<sup><small>i</small></sup><span class="tooltiptext">Pass refers to Grade A-D for G1 Subject, Grade 1-5 for G2 Subject, or Grade 1-8 for G3 Subject.</span></span>`;

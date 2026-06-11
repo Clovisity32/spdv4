@@ -1,6 +1,6 @@
 /**
  * Edge Case Test Suite — Student Pathway Dashboard
- * Phases 1–13 (all phases from the original plan)
+ * Phases 1–14
  *
  * Run: node scripts/run_edge_case_tests.js
  *
@@ -241,62 +241,10 @@ function ok(cond, id, msg) {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // PHASE 2c — ITE 2-Year: F9 IS included; G2 6 included but fails MER (Fix B)
-    // Using ECON G2 in place of BIO G2 (BIO restricted to G3 in School A).
-    // ════════════════════════════════════════════════════════════════════════
-    console.log("\n── Phase 2c: ITE 2-Year grade inclusion (Fix B) ──");
-
-    // I-07: HIST G3 F9 included → G2 equiv 5 ≤ 5 → MER met → Eligible
-    // Score = 1+1+1+1+5 = 9 ≤ 19
-    await reset(page);
-    await addMany(page, [
-      ["EL", "G2", "1"],
-      ["MATH", "G2", "1"],
-      ["HIST", "G3", "F9"],
-      ["GEOG", "G2", "1"],
-      ["ECON", "G2", "1"],
-    ]);
-    {
-      const r = await getResult(page, "Applied Science");
-      if (!r.found) ok(false, "I-07", "ITE Year 2 Applied Sci card not found");
-      else {
-        ok(
-          r.isEligible,
-          "I-07",
-          `ITE 2-Yr Applied Sci Eligible (F9 included; score=9 ≤ 19, MER met)`,
-        );
-        ok(r.gross === 9, "I-07", `gross=9 expected 9 (actual: ${r.gross})`);
-      }
-    }
-
-    // I-08: HIST G2 6 included in aggregate but G2 6 > 5 → "any_three_other_subj_g2 ≤ 5" MER fails
-    // Score = 1+1+6+1+1 = 10 ≤ 19 but MER fails
-    await reset(page);
-    await addMany(page, [
-      ["EL", "G2", "1"],
-      ["MATH", "G2", "1"],
-      ["HIST", "G2", "6"],
-      ["GEOG", "G2", "1"],
-      ["ECON", "G2", "1"],
-    ]);
-    {
-      const r = await getResult(page, "Applied Science");
-      if (!r.found) ok(false, "I-08", "ITE Year 2 Applied Sci card not found");
-      else {
-        ok(
-          !r.isEligible,
-          "I-08",
-          `ITE 2-Yr Applied Sci Not Eligible (G2 6 > 5 in 3-other MER)`,
-        );
-        ok(r.gross === 10, "I-08", `gross=10 expected 10 (actual: ${r.gross})`);
-      }
-    }
-
-    // ════════════════════════════════════════════════════════════════════════
-    // PHASE 2d — ITE 3-Year: F9 → G1 C (3pts), G2 6 → G1 D (4pts) in aggregate (Fix C)
+    // PHASE 2c — ITE 3-Year: F9 → G1 C (3pts), G2 6 → G1 D (4pts) in aggregate (Fix C)
     // ════════════════════════════════════════════════════════════════════════
     console.log(
-      "\n── Phase 2d: ITE 3-Year aggregate includes F9 and G2 6 (Fix C) ──",
+      "\n── Phase 2c: ITE 3-Year aggregate includes F9 and G2 6 (Fix C) ──",
     );
 
     // I-09: 4 x G3 F9 → each maps to G1 C → 3 pts. Best4 = 12.
@@ -1066,129 +1014,9 @@ function ok(cond, id, msg) {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // PHASE 9 — ITE Year 2 Higher Nitec ELMAB3
+    // PHASE 9 — ITE 3-Year Higher Nitec Pathways
     // ════════════════════════════════════════════════════════════════════════
-    console.log("\n── Phase 9: ITE Year 2 ELMAB3 ──");
-
-    // I2-01: all G2 1 → score=5 → Eligible
-    await reset(page);
-    await addMany(page, [
-      ["EL", "G2", "1"],
-      ["MATH", "G2", "1"],
-      ["HIST", "G2", "1"],
-      ["GEOG", "G2", "1"],
-      ["ECON", "G2", "1"],
-    ]);
-    {
-      const r = await getResult(page, "Applied Science");
-      ok(r.isEligible, "I2-01", "ITE 2-Yr Eligible (score=5 ≤ 19)");
-      ok(r.gross === 5, "I2-01", `gross=5 (actual:${r.gross})`);
-    }
-
-    // I2-02: score=19 exactly (boundary) → Eligible
-    await reset(page);
-    await addMany(page, [
-      ["EL", "G2", "4"],
-      ["MATH", "G2", "4"],
-      ["HIST", "G2", "3"],
-      ["GEOG", "G2", "4"],
-      ["ECON", "G2", "4"],
-    ]);
-    {
-      const r = await getResult(page, "Applied Science");
-      ok(
-        r.isEligible,
-        "I2-02",
-        "ITE 2-Yr Eligible (score=19 ≤ 19, exact boundary)",
-      );
-      ok(r.gross === 19, "I2-02", `gross=19 (actual:${r.gross})`);
-    }
-
-    // I2-03: score=20 → Not Eligible
-    await reset(page);
-    await addMany(page, [
-      ["EL", "G2", "4"],
-      ["MATH", "G2", "4"],
-      ["HIST", "G2", "4"],
-      ["GEOG", "G2", "4"],
-      ["ECON", "G2", "4"],
-    ]);
-    {
-      const r = await getResult(page, "Applied Science");
-      ok(!r.isEligible, "I2-03", "ITE 2-Yr Not Eligible (score=20 > 19)");
-      ok(r.gross === 20, "I2-03", `gross=20 (actual:${r.gross})`);
-    }
-
-    // I2-04: EL G2 5 → EL MER (≤4) fails → Not Eligible
-    await reset(page);
-    await addMany(page, [
-      ["EL", "G2", "5"],
-      ["MATH", "G2", "1"],
-      ["HIST", "G2", "1"],
-      ["GEOG", "G2", "1"],
-      ["ECON", "G2", "1"],
-    ]);
-    {
-      const r = await getResult(page, "Applied Science");
-      ok(!r.isEligible, "I2-04", "ITE 2-Yr Not Eligible (EL G2 5 > MER ≤ 4)");
-    }
-
-    // I2-05: MATH G2 5 → MATH MER (≤4) fails → Not Eligible
-    await reset(page);
-    await addMany(page, [
-      ["EL", "G2", "1"],
-      ["MATH", "G2", "5"],
-      ["HIST", "G2", "1"],
-      ["GEOG", "G2", "1"],
-      ["ECON", "G2", "1"],
-    ]);
-    {
-      const r = await getResult(page, "Applied Science");
-      ok(!r.isEligible, "I2-05", "ITE 2-Yr Not Eligible (MATH G2 5 > MER ≤ 4)");
-    }
-
-    // I2-06: HIST G3 F9 included → G2 equiv 5 → score=9 ≤ 19, MER others ≤ 5 → Eligible
-    await reset(page);
-    await addMany(page, [
-      ["EL", "G2", "1"],
-      ["MATH", "G2", "1"],
-      ["HIST", "G3", "F9"],
-      ["GEOG", "G2", "1"],
-      ["ECON", "G2", "1"],
-    ]);
-    {
-      const r = await getResult(page, "Applied Science");
-      ok(
-        r.isEligible,
-        "I2-06",
-        "ITE 2-Yr Eligible (HIST G3 F9 → G2:5 included, score=9, MER: 5 ≤ 5 ✓)",
-      );
-      ok(r.gross === 9, "I2-06", `gross=9 expected 9 (actual:${r.gross})`);
-    }
-
-    // I2-07: HIST G2 6 included → 6 > 5 in "3-other ≤ 5" MER → Not Eligible
-    await reset(page);
-    await addMany(page, [
-      ["EL", "G2", "1"],
-      ["MATH", "G2", "1"],
-      ["HIST", "G2", "6"],
-      ["GEOG", "G2", "1"],
-      ["ECON", "G2", "1"],
-    ]);
-    {
-      const r = await getResult(page, "Applied Science");
-      ok(
-        !r.isEligible,
-        "I2-07",
-        "ITE 2-Yr Not Eligible (HIST G2 6 > 5, 3-other MER fails)",
-      );
-      ok(r.gross === 10, "I2-07", `gross=10 expected 10 (actual:${r.gross})`);
-    }
-
-    // ════════════════════════════════════════════════════════════════════════
-    // PHASE 10 — ITE Year 1 Higher Nitec Pathways
-    // ════════════════════════════════════════════════════════════════════════
-    console.log("\n── Phase 10: ITE Year 1 Pathway MER ──");
+    console.log("\n── Phase 9: ITE 3-Year Higher Nitec Pathway MER ──");
 
     // BS2-1: 4 subjects → Complete SEC MER met → Eligible
     await reset(page);
@@ -1625,27 +1453,8 @@ function ok(cond, id, msg) {
       ok(r.gross === 12, "CCA-04", `gross=12 unchanged (actual:${r.gross})`);
     }
 
-    // CCA-05: ITE 2-Yr gross=19, CCA=2 → still Eligible (CCA does NOT affect ITE threshold)
-    await reset(page, 2);
-    await addMany(page, [
-      ["EL", "G2", "4"],
-      ["MATH", "G2", "4"],
-      ["HIST", "G2", "3"],
-      ["GEOG", "G2", "4"],
-      ["ECON", "G2", "4"],
-    ]);
-    {
-      const r = await getResult(page, "Applied Science");
-      ok(
-        r.isEligible,
-        "CCA-05",
-        "ITE 2-Yr Eligible (gross=19, CCA=2 irrelevant — ITE uses gross threshold)",
-      );
-      ok(r.gross === 19, "CCA-05", `gross=19 unchanged (actual:${r.gross})`);
-    }
-
     // ════════════════════════════════════════════════════════════════════════
-    // PHASE 12 — G1 Mother Tongue Exclusion from PFP and ITE 2-Yr ELMAB3
+    // PHASE 12 — G1 Mother Tongue Exclusion from PFP ELMAB3
     // ════════════════════════════════════════════════════════════════════════
     console.log("\n── Phase 12: G1 Mother Tongue Exclusion ──");
 
@@ -1710,30 +1519,6 @@ function ok(cond, id, msg) {
       );
     }
 
-    // MT-05: ITE 2-Yr: G1 MT + 5 valid G2 subjects → score=5 → Eligible (MT not counted)
-    // BIO G2 not available → use ECON G2 1
-    await reset(page);
-    await addMany(page, [
-      ["EL", "G2", "1"],
-      ["MATH", "G2", "1"],
-      ["HIST", "G2", "1"],
-      ["GEOG", "G2", "1"],
-      ["ECON", "G2", "1"],
-      ["MT", "G1", "A"],
-    ]);
-    {
-      const r = await getResult(page, "Applied Science");
-      ok(
-        r.isEligible,
-        "MT-05",
-        "ITE 2-Yr Eligible (MT G1 excluded; 5 valid G2 subjects; score=5)",
-      );
-      ok(
-        r.gross === 5,
-        "MT-05",
-        `gross=5 expected 5 (G1 MT not counted; actual:${r.gross})`,
-      );
-    }
     // ════════════════════════════════════════════════════════════════════════
     // PHASE 13 — Improvement Suggestions
     // Tests that single-grade improvements produce correct suggestion cards.
@@ -1836,112 +1621,15 @@ function ok(cond, id, msg) {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // Phase 14: ITE 2-Year Nitec
-    // ════════════════════════════════════════════════════════════════════════
-    console.log("\n── Phase 14: ITE 2-Year Nitec ──");
-
-    // 2YN-01: Basic eligibility — all G3 standard grades
-    // ELMAB3 = EL(C6→G2 2) + MA(C6→G2 2) + BIO(C6→G2 2) + HIST(B4→G2 2) + GEOG(B4→G2 2) = 10 ≤ 99
-    await reset(page);
-    await addMany(page, [
-      ["EL", "G3", "C6"],
-      ["MATH", "G3", "C6"],
-      ["BIO", "G3", "C6"],
-      ["HIST", "G3", "B4"],
-      ["GEOG", "G3", "B4"],
-    ]);
-    {
-      const r = await getResult(page, "ITE 2-Year Nitec");
-      ok(
-        r.isEligible,
-        "2YN-01",
-        "ITE 2-Year Eligible (score=10 ≤ 99, MER met)",
-      );
-      ok(r.gross === 10, "2YN-01", `gross=10 expected 10 (actual:${r.gross})`);
-    }
-
-    // 2YN-02: G3 F9 included in ELMAB3 (unlike PFP/Poly where F9 is excluded)
-    // BIO F9 → G2 5; score = 2+2+5+2+2 = 13
-    await reset(page);
-    await addMany(page, [
-      ["EL", "G3", "C6"],
-      ["MATH", "G3", "C6"],
-      ["BIO", "G3", "F9"],
-      ["HIST", "G3", "B4"],
-      ["GEOG", "G3", "B4"],
-    ]);
-    {
-      const r = await getResult(page, "ITE 2-Year Nitec");
-      ok(
-        r.isEligible,
-        "2YN-02",
-        "ITE 2-Year Eligible (F9 counted in aggregate)",
-      );
-      ok(
-        r.gross === 13,
-        "2YN-02",
-        `gross=13 with F9→G2 5 included (actual:${r.gross})`,
-      );
-    }
-
-    // 2YN-03: G2 grade 6 included in ELMAB3 (unlike PFP where G2 6 is excluded)
-    // DT G2 6 and NFS G2 6 count; score = G2(EL C6→2) + G2(MATH C6→2) + G2(HIST 2) + G2(DT 6) + G2(NFS 6) = 18
-    await reset(page);
-    await addMany(page, [
-      ["EL", "G3", "C6"],
-      ["MATH", "G3", "C6"],
-      ["HIST", "G2", "2"],
-      ["DT", "G2", "6"],
-      ["NFS", "G2", "6"],
-    ]);
-    {
-      const r = await getResult(page, "ITE 2-Year Nitec");
-      ok(
-        r.isEligible,
-        "2YN-03",
-        "ITE 2-Year Eligible (G2 grade 6 counted in aggregate)",
-      );
-      ok(
-        r.gross === 18,
-        "2YN-03",
-        `gross=18 with G2-6 included (actual:${r.gross})`,
-      );
-    }
-
-    // 2YN-04: Not Eligible when English Language is absent
-    // No EL → calculateELMAB3_G2 returns Infinity → scoreMet=false
-    await reset(page);
-    await addMany(page, [
-      ["MATH", "G3", "C6"],
-      ["BIO", "G3", "C6"],
-      ["PHY", "G3", "B4"],
-      ["HIST", "G3", "B4"],
-      ["GEOG", "G3", "B4"],
-    ]);
-    {
-      const r = await getResult(page, "ITE 2-Year Nitec");
-      ok(
-        !r.isEligible,
-        "2YN-04",
-        "ITE 2-Year Not Eligible (no English Language)",
-      );
-      ok(
-        r.gross === null,
-        "2YN-04",
-        `gross=null when EL absent (Score: N/A shown; actual:${r.gross})`,
-      );
-    }
-
-    // ════════════════════════════════════════════════════════════════════════
-    // Phase 15: Eligibility-First Group Sort
-    // groupedPathways insertion order: JC/MI(0) Poly(1) PFP(2) ITE-Y2(3) ITE-Y1(4) ITE-2Yr(5)
+    // Phase 14: Eligibility-First Group Sort
+    // groupedPathways insertion order: JC/MI(0) Poly(1) PFP(2) ITE-3Yr(3)
     // Groups with ≥1 eligible pathway sort before groups with none; stable within each tier.
     // ════════════════════════════════════════════════════════════════════════
-    console.log("\n── Phase 15: Eligibility-First Group Sort ──");
+    console.log("\n── Phase 14: Eligibility-First Group Sort ──");
 
     // SORT-01: Eligible group appears before Not-Eligible group in DOM
-    // Profile: EL E8 fails JC/Poly/ITE-Y2 MER → only ITE-Y1 and ITE-2Yr eligible
-    // Expected: ITE Year 1 (pos=4, eligible) rendered before JC/MI (pos=0, not eligible)
+    // Profile: EL E8 fails JC/Poly MER → PFP and ITE 3-Year Higher Nitec eligible
+    // Expected: ITE 3-Year Higher Nitec (pos=3, eligible) rendered before JC/MI (pos=0, not eligible)
     await reset(page);
     await addMany(page, [
       ["EL", "G3", "E8"],
@@ -1952,12 +1640,12 @@ function ok(cond, id, msg) {
     ]);
     {
       const order = await getGroupOrder(page);
-      const iY1 = order.indexOf("ITE Year 1 Higher Nitec");
+      const iY3 = order.indexOf("ITE 3-Year Higher Nitec");
       const iJC = order.indexOf("JC/MI");
       ok(
-        iY1 !== -1 && iJC !== -1 && iY1 < iJC,
+        iY3 !== -1 && iJC !== -1 && iY3 < iJC,
         "SORT-01",
-        `Eligible group "ITE Year 1" (pos ${iY1}) before Not-Eligible "JC/MI" (pos ${iJC})`,
+        `Eligible group "ITE 3-Year Higher Nitec" (pos ${iY3}) before Not-Eligible "JC/MI" (pos ${iJC})`,
       );
     }
 
@@ -1976,8 +1664,8 @@ function ok(cond, id, msg) {
     }
 
     // SORT-03: Among Eligible groups, original insertion order preserved
-    // Profile: EL D7 → PFP-Hum eligible (orig 2) and ITE-Y2 eligible (orig 3)
-    // Expected: PFP appears before ITE Year 2 Higher Nitec in DOM
+    // Profile: EL D7 → PFP-Hum eligible (orig 2) and ITE 3-Year Higher Nitec eligible (orig 3)
+    // Expected: PFP appears before ITE 3-Year Higher Nitec in DOM
     await reset(page);
     await addMany(page, [
       ["EL", "G3", "D7"],
@@ -1989,11 +1677,11 @@ function ok(cond, id, msg) {
     {
       const order = await getGroupOrder(page);
       const iPFP = order.indexOf("PFP");
-      const iY2 = order.indexOf("ITE Year 2 Higher Nitec");
+      const iY3 = order.indexOf("ITE 3-Year Higher Nitec");
       ok(
-        iPFP !== -1 && iY2 !== -1 && iPFP < iY2,
+        iPFP !== -1 && iY3 !== -1 && iPFP < iY3,
         "SORT-03",
-        `Eligible "PFP" (pos ${iPFP}) before Eligible "ITE Year 2 Higher Nitec" (pos ${iY2}) — original order preserved`,
+        `Eligible "PFP" (pos ${iPFP}) before Eligible "ITE 3-Year Higher Nitec" (pos ${iY3}) — original order preserved`,
       );
     }
   } finally {
