@@ -220,8 +220,12 @@
           <div>
             <label
               for="level"
-              class="block text-sm font-medium text-sky-300 mb-1"
-              >Level</label
+              class="block text-sm font-medium text-sky-300 mb-1 tooltip"
+              >Level<sup><small>i</small></sup
+              ><span class="tooltiptext"
+                >G3 = O-Level (grades A1–F9). G2 = N(A)-Level (grades 1–6). G1 =
+                N(T)-Level (grades A–E).</span
+              ></label
             >
             <select
               id="level"
@@ -318,42 +322,6 @@
       </section>
 
       <section
-        id="improvementSuggestionsSection"
-        class="mb-10 p-6 bg-slate-800 shadow-2xl rounded-xl border border-slate-700 hidden"
-      >
-        <h2 class="text-2xl font-semibold mb-6 text-cyan-400 flex items-center">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            class="icon-lg mr-3 text-cyan-500"
-          >
-            <path
-              d="M3 17H5V19H3V17ZM7 5H9V19H7V5ZM11 13H13V19H11V13ZM15 9H17V19H15V9ZM19 12H21V19H19V12Z"
-            ></path>
-          </svg>
-          Improvement Suggestions
-        </h2>
-        <div id="improvementSuggestionsContainer" class="min-h-[100px]"></div>
-        <div
-          id="improvementPlaceholder"
-          class="text-center py-8 text-slate-400"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            class="icon-lg mx-auto mb-4 text-emerald-500 w-12 h-12"
-          >
-            <path
-              d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"
-            ></path>
-          </svg>
-          <p class="text-xl">Add subjects to see improvement suggestions.</p>
-        </div>
-      </section>
-
-      <section
         class="mb-10 p-6 bg-slate-800 shadow-2xl rounded-xl border border-slate-700"
       >
         <h2 class="text-2xl font-semibold mb-6 text-cyan-400 flex items-center">
@@ -391,6 +359,42 @@
               Please add subjects to see your eligible pathways.
             </p>
           </div>
+        </div>
+      </section>
+
+      <section
+        id="improvementSuggestionsSection"
+        class="mb-10 p-6 bg-slate-800 shadow-2xl rounded-xl border border-slate-700 hidden"
+      >
+        <h2 class="text-2xl font-semibold mb-6 text-cyan-400 flex items-center">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            class="icon-lg mr-3 text-cyan-500"
+          >
+            <path
+              d="M3 17H5V19H3V17ZM7 5H9V19H7V5ZM11 13H13V19H11V13ZM15 9H17V19H15V9ZM19 12H21V19H19V12Z"
+            ></path>
+          </svg>
+          Improvement Suggestions
+        </h2>
+        <div id="improvementSuggestionsContainer" class="min-h-[100px]"></div>
+        <div
+          id="improvementPlaceholder"
+          class="text-center py-8 text-slate-400"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            class="icon-lg mx-auto mb-4 text-emerald-500 w-12 h-12"
+          >
+            <path
+              d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"
+            ></path>
+          </svg>
+          <p class="text-xl">Add subjects to see improvement suggestions.</p>
         </div>
       </section>
 
@@ -906,8 +910,8 @@
           // MODIFIED: Added R1_criteria, R1_is_ids, R2_criteria, R2_is_ids for ELR2B2 pathways
           {
             id: "poly_yr1_elr2b2_a",
-            name: "Polytechnic Year 1 (ELR2B2-A)",
-            tooltipText: "Humanities, Media & Communications",
+            name: "Humanities, Media & Communications",
+            tooltipText: "ELR2B2-A aggregate type.",
             group: "Polytechnic Year 1",
             calcType: "ELR2B2_G3_Mixed",
             requirements: { netELR2B2: 22 },
@@ -928,8 +932,8 @@
           },
           {
             id: "poly_yr1_elr2b2_b",
-            name: "Polytechnic Year 1 (ELR2B2-B)",
-            tooltipText: "Business & Management",
+            name: "Business & Management",
+            tooltipText: "ELR2B2-B aggregate type.",
             group: "Polytechnic Year 1",
             calcType: "ELR2B2_G3_Mixed",
             requirements: { netELR2B2: 22 },
@@ -950,9 +954,9 @@
           },
           {
             id: "poly_yr1_elr2b2_c_general",
-            name: "Polytechnic Year 1 (ELR2B2-C)",
+            name: "Sciences, Engineering & Technology",
             tooltipText:
-              "Applied/Health Sc, Engrg, Info & Digital Tech, Built Environment",
+              "ELR2B2-C aggregate type. Covers Applied/Health Sciences, Engineering, Info & Digital Technology, Built Environment.",
             group: "Polytechnic Year 1",
             calcType: "ELR2B2_G3_Mixed",
             requirements: { netELR2B2: 22 },
@@ -973,8 +977,9 @@
           },
           {
             id: "poly_yr1_elr2b2_c_nursing",
-            name: "Polytechnic Year 1 (ELR2B2-C) — Nursing",
-            tooltipText: "Nursing courses only. NET ELR2B2 ≤ 24.",
+            name: "Nursing",
+            tooltipText:
+              "ELR2B2-C aggregate type. Nursing courses only. NET ELR2B2 ≤ 24.",
             group: "Polytechnic Year 1",
             calcType: "ELR2B2_G3_Mixed",
             requirements: { netELR2B2: 24 },
@@ -995,8 +1000,8 @@
           },
           {
             id: "poly_yr1_elr2b2_d",
-            name: "Polytechnic Year 1 (ELR2B2-D)",
-            tooltipText: "Design, Built Environment",
+            name: "Design & Built Environment",
+            tooltipText: "ELR2B2-D aggregate type.",
             group: "Polytechnic Year 1",
             calcType: "ELR2B2_G3_Mixed",
             requirements: { netELR2B2: 22 },
@@ -1057,6 +1062,37 @@
                 "HUM_SS_GEOG",
               ], // Added full list for MER tooltip
               other_two_subj_g2: "4",
+            },
+            description: "",
+          },
+
+          {
+            id: "ite_yr2_hnitec_applied_sci_eng_ict",
+            name: "ITE Year 2 — Applied Science, Engineering & ICT",
+            tooltipText:
+              "Direct Year 2 entry to 3-Year Higher Nitec. For Applied Science, Engineering, and Info-Comms Technology clusters. ELMAB3 ≤ 19 (G2). G3 F9 and G2 grade 5 included in computation.",
+            group: "ITE Year 2 Higher Nitec",
+            calcType: "ELMAB3_G2",
+            requirements: { grossELMAB3: 19 },
+            calcOptions: { allowG3F9: true, maxG2GradeForCalc: 5 },
+            mer: {
+              el_g2: "4",
+              math_am_g2: "4",
+            },
+            description: "",
+          },
+          {
+            id: "ite_yr2_hnitec_biz_services_hosp",
+            name: "ITE Year 2 — Business, Services & Hospitality",
+            tooltipText:
+              "Direct Year 2 entry to 3-Year Higher Nitec. For Business & Services, and Hospitality clusters. ELMAB3 ≤ 19 (G2). G3 F9 and G2 grade 5 included in computation.",
+            group: "ITE Year 2 Higher Nitec",
+            calcType: "ELMAB3_G2",
+            requirements: { grossELMAB3: 19 },
+            calcOptions: { allowG3F9: true, maxG2GradeForCalc: 5 },
+            mer: {
+              el_g2: "3",
+              math_am_g2: "4",
             },
             description: "",
           },
@@ -1647,6 +1683,12 @@
           pathwayId = null,
         ) => {
           const pathwayConfig = PATHWAYS.find((p) => p.id === pathwayId);
+          const calcOpts = pathwayConfig?.calcOptions || {};
+          const maxG3Numeric = calcOpts.allowG3F9
+            ? G3_TO_NUMERIC_RAW["F9"]
+            : G3_TO_NUMERIC_RAW["E8"];
+          const maxG2Numeric =
+            G2_TO_NUMERIC_RAW[String(calcOpts.maxG2GradeForCalc ?? 4)];
 
           // Add numericOriginalGrade to all subjects for consistent sorting
           const allSubjectsWithOriginalNumericGrade = currentStudentSubjects
@@ -1662,16 +1704,10 @@
                 SUBJECT_CATEGORIES_DEF.MT_ALL.includes(s.category);
               if (isG1MotherTongue) return false;
 
-              if (s.level === "G3") {
-                // PFP: F9 (grade 9) cannot be used
-                return (
-                  getNumericGrade(s.grade, "G3") <= G3_TO_NUMERIC_RAW["E8"]
-                );
-              }
-              if (s.level === "G2") {
-                // PFP: grades 5 & 6 cannot be used (max G2=4)
-                return getNumericGrade(s.grade, "G2") <= G2_TO_NUMERIC_RAW["4"];
-              }
+              if (s.level === "G3")
+                return getNumericGrade(s.grade, "G3") <= maxG3Numeric;
+              if (s.level === "G2")
+                return getNumericGrade(s.grade, "G2") <= maxG2Numeric;
               if (s.level === "G1")
                 return (
                   getNumericGrade(s.grade, "G1") <= G1_TO_NUMERIC_RAW_ITE["D"]
@@ -1768,6 +1804,29 @@
               subjectsUsedWithRoles.push({ ...s, role: `B${index + 2}` });
               scoreDetailsParts.push(
                 `B${index + 2}(${getSubjectById(s.subjectId)?.name} ${s.level} ${s.level} ${s.grade} (G2 equiv ${getStudentSubjectG2Grade(s)})`,
+              );
+            });
+          } else if (
+            pathwayConfig &&
+            pathwayConfig.group === "ITE Year 2 Higher Nitec"
+          ) {
+            // ITE Year 2: find 3 best other subjects (B1, B2, B3)
+            otherSubjects = allSubjectsWithOriginalNumericGrade
+              .filter((s) => !usedSubjectIds.has(s.subjectId))
+              .sort((a, b) => a.numericOriginalGrade - b.numericOriginalGrade)
+              .slice(0, 3);
+            if (otherSubjects.length < 3) {
+              return {
+                grossScore: Infinity,
+                netScore: Infinity,
+                details: `Need 3 other subjects for ITE Year 2, found ${otherSubjects.length}`,
+                subjectsUsed: [],
+              };
+            }
+            otherSubjects.forEach((s, index) => {
+              subjectsUsedWithRoles.push({ ...s, role: `B${index + 1}` });
+              scoreDetailsParts.push(
+                `B${index + 1}(${getSubjectById(s.subjectId)?.name} ${s.level} ${s.grade} (G2 equiv ${getStudentSubjectG2Grade(s)})`,
               );
             });
           }
@@ -2723,6 +2782,15 @@
               });
               if (!otherTwoSubjCheck) overallMerMet = false;
             }
+
+            if (pathway.group === "ITE Year 2 Higher Nitec") {
+              merDetails.push({
+                merId: "ite_yr2_b3_info",
+                text: `3 other subjects at G2 ≤ 5 (automatically verified by score computation)`,
+                met: true,
+                isPlainBullet: true,
+              });
+            }
           }
 
           if (pathway.group === "JC/MI") {
@@ -3065,6 +3133,7 @@
                   newlyEligiblePathways.push(name);
               });
               const merImprovements = [];
+              const scoreImprovements = [];
               newAllPathwaysStatus.forEach((newPathway) => {
                 const currentPathway = currentAllPathwaysStatus.find(
                   (p) => p.id === newPathway.id,
@@ -3088,9 +3157,64 @@
                         merText: newDetail.text,
                       });
                   });
+                  if (!currentPathway.isEligible && !newPathway.isEligible) {
+                    const req = currentPathway.requirements;
+                    if (req.grossL1R4 !== undefined) {
+                      const oldS = currentPathway.grossScore,
+                        newS = newPathway.grossScore;
+                      if (
+                        oldS !== Infinity &&
+                        newS !== Infinity &&
+                        newS < oldS &&
+                        newS > req.grossL1R4
+                      )
+                        scoreImprovements.push({
+                          pathwayName: newPathway.name,
+                          scoreDrop: oldS - newS,
+                          newScore: newS,
+                          threshold: req.grossL1R4,
+                          label: `L1R4 ≤ ${req.grossL1R4}`,
+                        });
+                    } else if (req.netELR2B2 !== undefined) {
+                      const oldS = currentPathway.netScore,
+                        newS = newPathway.netScore;
+                      if (
+                        oldS !== Infinity &&
+                        newS !== Infinity &&
+                        newS < oldS &&
+                        newS > req.netELR2B2
+                      )
+                        scoreImprovements.push({
+                          pathwayName: newPathway.name,
+                          scoreDrop: oldS - newS,
+                          newScore: newS,
+                          threshold: req.netELR2B2,
+                          label: `Net ELR2B2 ≤ ${req.netELR2B2}`,
+                        });
+                    } else if (req.grossELMAB3 !== undefined) {
+                      const oldS = currentPathway.grossScore,
+                        newS = newPathway.grossScore;
+                      if (
+                        oldS !== Infinity &&
+                        newS !== Infinity &&
+                        newS < oldS &&
+                        newS > req.grossELMAB3
+                      )
+                        scoreImprovements.push({
+                          pathwayName: newPathway.name,
+                          scoreDrop: oldS - newS,
+                          newScore: newS,
+                          threshold: req.grossELMAB3,
+                          label: `ELMAB3 ≤ ${req.grossELMAB3}`,
+                        });
+                    }
+                  }
                 }
               });
-              if (newlyEligiblePathways.length > 0)
+              if (
+                newlyEligiblePathways.length > 0 ||
+                scoreImprovements.length > 0
+              )
                 suggestions.push({
                   subjectName:
                     getSubjectById(subject.subjectId)?.name ||
@@ -3102,12 +3226,13 @@
                   pathwaysUnlockedCount: newlyEligiblePathways.length,
                   unlockedPathwayNames: newlyEligiblePathways.sort(),
                   merImprovements,
+                  scoreImprovements,
                 });
             }
           });
           if (suggestions.length === 0) {
             improvementPlaceholder.classList.remove("hidden");
-            improvementPlaceholder.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-lg mx-auto mb-4 text-emerald-500 w-12 h-12"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg> <p class="text-xl">No single grade improvement would unlock an additional pathway based on your current subjects.</p>`;
+            improvementPlaceholder.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-lg mx-auto mb-4 text-slate-500 w-12 h-12"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z"></path></svg><p class="text-xl mb-2">You're already optimised for your current subjects.</p><p class="text-sm text-slate-500">No single grade improvement would unlock a new pathway. Consider speaking with your school counsellor about your subject combination.</p>`;
           } else {
             improvementPlaceholder.classList.add("hidden");
             renderImprovementSuggestions(suggestions);
@@ -3134,7 +3259,24 @@
             let benefitsHtml = "";
             if (suggestion.unlockedPathwayNames.length > 0)
               benefitsHtml += `<p class="text-slate-300 text-sm mb-1">Unlock <strong>${suggestion.pathwaysUnlockedCount}</strong> additional pathway(s):</p><ul class="list-disc list-inside text-sm ml-4 space-y-1 mb-2">${pathwayNamesList}</ul>`;
-            // Removed the condition for merImprovements
+            if (
+              suggestion.scoreImprovements &&
+              suggestion.scoreImprovements.length > 0
+            ) {
+              const dedupedScoreImprovements =
+                suggestion.scoreImprovements.filter(
+                  (si, idx, arr) =>
+                    arr.findIndex((x) => x.pathwayName === si.pathwayName) ===
+                    idx,
+                );
+              const scoreList = dedupedScoreImprovements
+                .map(
+                  (si) =>
+                    `<li class="text-slate-400">Reduce <strong>${si.pathwayName}</strong> score by <strong>${si.scoreDrop}</strong> pt${si.scoreDrop > 1 ? "s" : ""} → ${si.newScore} (need ${si.label})</li>`,
+                )
+                .join("");
+              benefitsHtml += `<p class="text-slate-400 text-sm mb-1 mt-1">Reduce the gap to:</p><ul class="list-disc list-inside text-sm ml-4 space-y-1 mb-2">${scoreList}</ul>`;
+            }
             suggestionCard.innerHTML = `<h4 class="text-lg font-semibold text-emerald-300 mb-2">Improve ${suggestion.subjectName}</h4><p class="text-slate-300 text-sm mb-2">If you improve your <strong>${suggestion.subjectName}</strong> grade from <span class="font-bold text-cyan-300">${suggestion.originalGrade} (${suggestion.originalLevel})</span> to <span class="font-bold text-cyan-300">${suggestion.improvedGrade} (${suggestion.originalLevel})</span>, you could:</p>${benefitsHtml}`;
             improvementSuggestionsContainer.appendChild(suggestionCard);
           });
@@ -3379,6 +3521,7 @@
             "JC/MI": [],
             "Polytechnic Year 1": [],
             PFP: [],
+            "ITE Year 2 Higher Nitec": [],
             "ITE 3-Year Higher Nitec": [],
           };
           eligibilityResults.forEach((p) => {
@@ -3407,13 +3550,15 @@
               );
               let groupHeaderHtml = `<h3 class="text-xl font-semibold text-sky-300 mb-4 border-b border-slate-700 pb-2">${group}</h3>`;
               if (group === "JC/MI")
-                groupHeaderHtml += `<ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: Gross Aggregate (L1R4) & <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Net Aggregate (L1R4)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of L1R4 minus bonus points.</span></span></li></ul>`;
+                groupHeaderHtml += `<p class="text-sm text-slate-300 mb-3">A-level pre-university programme (2 years) — the strongest academic pathway for university admission.</p><ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: Gross Aggregate (L1R4) & <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Net Aggregate (L1R4)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of L1R4 minus bonus points.</span></span></li></ul>`;
               else if (group === "Polytechnic Year 1")
-                groupHeaderHtml += `<ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: <span class="tooltip">Net Aggregate (ELR2B2)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of ELR2B2 minus bonus points.</span></span> & <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Net Aggregate (ELR2B2)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of ELR2B2 minus bonus points.</span></span></li></ul>`;
+                groupHeaderHtml += `<p class="text-sm text-slate-300 mb-3">Three-year diploma programmes across a wide range of career fields.</p><ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: <span class="tooltip">Net Aggregate (ELR2B2)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of ELR2B2 minus bonus points.</span></span> & <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Net Aggregate (ELR2B2)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of ELR2B2 minus bonus points.</span></span></li></ul>`;
               else if (group === "PFP")
-                groupHeaderHtml += `<ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: <span class="tooltip">Gross Aggregate (ELMAB3)<sup><small>i</small></sup><span class="tooltiptext">Gross Aggregate is the sum of ELMAB3. G1 Mother Tongue cannot be used.</span></span> & <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Net Aggregate (ELMAB3)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of ELMAB3 minus bonus points.</span></span></li></ul>`;
+                groupHeaderHtml += `<p class="text-sm text-slate-300 mb-3">A one-year bridging programme that prepares you for a Polytechnic diploma in specific course clusters.</p><ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: <span class="tooltip">Gross Aggregate (ELMAB3)<sup><small>i</small></sup><span class="tooltiptext">Gross Aggregate is the sum of ELMAB3. G1 Mother Tongue cannot be used.</span></span> & <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Net Aggregate (ELMAB3)<sup><small>i</small></sup><span class="tooltiptext">Net Aggregate is the sum of ELMAB3 minus bonus points.</span></span></li></ul>`;
+              else if (group === "ITE Year 2 Higher Nitec")
+                groupHeaderHtml += `<p class="text-sm text-slate-300 mb-3">Direct Year 2 entry to a 3-year Higher Nitec — skip Year 1 based on your O-Level results.</p><ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: <span class="tooltip">Gross ELMAB3 ≤ 19<sup><small>i</small></sup><span class="tooltiptext">Gross ELMAB3 is EL + MA + 3 best subjects, computed at G2 equivalent. G3 grade F9 and G2 grade 5 count toward the score but cannot fulfil EL/Math MER.</span></span> & <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span></li></ul>`;
               else if (group === "ITE 3-Year Higher Nitec")
-                groupHeaderHtml += `<ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Aggregate score<sup><small>i</small></sup><span class="tooltiptext">Aggregate score is the sum of 4 G1 subjects (including Pre-requisite subjects if applicable) minus bonus points.</span></span></li></ul>`;
+                groupHeaderHtml += `<p class="text-sm text-slate-300 mb-3">Three-year vocational qualification — leads to workplace entry or Polytechnic progression via DPP.</p><ul class="list-disc list-inside text-sm text-slate-400 mb-4"><li><strong>Eligibility</strong>: <span class="tooltip">MER<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span></li><li><strong>Posting</strong>: <span class="tooltip">Aggregate score<sup><small>i</small></sup><span class="tooltiptext">Aggregate score is the sum of 4 G1 subjects (including Pre-requisite subjects if applicable) minus bonus points.</span></span></li></ul>`;
               groupSection.innerHTML = groupHeaderHtml;
               const cardsContainer = document.createElement("div");
               cardsContainer.className =
@@ -3422,7 +3567,37 @@
                 const card = document.createElement("div");
                 const isEligible = pathway.isEligible;
                 const isCA = pathway.isCA;
-                card.className = `p-5 rounded-lg shadow-lg border ${isCA ? "bg-amber-800/30 border-amber-500" : isEligible ? "bg-emerald-800/30 border-emerald-600" : "bg-red-800/30 border-red-600"} transition-all hover:shadow-xl hover:scale-[1.02]`;
+                let notEligibleLabel = "Not yet eligible";
+                if (!isEligible && !isCA) {
+                  if (pathway.requirements.grossL1R4 !== undefined) {
+                    const s = pathway.grossScore;
+                    notEligibleLabel =
+                      s === Infinity
+                        ? "Not yet eligible — add more subjects"
+                        : s - pathway.requirements.grossL1R4 > 0
+                          ? `Not yet eligible — ${s - pathway.requirements.grossL1R4} pts above cut-off`
+                          : "Not yet eligible — MER not met";
+                  } else if (pathway.requirements.netELR2B2 !== undefined) {
+                    const s = pathway.netScore;
+                    notEligibleLabel =
+                      s === Infinity
+                        ? "Not yet eligible — add more subjects"
+                        : s - pathway.requirements.netELR2B2 > 0
+                          ? `Not yet eligible — ${s - pathway.requirements.netELR2B2} pts above cut-off`
+                          : "Not yet eligible — MER not met";
+                  } else if (pathway.requirements.grossELMAB3 !== undefined) {
+                    const s = pathway.grossScore;
+                    notEligibleLabel =
+                      s === Infinity
+                        ? "Not yet eligible — add more subjects"
+                        : s - pathway.requirements.grossELMAB3 > 0
+                          ? `Not yet eligible — ${s - pathway.requirements.grossELMAB3} pts above cut-off`
+                          : "Not yet eligible — MER not met";
+                  } else {
+                    notEligibleLabel = "Not yet eligible — MER not met";
+                  }
+                }
+                card.className = `p-5 rounded-lg shadow-lg border ${isCA ? "bg-amber-800/30 border-amber-500" : isEligible ? "bg-emerald-800/30 border-emerald-600" : "bg-slate-700/50 border-slate-500"} transition-all hover:shadow-xl hover:scale-[1.02]`;
                 let scoreText = "";
                 if (pathway.group === "ITE 3-Year Higher Nitec") {
                   if (!isEligible) {
@@ -3431,21 +3606,29 @@
                     scoreText = `<p class="text-xs text-slate-400 mb-1">Aggregate score for posting: <strong>${pathway.netScore === Infinity ? "N/A" : pathway.netScore}</strong></p>`;
                   }
                 } else {
-                  // For other pathways
+                  const cutoffLabel =
+                    pathway.requirements.grossL1R4 !== undefined
+                      ? ` <span class="text-slate-500">(cut-off ≤ ${pathway.requirements.grossL1R4})</span>`
+                      : pathway.requirements.grossELMAB3 !== undefined
+                        ? ` <span class="text-slate-500">(cut-off ≤ ${pathway.requirements.grossELMAB3})</span>`
+                        : "";
+                  const netCutoffLabel =
+                    pathway.requirements.netELR2B2 !== undefined
+                      ? ` <span class="text-slate-500">(cut-off ≤ ${pathway.requirements.netELR2B2})</span>`
+                      : "";
                   if (
                     pathway.grossScore !== Infinity ||
                     pathway.netScore !== Infinity
                   ) {
-                    scoreText = `<p class="text-xs text-slate-400 mb-1">Gross Aggregate: <strong>${pathway.grossScore === Infinity ? "N/A" : pathway.grossScore}</strong></p><p class="text-xs text-slate-400 mb-1">Net Aggregate: <strong>${pathway.netScore === Infinity ? "N/A" : pathway.netScore}</strong></p>`;
+                    scoreText = `<p class="text-xs text-slate-400 mb-1">Gross Aggregate: <strong>${pathway.grossScore === Infinity ? "N/A" : pathway.grossScore}</strong>${cutoffLabel}</p><p class="text-xs text-slate-400 mb-1">Net Aggregate: <strong>${pathway.netScore === Infinity ? "N/A" : pathway.netScore}</strong>${netCutoffLabel}</p>`;
                   } else {
                     scoreText = `<p class="text-xs text-slate-400 mb-1">Score: N/A (Missing prerequisite subjects or grades)`;
                   }
                 }
                 const requirementsList = pathway.merCheck.merDetails
                   .map((detail) => {
-                    // MODIFIED: Changed icon color for plain bullets to red
                     if (detail.isPlainBullet)
-                      return `<li class="mb-0.5 text-slate-400"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-sm inline-block mr-1 text-red-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z"></path></svg> ${detail.text}</li>`;
+                      return `<li class="mb-0.5 text-slate-400"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-sm inline-block mr-1 text-sky-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z"></path></svg> ${detail.text}</li>`;
                     const icon = detail.met
                       ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-sm inline-block mr-1 text-emerald-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg>`
                       : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-sm inline-block mr-1 text-red-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z"></path></svg>`;
@@ -3495,13 +3678,13 @@
                         .join("")}</ul>`
                     : `<h5 class="text-sm font-semibold text-sky-300 mt-3 mb-1">Subjects considered for calculation:</h5><p class="text-slate-300 text-sm pl-2">No subjects met criteria or not applicable.</p>`;
 
-                card.innerHTML = `<h3 class="text-xl font-semibold mb-2 flex items-center">${isCA ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-amber-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg>' : isEligible ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-emerald-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-red-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z"></path></svg>'} ${pathwayNameDisplay}</h3><p class="text-sm mb-1 font-medium ${isCA ? "text-amber-300" : isEligible ? "text-emerald-300" : "text-red-300"}">Status: ${isCA ? 'Eligible <span class="tooltip">(Conditional Admission)<sup><small>i</small></sup><span class="tooltiptext">Score qualifies for Conditional Admission. You may still be considered even though MER is not fully met. Consider re-sitting to fulfil MER requirements.</span></span>' : isEligible ? 'Eligible <span class="tooltip">(subject to MER)<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span>' : "Not Eligible"}</p>${scoreText}<details class="text-xs mt-2"><summary class="cursor-pointer text-sky-400 hover:text-sky-300">Details & Reasons</summary><div class="mt-2"><h5 class="text-sm font-semibold text-sky-300 mb-1">Requirements:</h5><ul class="list-disc list-inside mt-1 pl-2 text-slate-300 space-y-1">${requirementsList}${descriptionItemHtml}</ul></div>${subjectsUsedHtml}</details>`;
+                card.innerHTML = `<h3 class="text-xl font-semibold mb-2 flex items-center">${isCA ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-amber-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg>' : isEligible ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-emerald-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-slate-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z"></path></svg>'} ${pathwayNameDisplay}</h3><p class="text-sm mb-1 font-medium ${isCA ? "text-amber-300" : isEligible ? "text-emerald-300" : "text-slate-400"}">Status: ${isCA ? 'Eligible <span class="tooltip">(Conditional Admission)<sup><small>i</small></sup><span class="tooltiptext">Score qualifies for Conditional Admission. You may still be considered even though MER is not fully met. Consider re-sitting to fulfil MER requirements.</span></span>' : isEligible ? 'Eligible <span class="tooltip">(subject to MER)<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span>' : notEligibleLabel}</p>${scoreText}<details class="text-xs mt-2"><summary class="cursor-pointer text-sky-400 hover:text-sky-300">Details & Reasons</summary><div class="mt-2"><h5 class="text-sm font-semibold text-sky-300 mb-1">Requirements:</h5><ul class="list-disc list-inside mt-1 pl-2 text-slate-300 space-y-1">${requirementsList}${descriptionItemHtml}</ul></div>${subjectsUsedHtml}</details>`;
                 cardsContainer.appendChild(card);
               });
               if (allNotEligibleInGroup && groupSection.children.length <= 1) {
                 const detailsWrapper = document.createElement("details");
                 detailsWrapper.className = "col-span-full";
-                detailsWrapper.innerHTML = `<summary class="cursor-pointer text-lg font-semibold text-red-400 hover:text-red-300"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 inline-block"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z"></path></svg> ${group} - Not Eligible for any pathway in this group (Click to Expand for details)</summary>`;
+                detailsWrapper.innerHTML = `<summary class="cursor-pointer text-lg font-semibold text-slate-400 hover:text-slate-300"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 inline-block"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z"></path></svg> ${group} — Not yet eligible (click to expand)</summary>`;
                 detailsWrapper.appendChild(cardsContainer);
                 groupSection.appendChild(cardsContainer);
               } else groupSection.appendChild(cardsContainer);

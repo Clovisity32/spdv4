@@ -173,7 +173,7 @@ function ok(cond, id, msg) {
       await reset(page);
       await addMany(page, base1);
       await add(page, subj, lvl, grd);
-      const r = await getResult(page, "ELR2B2-B");
+      const r = await getResult(page, "Business & Management");
       if (!r.found) {
         ok(false, id, "ELR2B2-B card not found");
         continue;
@@ -197,7 +197,7 @@ function ok(cond, id, msg) {
       await reset(page);
       await addMany(page, base1);
       await add(page, subj, lvl, grd);
-      const r = await getResult(page, "ELR2B2-B");
+      const r = await getResult(page, "Business & Management");
       if (!r.found) {
         ok(false, id, "ELR2B2-B card not found");
         continue;
@@ -658,7 +658,7 @@ function ok(cond, id, msg) {
       ["CHEM", "G3", "D7"],
     ]);
     {
-      const r = await getResult(page, "ELR2B2-B");
+      const r = await getResult(page, "Business & Management");
       ok(r.isEligible, "P-01", "ELR2B2-B Eligible (gross=22 ≤ 22)");
       ok(r.gross === 22, "P-01", `gross=22 expected 22 (actual:${r.gross})`);
     }
@@ -673,7 +673,7 @@ function ok(cond, id, msg) {
       ["CHEM", "G3", "E8"],
     ]);
     {
-      const r = await getResult(page, "ELR2B2-B");
+      const r = await getResult(page, "Business & Management");
       ok(!r.isEligible, "P-02", "ELR2B2-B Not Eligible (gross=23 > 22)");
       ok(r.gross === 23, "P-02", `gross=23 expected 23 (actual:${r.gross})`);
     }
@@ -688,7 +688,7 @@ function ok(cond, id, msg) {
       ["CHEM", "G3", "D7"],
     ]);
     {
-      const r = await getResult(page, "ELR2B2-B");
+      const r = await getResult(page, "Business & Management");
       ok(
         r.isEligible,
         "P-03",
@@ -707,7 +707,7 @@ function ok(cond, id, msg) {
       ["CHEM", "G3", "E8"],
     ]);
     {
-      const r = await getResult(page, "ELR2B2-B");
+      const r = await getResult(page, "Business & Management");
       ok(
         r.isEligible,
         "P-04",
@@ -726,7 +726,7 @@ function ok(cond, id, msg) {
       ["CHEM", "G3", "E8"],
     ]);
     {
-      const r = await getResult(page, "ELR2B2-B");
+      const r = await getResult(page, "Business & Management");
       ok(
         r.isEligible,
         "P-05",
@@ -751,8 +751,8 @@ function ok(cond, id, msg) {
       ["GEOG", "G3", "B3"],
     ]);
     {
-      const gen = await getResult(page, "ELR2B2-C)");
-      const nur = await getResult(page, "ELR2B2-C) — Nursing");
+      const gen = await getResult(page, "Sciences, Engineering");
+      const nur = await getResult(page, "Nursing courses only");
       ok(
         !gen.isEligible,
         "P-06",
@@ -780,7 +780,7 @@ function ok(cond, id, msg) {
       ["GEOG", "G3", "B4"],
     ]);
     {
-      const nur = await getResult(page, "ELR2B2-C) — Nursing");
+      const nur = await getResult(page, "Nursing courses only");
       ok(
         nur.isEligible,
         "P-07",
@@ -803,7 +803,7 @@ function ok(cond, id, msg) {
       ["GEOG", "G3", "B4"],
     ]);
     {
-      const nur = await getResult(page, "ELR2B2-C) — Nursing");
+      const nur = await getResult(page, "Nursing courses only");
       ok(!nur.isEligible, "P-08", "Nursing Not Eligible (gross=25 > 24)");
       ok(
         nur.gross === 25,
@@ -822,7 +822,7 @@ function ok(cond, id, msg) {
       ["GEOG", "G2", "5"],
     ]);
     {
-      const nur = await getResult(page, "ELR2B2-C) — Nursing");
+      const nur = await getResult(page, "Nursing courses only");
       ok(
         !nur.isEligible,
         "P-09",
@@ -845,7 +845,7 @@ function ok(cond, id, msg) {
       ["BIO", "G3", "A1"],
     ]);
     {
-      const r = await getResult(page, "ELR2B2-D");
+      const r = await getResult(page, "Design & Built");
       ok(r.isEligible, "R-03", "ELR2B2-D Eligible (normal pass)");
     }
 
@@ -859,8 +859,8 @@ function ok(cond, id, msg) {
       ["BIO", "G3", "A1"],
     ]);
     {
-      const rb = await getResult(page, "ELR2B2-B");
-      const rd = await getResult(page, "ELR2B2-D");
+      const rb = await getResult(page, "Business & Management");
+      const rd = await getResult(page, "Design & Built");
       ok(
         !rb.isEligible,
         "R-04",
@@ -1369,6 +1369,152 @@ function ok(cond, id, msg) {
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // PHASE 10 — ITE Year 2 Higher Nitec
+    // Two clusters: Applied Science/Eng/ICT (EL MER ≤ G2:4) and Biz/Services/Hosp (EL MER ≤ G2:3).
+    // calcOptions: allowG3F9=true, maxG2GradeForCalc=5 (different from PFP defaults).
+    // ════════════════════════════════════════════════════════════════════════
+    console.log("\n── Phase 10: ITE Year 2 Higher Nitec ──");
+
+    // ITE2-01: Score=19 boundary → Applied Sci Eligible; Biz Not Eligible (EL G2:4 > Biz MER ≤ 3)
+    // EL G3 E8(→G2:4) + MA G3 E8(→G2:4) + HIST G3 E8(→G2:4) + GEOG G3 E8(→G2:4) + CHEM G3 D7(→G2:3)
+    // Score = 4+4+4+4+3 = 19
+    await reset(page);
+    await addMany(page, [
+      ["EL", "G3", "E8"],
+      ["MATH", "G3", "E8"],
+      ["HIST", "G3", "E8"],
+      ["GEOG", "G3", "E8"],
+      ["CHEM", "G3", "D7"],
+    ]);
+    {
+      const applied = await getResult(page, "Applied Science, Engineering");
+      const biz = await getResult(page, "Business, Services");
+      ok(
+        applied.isEligible,
+        "ITE2-01",
+        `Applied Sci Eligible at score=19 boundary (actual:${applied.gross})`,
+      );
+      ok(
+        applied.gross === 19,
+        "ITE2-01",
+        `Applied Sci gross=19 expected 19 (actual:${applied.gross})`,
+      );
+      ok(
+        !biz.isEligible,
+        "ITE2-01",
+        "Biz Not Eligible (EL G2:4 > Biz MER threshold G2:3)",
+      );
+    }
+
+    // ITE2-02: Score=20 → Both pathways Not Eligible (score > 19)
+    // EL G3 E8(→G2:4) × 5 = 20
+    await reset(page);
+    await addMany(page, [
+      ["EL", "G3", "E8"],
+      ["MATH", "G3", "E8"],
+      ["HIST", "G3", "E8"],
+      ["GEOG", "G3", "E8"],
+      ["CHEM", "G3", "E8"],
+    ]);
+    {
+      const applied = await getResult(page, "Applied Science, Engineering");
+      const biz = await getResult(page, "Business, Services");
+      ok(
+        !applied.isEligible,
+        "ITE2-02",
+        `Applied Sci Not Eligible (score=20 > 19; actual:${applied.gross})`,
+      );
+      ok(
+        !biz.isEligible,
+        "ITE2-02",
+        `Biz Not Eligible (score=20 > 19; actual:${biz.gross})`,
+      );
+    }
+
+    // ITE2-03: G3 F9 counts toward ITE Year 2 score but is excluded from PFP computation
+    // EL G3 A1(→G2:1) + MA G3 A1(→G2:1) + HIST G3 F9(→G2:5) + GEOG G3 D7(→G2:3) + BIO G3 D7(→G2:3)
+    // ITE Year 2 score = 1+1+5+3+3 = 13 (F9 included) → Applied Sci Eligible (EL G2:1 ≤ 4 MER passes)
+    // PFP-Hum: HIST G3 F9 excluded → only 4 valid subjects → insufficient B subjects → Not Eligible
+    await reset(page);
+    await addMany(page, [
+      ["EL", "G3", "A1"],
+      ["MATH", "G3", "A1"],
+      ["HIST", "G3", "F9"],
+      ["GEOG", "G3", "D7"],
+      ["BIO", "G3", "D7"],
+    ]);
+    {
+      const applied = await getResult(page, "Applied Science, Engineering");
+      const pfp = await getResult(page, "PFP) - Humanities");
+      ok(
+        applied.isEligible,
+        "ITE2-03",
+        `Applied Sci Eligible (HIST G3 F9 counts as G2:5; gross=${applied.gross})`,
+      );
+      ok(
+        applied.gross === 13,
+        "ITE2-03",
+        `Applied Sci gross=13 (F9→G2:5 included; actual:${applied.gross})`,
+      );
+      ok(
+        !pfp.isEligible,
+        "ITE2-03",
+        "PFP-Hum Not Eligible (G3 F9 excluded from PFP → insufficient B subjects)",
+      );
+    }
+
+    // ITE2-04: EL G2 5 fails MER for both clusters
+    // EL G2 5 + MA G3 A1(→G2:1) + HIST/GEOG/BIO G3 A1(→G2:1 each) → Score=5+1+1+1+1=9 ≤ 19
+    // Applied Sci: EL G2:5 > 4 → Not Eligible; Biz: EL G2:5 > 3 → Not Eligible
+    await reset(page);
+    await addMany(page, [
+      ["EL", "G2", "5"],
+      ["MATH", "G3", "A1"],
+      ["HIST", "G3", "A1"],
+      ["GEOG", "G3", "A1"],
+      ["BIO", "G3", "A1"],
+    ]);
+    {
+      const applied = await getResult(page, "Applied Science, Engineering");
+      const biz = await getResult(page, "Business, Services");
+      ok(
+        !applied.isEligible,
+        "ITE2-04",
+        "Applied Sci Not Eligible (EL G2:5 > MER threshold G2:4)",
+      );
+      ok(
+        !biz.isEligible,
+        "ITE2-04",
+        "Biz Not Eligible (EL G2:5 > MER threshold G2:3)",
+      );
+    }
+
+    // ITE2-05: EL G3 E8(→G2:4) passes Applied Sci MER (≤4) but fails Biz MER (≤3)
+    // EL G3 E8(→G2:4) + MA G3 A1 + HIST/GEOG/BIO G3 A1 → Score=4+1+1+1+1=8 ≤ 19
+    await reset(page);
+    await addMany(page, [
+      ["EL", "G3", "E8"],
+      ["MATH", "G3", "A1"],
+      ["HIST", "G3", "A1"],
+      ["GEOG", "G3", "A1"],
+      ["BIO", "G3", "A1"],
+    ]);
+    {
+      const applied = await getResult(page, "Applied Science, Engineering");
+      const biz = await getResult(page, "Business, Services");
+      ok(
+        applied.isEligible,
+        "ITE2-05",
+        "Applied Sci Eligible (EL G2:4 ≤ MER threshold G2:4)",
+      );
+      ok(
+        !biz.isEligible,
+        "ITE2-05",
+        "Biz Not Eligible (EL G2:4 > Biz MER threshold G2:3)",
+      );
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // PHASE 11 — CCA Bonus Points
     // ════════════════════════════════════════════════════════════════════════
     console.log("\n── Phase 11: CCA Bonus Points ──");
@@ -1383,7 +1529,7 @@ function ok(cond, id, msg) {
       ["CHEM", "G3", "D7"],
     ]);
     {
-      const r = await getResult(page, "ELR2B2-B");
+      const r = await getResult(page, "Business & Management");
       ok(
         r.isEligible,
         "CCA-01",
@@ -1406,7 +1552,7 @@ function ok(cond, id, msg) {
       ["CHEM", "G3", "E8"],
     ]);
     {
-      const r = await getResult(page, "ELR2B2-B");
+      const r = await getResult(page, "Business & Management");
       ok(
         r.isEligible,
         "CCA-02",
