@@ -310,6 +310,86 @@ function buildITEYr2Profile(elG2, mathG2, targetScore) {
       false,
       false,
     );
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Phase III: Conditional Admission Spot Checks
+    //
+    // CA fires when: merMet=false AND grossScore ≤ grossThreshold AND
+    //   (gross ≤ simpleCaThreshold  OR  all 4 R-subjects numericGrade ≤ 2)
+    // simpleCaThreshold: 12 for JC (threshold ≤ 16), 15 for MI (threshold > 16)
+    //
+    // isCA = scoreMet && !merMet && conditionalAdmission
+    // isEligible = scoreMet && (merMet || conditionalAdmission)
+    // ══════════════════════════════════════════════════════════════════════════
+    console.log("\n── Phase III: Conditional Admission Spot Checks ──");
+
+    async function checkCA(
+      profileKey,
+      subjects,
+      expectJCElig,
+      expectJCCA,
+      expectMIElig,
+      expectMICA,
+    ) {
+      const results = await calc(page, subjects);
+      const jc = results.find((p) => p.id === "jc");
+      const mi = results.find((p) => p.id === "mi");
+      ok(
+        jc?.isEligible === expectJCElig,
+        `CA_${profileKey}_jc_elig`,
+        `JC ${expectJCElig ? "Eligible" : "NotEligible"} (actual:${jc?.isEligible}, gross:${jc?.grossScore})`,
+      );
+      ok(
+        jc?.isCA === expectJCCA,
+        `CA_${profileKey}_jc_isca`,
+        `JC isCA=${expectJCCA} (actual:${jc?.isCA})`,
+      );
+      ok(
+        mi?.isEligible === expectMIElig,
+        `CA_${profileKey}_mi_elig`,
+        `MI ${expectMIElig ? "Eligible" : "NotEligible"} (actual:${mi?.isEligible}, gross:${mi?.grossScore})`,
+      );
+      ok(
+        mi?.isCA === expectMICA,
+        `CA_${profileKey}_mi_isca`,
+        `MI isCA=${expectMICA} (actual:${mi?.isCA})`,
+      );
+    }
+
+    // gross=11, EL D7 fails MER: 11 ≤ 12 (JC CA threshold) and 11 ≤ 15 (MI CA threshold)
+    // EL(7)+HIST(1)+MATH(1)+GEOG(1)+MT(1) = 11 → JC CA ✓  MI CA ✓
+    await checkCA(
+      "gross11_el_fail",
+      [
+        { subjectId: "EL", level: "G3", grade: "D7" },
+        { subjectId: "HIST", level: "G3", grade: "A1" },
+        { subjectId: "MATH", level: "G3", grade: "A1" },
+        { subjectId: "GEOG", level: "G3", grade: "A1" },
+        { subjectId: "MT", level: "G3", grade: "A1" },
+      ],
+      true,
+      true, // JC: Eligible via CA
+      true,
+      true, // MI: Eligible via CA
+    );
+
+    // gross=13, EL D7 fails MER: 13 > 12 and GEOG(B3=3) prevents "all R ≤ 2" JC CA path
+    // but 13 ≤ 15 still triggers MI CA
+    // EL(7)+HIST(1)+MATH(1)+GEOG(3)+MT(1) = 13 → JC Not Eligible  MI CA ✓
+    await checkCA(
+      "gross13_el_fail",
+      [
+        { subjectId: "EL", level: "G3", grade: "D7" },
+        { subjectId: "HIST", level: "G3", grade: "A1" },
+        { subjectId: "MATH", level: "G3", grade: "A1" },
+        { subjectId: "GEOG", level: "G3", grade: "B3" },
+        { subjectId: "MT", level: "G3", grade: "A1" },
+      ],
+      false,
+      false, // JC: NotEligible (above JC CA threshold, R not all ≤ 2)
+      true,
+      true, // MI: Eligible via CA (13 ≤ 15)
+    );
   } finally {
     await browser.close();
 
