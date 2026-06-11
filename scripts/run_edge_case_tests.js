@@ -1,6 +1,6 @@
 /**
  * Edge Case Test Suite — Student Pathway Dashboard
- * Phases 1–12 (Phase 13 Improvement Suggestions skipped — see anti-hang protocol)
+ * Phases 1–13 (all phases from the original plan)
  *
  * Run: node scripts/run_edge_case_tests.js
  *
@@ -87,6 +87,28 @@ async function getResult(page, nameSubstr) {
     }
     return { found: false };
   }, nameSubstr);
+}
+
+/** Extract all improvement suggestion cards from the page. */
+async function getSuggestions(page) {
+  await page.waitForTimeout(600);
+  return page.evaluate(() => {
+    const c = document.getElementById("improvementSuggestionsContainer");
+    if (!c) return [];
+    return Array.from(c.children).map((card) => {
+      const h4 = card.querySelector("h4");
+      const spans = Array.from(card.querySelectorAll("span"));
+      const pathways = Array.from(card.querySelectorAll("li")).map((li) =>
+        li.textContent.trim(),
+      );
+      return {
+        subject: h4 ? h4.textContent.replace("Improve ", "").trim() : "",
+        fromGrade: spans[0] ? spans[0].textContent.trim() : "",
+        toGrade: spans[1] ? spans[1].textContent.trim() : "",
+        pathways,
+      };
+    });
+  });
 }
 
 function ok(cond, id, msg) {
@@ -1698,6 +1720,106 @@ function ok(cond, id, msg) {
         "MT-05",
         `gross=5 expected 5 (G1 MT not counted; actual:${r.gross})`,
       );
+    }
+    // ════════════════════════════════════════════════════════════════════════
+    // PHASE 13 — Improvement Suggestions
+    // Tests that single-grade improvements produce correct suggestion cards.
+    // Only suggestions that unlock NEW pathways appear in the UI.
+    // ════════════════════════════════════════════════════════════════════════
+    console.log("\n── Phase 13: Improvement Suggestions ──");
+
+    // SUG-01: EL D7 drag score to 17 → JC/MI not eligible.
+    // Improving EL D7→C6 drops score to 16 and fixes EL MER → unlocks JC (and MI).
+    await reset(page);
+    await addMany(page, [
+      ["EL", "G3", "D7"],
+      ["MATH", "G3", "A1"],
+      ["HIST", "G3", "A1"],
+      ["GEOG", "G3", "A1"],
+      ["MT", "G3", "D7"],
+    ]);
+    {
+      const sugs = await getSuggestions(page);
+      const elSug = sugs.find(
+        (s) =>
+          s.subject === "English Language" &&
+          s.fromGrade.includes("D7") &&
+          s.toGrade.includes("C6"),
+      );
+      ok(
+        !!elSug,
+        "SUG-01",
+        `Suggestion to improve English Language D7→C6 exists (found ${sugs.length} suggestions)`,
+      );
+      ok(
+        !!(elSug && elSug.pathways.some((p) => p.includes("Junior College"))),
+        "SUG-01",
+        "EL D7→C6 suggestion lists Junior College (JC) as unlocked pathway",
+      );
+    }
+
+    // SUG-02: MATH E8 fails MER → MI not eligible (score=18 ≤ 20 but MATH MER fails).
+    // Improving MATH E8→D7 fixes MATH MER → unlocks Millennia Institute.
+    await reset(page);
+    await addMany(page, [
+      ["EL", "G3", "A1"],
+      ["MATH", "G3", "E8"],
+      ["HIST", "G3", "A1"],
+      ["GEOG", "G3", "A1"],
+      ["MT", "G3", "D7"],
+    ]);
+    {
+      const sugs = await getSuggestions(page);
+      const mathSug = sugs.find(
+        (s) =>
+          s.subject === "Mathematics" &&
+          s.fromGrade.includes("E8") &&
+          s.toGrade.includes("D7"),
+      );
+      ok(
+        !!mathSug,
+        "SUG-02",
+        `Suggestion to improve Mathematics E8→D7 exists (found ${sugs.length} suggestions)`,
+      );
+      ok(
+        !!(
+          mathSug &&
+          mathSug.pathways.some((p) => p.includes("Millennia Institute"))
+        ),
+        "SUG-02",
+        "MATH E8→D7 suggestion lists Millennia Institute (MI) as unlocked pathway",
+      );
+    }
+
+    // SUG-03: PFP-Hum score=13 > 12 → not eligible.
+    // Improving any of EL/MATH/HIST by 1 grade drops score to 12 → PFP-Hum eligible.
+    await reset(page);
+    await addMany(page, [
+      ["EL", "G3", "D7"],
+      ["MATH", "G3", "D7"],
+      ["HIST", "G3", "D7"],
+      ["GEOG", "G3", "C6"],
+      ["CHEM", "G3", "C6"],
+    ]);
+    {
+      const sugs = await getSuggestions(page);
+      const pfpSug = sugs.find((s) =>
+        s.pathways.some((p) => p.includes("Foundation Programme")),
+      );
+      ok(
+        !!pfpSug,
+        "SUG-03",
+        `At least one suggestion unlocks PFP pathway (found ${sugs.length} suggestions)`,
+      );
+      if (pfpSug) {
+        ok(
+          pfpSug.pathways.some((p) => p.includes("Humanities")),
+          "SUG-03",
+          `PFP-Hum listed in suggestion for subject "${pfpSug.subject}" (${pfpSug.fromGrade}→${pfpSug.toGrade})`,
+        );
+      } else {
+        ok(false, "SUG-03", "PFP-Hum not found in any suggestion pathways");
+      }
     }
   } finally {
     await browser.close();
