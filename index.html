@@ -2970,14 +2970,6 @@
           if (pathway.group === "JC/MI" && !overallMerMet) {
             const grossScore = pathway.grossScore;
             const grossThreshold = pathway.requirements?.grossL1R4;
-            console.log(
-              "[CA DEBUG]",
-              pathway.name,
-              "group=" + pathway.group,
-              "grossScore=" + grossScore,
-              "grossThreshold=" + grossThreshold,
-              "overallMerMet=" + overallMerMet,
-            );
             if (
               grossScore !== undefined &&
               grossScore !== Infinity &&
@@ -2987,9 +2979,6 @@
               const simpleCaThreshold = grossThreshold <= 16 ? 12 : 15;
               if (grossScore <= simpleCaThreshold) {
                 conditionalAdmission = true;
-                console.log(
-                  "[CA DEBUG] → conditionalAdmission=true (simple threshold)",
-                );
               } else {
                 const rSubjects = (
                   subjectsUsedForScoreCalculation || []
