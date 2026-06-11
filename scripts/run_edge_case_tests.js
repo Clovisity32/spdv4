@@ -89,6 +89,19 @@ async function getResult(page, nameSubstr) {
   }, nameSubstr);
 }
 
+/** Return group names in the order they appear in the DOM (top → bottom). */
+async function getGroupOrder(page) {
+  return page.evaluate(() => {
+    const container = document.getElementById("eligibilityResultsContainer");
+    return Array.from(container.querySelectorAll(".col-span-full.mb-6"))
+      .map((section) => {
+        const h3 = section.querySelector("h3");
+        return h3 ? h3.textContent.trim() : null;
+      })
+      .filter(Boolean);
+  });
+}
+
 /** Extract all improvement suggestion cards from the page. */
 async function getSuggestions(page) {
   await page.waitForTimeout(600);
@@ -1916,6 +1929,71 @@ function ok(cond, id, msg) {
         r.gross === null,
         "2YN-04",
         `gross=null when EL absent (Score: N/A shown; actual:${r.gross})`,
+      );
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Phase 15: Eligibility-First Group Sort
+    // groupedPathways insertion order: JC/MI(0) Poly(1) PFP(2) ITE-Y2(3) ITE-Y1(4) ITE-2Yr(5)
+    // Groups with ≥1 eligible pathway sort before groups with none; stable within each tier.
+    // ════════════════════════════════════════════════════════════════════════
+    console.log("\n── Phase 15: Eligibility-First Group Sort ──");
+
+    // SORT-01: Eligible group appears before Not-Eligible group in DOM
+    // Profile: EL E8 fails JC/Poly/ITE-Y2 MER → only ITE-Y1 and ITE-2Yr eligible
+    // Expected: ITE Year 1 (pos=4, eligible) rendered before JC/MI (pos=0, not eligible)
+    await reset(page);
+    await addMany(page, [
+      ["EL", "G3", "E8"],
+      ["MATH", "G3", "C6"],
+      ["BIO", "G3", "C6"],
+      ["HIST", "G3", "B4"],
+      ["GEOG", "G3", "B4"],
+    ]);
+    {
+      const order = await getGroupOrder(page);
+      const iY1 = order.indexOf("ITE Year 1 Higher Nitec");
+      const iJC = order.indexOf("JC/MI");
+      ok(
+        iY1 !== -1 && iJC !== -1 && iY1 < iJC,
+        "SORT-01",
+        `Eligible group "ITE Year 1" (pos ${iY1}) before Not-Eligible "JC/MI" (pos ${iJC})`,
+      );
+    }
+
+    // SORT-02: Among Not-Eligible groups, original insertion order preserved
+    // Same profile: JC/MI (not eligible, original 0) and Poly (not eligible, original 1)
+    // Expected: JC/MI appears before Polytechnic Year 1 in DOM
+    {
+      const order = await getGroupOrder(page);
+      const iJC = order.indexOf("JC/MI");
+      const iPoly = order.indexOf("Polytechnic Year 1");
+      ok(
+        iJC !== -1 && iPoly !== -1 && iJC < iPoly,
+        "SORT-02",
+        `Not-Eligible "JC/MI" (pos ${iJC}) before "Polytechnic Year 1" (pos ${iPoly}) — original order preserved`,
+      );
+    }
+
+    // SORT-03: Among Eligible groups, original insertion order preserved
+    // Profile: EL D7 → PFP-Hum eligible (orig 2) and ITE-Y2 eligible (orig 3)
+    // Expected: PFP appears before ITE Year 2 Higher Nitec in DOM
+    await reset(page);
+    await addMany(page, [
+      ["EL", "G3", "D7"],
+      ["MATH", "G3", "C6"],
+      ["BIO", "G3", "C6"],
+      ["HIST", "G3", "B4"],
+      ["GEOG", "G3", "B4"],
+    ]);
+    {
+      const order = await getGroupOrder(page);
+      const iPFP = order.indexOf("PFP");
+      const iY2 = order.indexOf("ITE Year 2 Higher Nitec");
+      ok(
+        iPFP !== -1 && iY2 !== -1 && iPFP < iY2,
+        "SORT-03",
+        `Eligible "PFP" (pos ${iPFP}) before Eligible "ITE Year 2 Higher Nitec" (pos ${iY2}) — original order preserved`,
       );
     }
   } finally {
