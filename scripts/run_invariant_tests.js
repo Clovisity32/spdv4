@@ -390,6 +390,25 @@ function buildITEYr2Profile(elG2, mathG2, targetScore) {
       true,
       true, // MI: Eligible via CA (13 ≤ 15)
     );
+
+    // gross=16, EL E8 fails MER: 16 > simpleCaThreshold for both JC (12) and MI (15)
+    // CA fires via "all 4 R-subjects ≤ 2" path: HIST(A2=2)+MATH(A2=2)+GEOG(A2=2)+MT(A2=2)
+    // EL(8)+HIST(2)+MATH(2)+GEOG(2)+MT(2) = 16 → JC CA ✓  MI CA ✓
+    // Contrast with el_mer_fail (gross=16, GEOG B4=4): that case has R not all ≤ 2 → no CA
+    await checkCA(
+      "all_r_grade2_el_fail",
+      [
+        { subjectId: "EL", level: "G3", grade: "E8" },
+        { subjectId: "HIST", level: "G3", grade: "A2" },
+        { subjectId: "MATH", level: "G3", grade: "A2" },
+        { subjectId: "GEOG", level: "G3", grade: "A2" },
+        { subjectId: "MT", level: "G3", grade: "A2" },
+      ],
+      true,
+      true, // JC: Eligible via CA ("all R ≤ 2" path fires)
+      true,
+      true, // MI: Eligible via CA ("all R ≤ 2" path fires)
+    );
   } finally {
     await browser.close();
 
