@@ -205,7 +205,7 @@ async function advise(page, subjects) {
       S("MATH", "G3", "F9", 35),
       S("COMB_SCI", "G3", "E8", 42),
       S("COMB_HUM", "G3", "D7", 49),
-      S("POA", "G3", "F9", 35),
+      S("DT", "G3", "F9", 35),
     ]);
     ok(
       !a.options[0].applicable,
@@ -213,16 +213,42 @@ async function advise(page, subjects) {
       "Subjects within reach of the next grade are never advised to be dropped",
     );
     ok(
-      a.recommended.id === 0 &&
+      a.recommended.id === 4 &&
         a.after.realistic === a.before.realistic &&
-        a.options.some((o) => o.id === 0),
+        a.after.realistic === 8 &&
+        a.options.find((o) => o.id === 3).realistic === 6,
       "P4b-4",
-      "Profile B: status quo wins (8 realistic) over the compulsory moves (6)",
+      "Profile B: keeping 8 realistic pathways beats the compulsory moves (6); D&T is lowered for free",
     );
     ok(
-      a.recommended.conflicts.some((c) => c.id === "C6"),
+      a.freeMoves.length === 1 &&
+        /Design & Technology at G2 \(G3 F9 → projected G2 5\)/.test(
+          a.freeMoves[0].text,
+        ) &&
+        /costs you no pathway/.test(a.freeMoves[0].reason),
+      "P4b-6",
+      "D&T is the free move: no pathway uses it, so lowering it costs nothing",
+    );
+    ok(
+      a.recommended.conflicts.some((c) => c.id === "C6") &&
+        !/Design & Technology/.test(
+          a.recommended.conflicts.find((c) => c.id === "C6").text,
+        ),
       "P4b-5",
-      "Status quo flags the subjects that would normally move down",
+      "Option 4 still flags Maths and Science as normally moving down, but not the free-moved D&T",
+    );
+    a = await advise(page, [
+      S("EL", "G3", "B3", 69),
+      S("MT", "G3", "C6", 50),
+      S("MATH", "G3", "F9", 31),
+      S("COMB_SCI", "G3", "D7", 47),
+      S("COMB_HUM", "G3", "E8", 43),
+      S("POA", "G3", "F9", 38),
+    ]);
+    ok(
+      !a.freeMoves.some((f) => /Mathematics/.test(f.name)),
+      "P4b-7",
+      "Profile A: Maths is not a free move because pathways use it",
     );
     a = await advise(page, [
       S("EL", "G3", "B3"),
@@ -345,7 +371,7 @@ async function advise(page, subjects) {
       S("MATH", "G3", "F9", 35),
       S("COMB_SCI", "G3", "E8", 42),
       S("COMB_HUM", "G3", "D7", 49),
-      S("POA", "G3", "F9", 35),
+      S("DT", "G3", "F9", 35),
     ]);
     ok(
       a.levels[0].count === 4 &&

@@ -3318,11 +3318,13 @@
           1: "Reduce the number of subjects",
           2: "Move one elective down a level",
           3: "Compulsory lower level",
+          4: "Stay, and lower subjects no pathway needs",
         };
         const OPTION_NOT_APPLICABLE = {
           1: "No subject can be dropped without losing a realistic pathway, or you are already at the minimum number of subjects.",
           2: "Moving any one subject down a level would not add a realistic pathway.",
           3: "No subject is at G3 E8/F9 or G2 grade 6.",
+          4: "Every weak subject is used by a pathway, or cannot move down a level at this school.",
         };
 
         // Scores three alternative options from the student's original results
@@ -3334,6 +3336,7 @@
           const nameOf = (s) =>
             getSubjectById(s.subjectId)?.name || s.subjectId;
           const gradeText = (s) => `${s.level} ${s.grade}`;
+          const marksText = (n) => `${n} mark${n === 1 ? "" : "s"}`;
           const baseEval = evaluateRealistic(base);
           const baseOf = (s) => base.find((b) => b.subjectId === s.subjectId);
 
@@ -3596,28 +3599,104 @@
 
           // ---- Status quo: keep the current combination ----
           const compulsoryNow = base.filter(isCompulsoryLower);
+          const stayConflicts = (list, skip) =>
+            list.length
+              ? [
+                  {
+                    id: "C6",
+                    title: "Some subjects would normally move to a lower level",
+                    text: `${list.map((s) => `${nameOf(s)} (${gradeText(s)})`).join(", ")} would normally move to a lower level. Staying keeps ${baseEval.realistic.size} realistic pathway${baseEval.realistic.size === 1 ? "" : "s"}, versus ${opt3.eval.realistic.size} if they move. Confirm with your teacher or HOD that staying is acceptable.`,
+                  },
+                  ...opt3.conflicts.filter(
+                    (c) =>
+                      c.id === "C4" &&
+                      !skip.some((s) => c.title.startsWith(nameOf(s))),
+                  ),
+                ]
+              : [];
           const opt0 = {
             id: 0,
             applicable: true,
             subjects: base,
             eval: baseEval,
-            conflicts: compulsoryNow.length
-              ? [
-                  {
-                    id: "C6",
-                    title: "Some subjects would normally move to a lower level",
-                    text: `${compulsoryNow.map((s) => `${nameOf(s)} (${gradeText(s)})`).join(", ")} would normally move to a lower level. Staying keeps ${baseEval.realistic.size} realistic pathway${baseEval.realistic.size === 1 ? "" : "s"}, versus ${opt3.eval.realistic.size} if they move. Confirm with your teacher or HOD that staying is acceptable.`,
-                  },
-                  ...opt3.conflicts.filter((c) => c.id === "C4"),
-                ]
-              : [],
+            conflicts: stayConflicts(compulsoryNow, []),
+          };
+
+          // ---- Option 4: stay, but lower weak subjects no pathway needs ----
+          const keepsAll = (e) =>
+            idsMissing(baseEval.realistic, e.realistic).length === 0 &&
+            idsMissing(baseEval.eligible, e.eligible).length === 0;
+          // A subject is "free" only if no pathway uses it at all (the pathway
+          // calculations record which subjects they counted) and removing it
+          // changes neither today's nor the realistic pathways.
+          const usedIds = new Set(
+            calculateAllPathwaysStatus(base).flatMap((x) =>
+              (x.subjectsUsed || []).map((u) => u.subjectId),
+            ),
+          );
+          const contributes = (s) =>
+            usedIds.has(s.subjectId) ||
+            !keepsAll(
+              evaluateRealistic(
+                base.filter((x) => x.subjectId !== s.subjectId),
+              ),
+            );
+          const isWeakGrade = (s) =>
+            (s.level === "G3" && getNumericGrade(s.grade, "G3") >= 8) ||
+            (s.level === "G2" && getNumericGrade(s.grade, "G2") >= 5);
+          const applyFree = (list) =>
+            base.map((s) => {
+              const f = list.find((x) => x.subject.subjectId === s.subjectId);
+              return f ? f.moved : s;
+            });
+          let free = base
+            .filter((s) => isWeakGrade(s) && moveDown(s) && !contributes(s))
+            .map((s) => ({ subject: s, moved: moveDown(s) }));
+          let freeSubjects = base;
+          let freeEval = baseEval;
+          if (free.length) {
+            let e = evaluateRealistic(applyFree(free));
+            if (!keepsAll(e)) {
+              // The moves interact: keep only the weakest one.
+              free = [...free]
+                .sort((x, y) => weakness(y.subject) - weakness(x.subject))
+                .slice(0, 1);
+              e = evaluateRealistic(applyFree(free));
+              if (!keepsAll(e)) free = [];
+            }
+            if (free.length) {
+              freeSubjects = applyFree(free);
+              freeEval = e;
+            }
+          }
+          free.forEach((f) => {
+            const orig = f.subject;
+            const failing =
+              (orig.level === "G3" && orig.grade === "F9") ||
+              (orig.level === "G2" && orig.grade === "6");
+            const r = reachInfo(orig);
+            f.text = `Take ${nameOf(orig)} at ${f.moved.level} (${gradeText(orig)} → projected ${gradeText(f.moved)})`;
+            f.reason = `${nameOf(orig)} (${gradeText(orig)}) is not used by any pathway you are eligible for or within reach of, so taking it at ${gradeText(f.moved)} costs you no pathway. ${failing ? "It turns a failing grade into a projected pass." : "It moves the subject away from the edge of a pass."}${r.status === "reachable" ? ` Improving it by ${marksText(r.needed)} would not unlock anything either.` : ""}`;
+          });
+          const opt4 = {
+            id: 4,
+            applicable: free.length > 0,
+            free,
+            subjects: freeSubjects,
+            eval: freeEval,
+            conflicts: stayConflicts(
+              compulsoryNow.filter(
+                (s) => !free.some((f) => f.subject.subjectId === s.subjectId),
+              ),
+              free.map((f) => f.subject),
+            ),
           };
 
           // ---- Choose the single best option ----
           // Ties go to the least disruptive: drop a subject, then stay, then
           // move one subject, then the compulsory moves.
-          const tieRank = { 1: 0, 0: 1, 2: 2, 3: 3 };
-          const best = [opt0, opt1, opt2, opt3]
+          const tieRank = { 1: 0, 4: 1, 0: 2, 2: 3, 3: 4 };
+          const best = [opt0, opt1, opt2, opt3, opt4]
             .filter((o) => o.applicable)
             .sort(
               (a, b) =>
@@ -3631,15 +3710,22 @@
               ? OPTION_NOT_APPLICABLE[o.id]
               : o.id === 0
                 ? "Keep all subjects and levels as they are"
-                : o.id === 1
-                  ? `Drop ${nameOf(o.drops[0].subject)}`
-                  : o.id === 2
-                    ? `Take ${nameOf(o.pick.subject)} at ${o.pick.moved.level}`
-                    : o.mode === "all"
-                      ? "Take ALL subjects one level lower"
-                      : `Take ${o.moves.map(nameOf).join(", ")} at the lower level`;
+                : o.id === 4
+                  ? `Stay as you are, but ${o.free.map((f) => f.text.charAt(0).toLowerCase() + f.text.slice(1)).join("; ")}`
+                  : o.id === 1
+                    ? `Drop ${nameOf(o.drops[0].subject)}`
+                    : o.id === 2
+                      ? `Take ${nameOf(o.pick.subject)} at ${o.pick.moved.level}`
+                      : o.mode === "all"
+                        ? "Take ALL subjects one level lower"
+                        : `Take ${o.moves.map(nameOf).join(", ")} at the lower level`;
           const checklistFor = (o) => {
             if (o.id === 0) return ["Keep your current subjects and levels."];
+            if (o.id === 4)
+              return [
+                "Keep your other subjects and levels as they are.",
+                ...o.free.map((f) => `${f.text}.`),
+              ];
             if (o.id === 1)
               return o.drops.map((d) => `Drop ${nameOf(d.subject)}.`);
             if (o.id === 2)
@@ -3666,12 +3752,17 @@
             if (o.id === 0)
               return [
                 `Staying keeps ${o.eval.realistic.size} realistic pathway${o.eval.realistic.size === 1 ? "" : "s"}, which is as many as or more than any other option.`,
-                ...[opt1, opt2, opt3]
+                ...[opt1, opt2, opt3, opt4]
                   .filter((x) => x.applicable)
                   .map(
                     (x) =>
                       `Option ${x.id} (${summaryFor(x)}) would give ${x.eval.realistic.size}.`,
                   ),
+              ];
+            if (o.id === 4)
+              return [
+                ...o.free.map((f) => f.reason),
+                `Every pathway you are eligible for or within reach of stays open (${o.eval.realistic.size} realistic).`,
               ];
             if (o.id === 1)
               return [
@@ -3854,7 +3945,6 @@
               };
 
           // ---- Pathway levels: today -> realistic -> bigger improvements ----
-          const marksText = (n) => `${n} mark${n === 1 ? "" : "s"}`;
           const afterDesc = describeEval(afterEval);
           const reachMap = new Map();
           afterDesc.potential.forEach((pw) =>
@@ -3945,7 +4035,11 @@
                 (id) => !baseEval.eligible.has(id),
               ),
             ),
-            structural: recommended.id !== 0 ? recommended.checklist : [],
+            // Free moves (Option 4) unlock nothing, so they are not a next step.
+            structural:
+              recommended.id === 0 || recommended.id === 4
+                ? []
+                : recommended.checklist,
             reachActions,
             byGroup: countByGroup(afterEval.realistic),
           };
@@ -4318,7 +4412,7 @@
               ...describeEval(afterEval),
             },
             recommended,
-            options: [opt1, opt2, opt3, opt0].map((o) => ({
+            options: [opt1, opt2, opt3, opt0, opt4].map((o) => ({
               ...o,
               title: OPTION_TITLES[o.id],
               summary: summaryFor(o),
@@ -4329,6 +4423,11 @@
             reach,
             decision: { ladder, breakEvens },
             levels: levelsList,
+            freeMoves: free.map((f) => ({
+              name: nameOf(f.subject),
+              text: f.text,
+              reason: f.reason,
+            })),
             staircase,
             final: best ? best.subjects : base,
           };
@@ -4402,7 +4501,10 @@
               return `<details class="mt-4 mb-2"><summary class="cursor-pointer text-sm font-bold ${tierText[tr.tier]}" style="${indent(tr.tier)}">${label} (click to expand)</summary><div class="mt-2">${stepHtml(tr)}</div></details>`;
             return `<div class="mt-4 mb-2" style="${indent(tr.tier)}"><p class="text-sm font-bold ${tierText[tr.tier]}">${label}</p></div>${stepHtml(tr)}`;
           };
-          const stairs = `<div class="mb-6 p-4 rounded-lg bg-slate-900/60 border border-slate-600"><p class="text-lg font-semibold text-slate-100">Pathway staircase</p><p class="text-xs text-slate-400 mt-1">Read from the bottom up. Each step is one pathway with the easiest way to reach it. The higher the step, the more effort it needs.</p>${a.hasAnyRawMark ? "" : '<p class="text-sm text-amber-300 mt-2">Add raw marks so the steps can show how many marks each improvement needs.</p>'}${tiersTopDown.map(bandHtml).join("")}${hasToday ? "" : `<div class="mt-4" style="${indent(0)}"><p class="text-sm font-bold text-amber-300">★ YOU ARE HERE · No pathway is open yet</p></div>`}</div>`;
+          const freeHtml = a.freeMoves.length
+            ? `<div class="mt-3 p-3 rounded-lg bg-emerald-900/30 border border-emerald-500 text-sm"><p class="font-semibold text-emerald-300">Free move: no pathway depends on ${esc(a.freeMoves.map((f) => f.name).join(", "))}</p><ul class="list-disc list-inside text-slate-200 mt-1">${a.freeMoves.map((f) => `<li>${esc(f.text)}. ${esc(f.reason)}</li>`).join("")}</ul></div>`
+            : "";
+          const stairs = `<div class="mb-6 p-4 rounded-lg bg-slate-900/60 border border-slate-600"><p class="text-lg font-semibold text-slate-100">Pathway staircase</p><p class="text-xs text-slate-400 mt-1">Read from the bottom up. Each step is one pathway with the easiest way to reach it. The higher the step, the more effort it needs.</p>${freeHtml}${a.hasAnyRawMark ? "" : '<p class="text-sm text-amber-300 mt-2">Add raw marks so the steps can show how many marks each improvement needs.</p>'}${tiersTopDown.map(bandHtml).join("")}${hasToday ? "" : `<div class="mt-4" style="${indent(0)}"><p class="text-sm font-bold text-amber-300">★ YOU ARE HERE · No pathway is open yet</p></div>`}</div>`;
 
           // ---- Recommended option (Level 2 detail) ----
           const L2 = a.levels[1];
