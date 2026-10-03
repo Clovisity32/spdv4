@@ -976,6 +976,20 @@ async function advise(page, subjects) {
       "P9-U3b",
       `Choice D lists each lowered subject on its own line (${dChoice.stepList.length}); every step lead-in is 12 words or fewer`,
     );
+    const shownText =
+      (await page.textContent("#resultsAdviceContainer")) +
+      (await page.$$eval(`${ROWS} summary`, (s) =>
+        s.map((x) => x.textContent).join(" "),
+      ));
+    ok(
+      !shownText.includes("MER (") &&
+        shownText.includes("ITE Higher Nitec: pass") &&
+        (await page.$$eval(ROWS, (rs) =>
+          rs.some((r) => r.dataset.name.startsWith("MER (")),
+        )),
+      "P9-U3c",
+      "Action Plan shows plain ITE route names, while data names stay unchanged",
+    );
     // Try your own mix
     await page.click("#customDetails summary");
     await page.click('[data-seg="MATH"][data-mode="lower"]');

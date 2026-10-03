@@ -4872,6 +4872,21 @@
           customOpen: false,
         };
         const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+        // Display-only plain-language names for the six ITE entry routes. The
+        // data names ("MER (...)") stay as they are: eligibility cards and tests use them.
+        const PLAIN_NAMES = [
+          [
+            "MER (Pass Math or Science)",
+            "ITE Higher Nitec: pass Math or a Science",
+          ],
+          ["MER (Pass EL & Math)", "ITE Higher Nitec: pass English and Math"],
+          ["MER (Pass EL)", "ITE Higher Nitec: pass English"],
+          ["MER (Complete SEC)", "ITE Higher Nitec: complete secondary school"],
+          ["MER (Pass Math)", "ITE Higher Nitec: pass Math"],
+          ["MER (Pass 2G3)", "ITE Higher Nitec: pass 2 subjects at G3"],
+        ];
+        const plain = (s) =>
+          PLAIN_NAMES.reduce((out, [a, b]) => out.split(a).join(b), String(s));
         const planChoice = () =>
           planView.a
             ? planView.a.choices.find((c) => c.key === planView.sel)
@@ -4888,9 +4903,9 @@
             .map((it) => {
               const [icon, cls] = tone[it.status] || tone.note;
               const rows = it.rows
-                ? `<ul class="mt-1 space-y-1.5">${it.rows.map((r) => `<li class="rounded border border-slate-700 bg-slate-900/40 px-3 py-2"><p class="text-slate-100">${esc(r.subject)} <span class="text-slate-400">${esc(r.now)} → ${esc(r.ifLowered)}</span></p><p class="text-xs text-slate-300">Helps a pathway: ${esc(r.helps)}</p><p class="${r.consider ? "text-amber-300 font-semibold" : "text-slate-300"}">${esc(r.suggestion)}</p></li>`).join("")}</ul><p class="text-xs text-slate-400 mt-1">${esc(it.note)}</p>`
+                ? `<ul class="mt-1 space-y-1.5">${it.rows.map((r) => `<li class="rounded border border-slate-700 bg-slate-900/40 px-3 py-2"><p class="text-slate-100">${esc(r.subject)} <span class="text-slate-400">${esc(r.now)} → ${esc(r.ifLowered)}</span></p><p class="text-xs text-slate-300">Helps a pathway: ${esc(plain(r.helps))}</p><p class="${r.consider ? "text-amber-300 font-semibold" : "text-slate-300"}">${esc(r.suggestion)}</p></li>`).join("")}</ul><p class="text-xs text-slate-400 mt-1">${esc(it.note)}</p>`
                 : "";
-              return `<div data-check="${esc(it.rule)}" class="mt-2 text-sm ${cls}"><p>${icon} ${esc(it.text)}</p>${rows}</div>`;
+              return `<div data-check="${esc(it.rule)}" class="mt-2 text-sm ${cls}"><p>${icon} ${esc(plain(it.text))}</p>${rows}</div>`;
             })
             .join("");
           const ok = check.passed
@@ -4928,10 +4943,10 @@
             .filter((x) => ["C1", "C2", "C5", "C6"].includes(x.id))
             .map(
               (x) =>
-                `<li><span class="font-semibold text-amber-300">${esc(x.title)}.</span> ${esc(x.text)}</li>`,
+                `<li><span class="font-semibold text-amber-300">${esc(plain(x.title))}.</span> ${esc(plain(x.text))}</li>`,
             )
             .join("");
-          return `<details data-before class="mt-3"${planView.open ? " open" : ""}><summary class="cursor-pointer text-sky-400 hover:text-sky-300 text-sm font-medium py-3">Before you decide</summary><p class="text-sm text-slate-200">Aim for the highest level you can realistically manage. Lowering a level can close pathways that need the higher level.</p><p class="text-sm font-semibold text-sky-300 mt-3">If you recalibrate, consider in this order</p>${orderHtml({ dropped: c.droppedIds || [], lowered: c.loweredIds || [] })}${c.reasons.length ? `<p class="text-sm font-semibold text-sky-300 mt-3">Why this choice</p><ul class="list-disc list-inside text-sm text-slate-300 space-y-1 mt-1">${c.reasons.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}${heads ? `<p class="text-sm font-semibold text-sky-300 mt-3">Heads-up</p><ul class="list-disc list-inside text-sm text-slate-300 space-y-1 mt-1">${heads}</ul>` : ""}${alsoFree.length ? `<p class="text-sm text-emerald-300 mt-3">Also free: ${alsoFree.map((f) => esc(f.text)).join("; ")}. No pathway uses ${alsoFree.length === 1 ? "it" : "them"}.</p>` : ""}</details>`;
+          return `<details data-before class="mt-3"${planView.open ? " open" : ""}><summary class="cursor-pointer text-sky-400 hover:text-sky-300 text-sm font-medium py-3">Before you decide</summary><p class="text-sm text-slate-200">Aim for the highest level you can realistically manage. Lowering a level can close pathways that need the higher level.</p><p class="text-sm font-semibold text-sky-300 mt-3">If you recalibrate, consider in this order</p>${orderHtml({ dropped: c.droppedIds || [], lowered: c.loweredIds || [] })}${c.reasons.length ? `<p class="text-sm font-semibold text-sky-300 mt-3">Why this choice</p><ul class="list-disc list-inside text-sm text-slate-300 space-y-1 mt-1">${c.reasons.map((t) => `<li>${esc(plain(t))}</li>`).join("")}</ul>` : ""}${heads ? `<p class="text-sm font-semibold text-sky-300 mt-3">Heads-up</p><ul class="list-disc list-inside text-sm text-slate-300 space-y-1 mt-1">${heads}</ul>` : ""}${alsoFree.length ? `<p class="text-sm text-emerald-300 mt-3">Also free: ${alsoFree.map((f) => esc(f.text)).join("; ")}. No pathway uses ${alsoFree.length === 1 ? "it" : "them"}.</p>` : ""}</details>`;
         };
 
         const resetLink = () =>
@@ -4953,11 +4968,11 @@
                   : "";
             })
             .filter(Boolean);
-          return `<h3 class="text-lg font-semibold text-slate-100">Your own mix</h3><ol class="list-decimal list-inside text-base font-semibold text-slate-100 space-y-1 mt-2">${steps.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>${r.gained.length ? `<p class="text-sm text-emerald-300 mt-2">Opens ${r.gained.length} more: ${esc(r.gained.join(", "))}.</p>` : ""}${checkHtml(r.check)}<div class="mt-2">${resetLink()}</div>`;
+          return `<h3 class="text-lg font-semibold text-slate-100">Your own mix</h3><ol class="list-decimal list-inside text-base font-semibold text-slate-100 space-y-1 mt-2">${steps.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>${r.gained.length ? `<p class="text-sm text-emerald-300 mt-2">Opens ${r.gained.length} more: ${esc(plain(r.gained.join(", ")))}.</p>` : ""}${checkHtml(r.check)}<div class="mt-2">${resetLink()}</div>`;
         };
 
         const choicePanelHtml = (c) =>
-          `<p class="text-xs font-semibold uppercase tracking-wide text-emerald-300">What to do next · Choice ${esc(c.key)}${c.isRecommended ? " ★" : ""}</p><h3 class="text-lg font-semibold text-slate-100 mt-1">${esc(c.label)}</h3><ol class="list-decimal list-inside text-base font-semibold text-slate-100 space-y-1 mt-3">${c.steps.map((t) => `<li>${esc(t)}${t.endsWith(":") && c.stepList.length ? `<ul data-step-list class="list-disc list-inside text-sm font-normal text-slate-200 ml-5 mt-1 space-y-0.5">${c.stepList.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</li>`).join("")}</ol>${c.gained.length ? `<p class="text-sm text-emerald-300 mt-2">Opens ${c.gained.length} more: ${esc(c.gained.join(", "))}.</p>` : ""}${checkHtml(c.check)}<div class="mt-2">${resetLink()}</div>${beforeDecideHtml(c)}`;
+          `<p class="text-xs font-semibold uppercase tracking-wide text-emerald-300">What to do next · Choice ${esc(c.key)}${c.isRecommended ? " ★" : ""}</p><h3 class="text-lg font-semibold text-slate-100 mt-1">${esc(c.label)}</h3><ol class="list-decimal list-inside text-base font-semibold text-slate-100 space-y-1 mt-3">${c.steps.map((t) => `<li>${esc(t)}${t.endsWith(":") && c.stepList.length ? `<ul data-step-list class="list-disc list-inside text-sm font-normal text-slate-200 ml-5 mt-1 space-y-0.5">${c.stepList.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</li>`).join("")}</ol>${c.gained.length ? `<p class="text-sm text-emerald-300 mt-2">Opens ${c.gained.length} more: ${esc(plain(c.gained.join(", ")))}.</p>` : ""}${checkHtml(c.check)}<div class="mt-2">${resetLink()}</div>${beforeDecideHtml(c)}`;
 
         // Badges on explorer rows follow the selected choice.
         function applyPlanBadges() {
@@ -5032,7 +5047,7 @@
           if (live) {
             const r = planView.customResult;
             live.textContent = r
-              ? `${plural(r.count, "pathway")} · ${r.lost.length ? `Gives up: ${r.lost.join(", ")}` : "Gives up: nothing"}`
+              ? `${plural(r.count, "pathway")} · ${r.lost.length ? `Gives up: ${plain(r.lost.join(", "))}` : "Gives up: nothing"}`
               : "Pick Keep, Lower or Drop for each subject to see the exact cost.";
           }
           const panel = resultsAdviceContainer.querySelector("#planPanel");
@@ -5174,7 +5189,7 @@
                     .map((i) => `${i.name} +${i.marks} to ${i.to}`)
                     .join(", ")}`
                 : "Keep every subject and level";
-            return `<button type="button" data-choice="${esc(c.key)}" aria-pressed="false" class="block w-full text-left rounded-lg border border-slate-600 bg-slate-900/40 hover:bg-slate-700/50 p-3 min-h-[44px] focus:outline-none focus:ring-2 focus:ring-cyan-500 aria-pressed:border-emerald-500 aria-pressed:bg-emerald-800/20">${head}<span class="block text-xs text-slate-300 mt-0.5">${esc(what)}</span><span class="flex flex-wrap gap-x-3 gap-y-0.5 text-xs mt-1"><span class="font-semibold text-slate-100">${esc(plural(c.count, "pathway"))}</span><span class="${c.lost.length ? "text-amber-300" : "text-emerald-300"}">${c.lost.length ? `Gives up: ${esc(joinNames(c.lost, 2))}` : "Gives up: nothing"}</span></span></button>`;
+            return `<button type="button" data-choice="${esc(c.key)}" aria-pressed="false" class="block w-full text-left rounded-lg border border-slate-600 bg-slate-900/40 hover:bg-slate-700/50 p-3 min-h-[44px] focus:outline-none focus:ring-2 focus:ring-cyan-500 aria-pressed:border-emerald-500 aria-pressed:bg-emerald-800/20">${head}<span class="block text-xs text-slate-300 mt-0.5">${esc(what)}</span><span class="flex flex-wrap gap-x-3 gap-y-0.5 text-xs mt-1"><span class="font-semibold text-slate-100">${esc(plural(c.count, "pathway"))}</span><span class="${c.lost.length ? "text-amber-300" : "text-emerald-300"}">${c.lost.length ? `Gives up: ${esc(plain(joinNames(c.lost, 2)))}` : "Gives up: nothing"}</span></span></button>`;
           };
           const segRow = (s) =>
             `<div class="flex flex-wrap items-center justify-between gap-2 py-1"><span class="text-sm text-slate-100">${esc(subjName(s))} <span class="text-slate-400">${esc(s.level)} ${esc(s.grade)}</span></span><span class="flex gap-1">${[
@@ -5303,7 +5318,7 @@
             )}<p class="text-sm text-slate-300 mt-3">${s.blocker ? `Marks alone will not be enough. Even top grades in your current subjects would leave: ${esc(s.blocker)}. This usually means taking a different subject or level.` : "Top grades across your current subjects would get you there. A longer-term goal worth keeping in view."}</p>`;
           };
           const rowHtml = (s) =>
-            `<details data-pw data-id="${esc(s.id)}" data-group="${esc(s.group)}" data-name="${esc(s.name)}" data-quick="${winsFor(s).length ? 1 : 0}" data-status="${statusOf(s)}" class="group rounded-lg border border-slate-600 bg-slate-900/40 mb-2"><summary class="flex items-center gap-3 p-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden"><span class="w-3 h-3 rounded-full shrink-0 ${dot[statusOf(s)]}"></span><span class="min-w-0 flex-1"><span class="block font-semibold text-slate-100">${esc(s.name)}</span><span class="block text-xs text-slate-400">${esc(shortText(s))}${winsFor(s).length ? ` · <span class="text-emerald-300">Quick win: ${esc(winsFor(s)[0].subject)} ${esc(winsFor(s)[0].short)}${winsFor(s).length > 1 ? ` (+${winsFor(s).length - 1})` : ""}</span>` : ""}</span><span data-plan-badge class="hidden"></span></span><span class="text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span></summary><div class="px-3 pb-3 pt-1 border-t border-slate-700">${bodyOf(s)}</div></details>`;
+            `<details data-pw data-id="${esc(s.id)}" data-group="${esc(s.group)}" data-name="${esc(s.name)}" data-quick="${winsFor(s).length ? 1 : 0}" data-status="${statusOf(s)}" class="group rounded-lg border border-slate-600 bg-slate-900/40 mb-2"><summary class="flex items-center gap-3 p-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden"><span class="w-3 h-3 rounded-full shrink-0 ${dot[statusOf(s)]}"></span><span class="min-w-0 flex-1"><span class="block font-semibold text-slate-100">${esc(plain(s.name))}</span><span class="block text-xs text-slate-400">${esc(shortText(s))}${winsFor(s).length ? ` · <span class="text-emerald-300">Quick win: ${esc(winsFor(s)[0].subject)} ${esc(winsFor(s)[0].short)}${winsFor(s).length > 1 ? ` (+${winsFor(s).length - 1})` : ""}</span>` : ""}</span><span data-plan-badge class="hidden"></span></span><span class="text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span></summary><div class="px-3 pb-3 pt-1 border-t border-slate-700">${bodyOf(s)}</div></details>`;
           // One stair per group, each indented further than the one above
           const stairs = Object.keys(PATHWAY_TOTAL_BY_GROUP)
             .map((g, i) => {
