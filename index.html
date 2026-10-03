@@ -89,7 +89,7 @@
         display: inline-block;
       }
       .tooltip .tooltiptext {
-        visibility: hidden;
+        display: none; /* out of layout until hovered, so it cannot widen the page */
         width: max-content;
         max-width: 250px;
         background-color: #0f172a; /* slate-900 */
@@ -108,8 +108,20 @@
         border: 1px solid #334155; /* slate-700 */
       }
       .tooltip:hover .tooltiptext {
-        visibility: visible;
+        display: block;
         opacity: 1;
+      }
+      /* Keep hidden tooltips from widening the page on phones */
+      body {
+        overflow-x: hidden;
+      }
+      @media (max-width: 640px) {
+        .tooltip .tooltiptext {
+          left: 0;
+          transform: none;
+          max-width: min(250px, calc(100vw - 48px));
+          text-align: left;
+        }
       }
     </style>
     <!-- Google tag (gtag.js) -->
@@ -392,50 +404,31 @@
         id="resultsAdviceSection"
         class="mb-10 p-6 bg-slate-800 shadow-2xl rounded-xl border border-slate-700 hidden"
       >
-        <h2 class="text-2xl font-semibold mb-2 text-cyan-400">
-          Results Action Plan
+        <h2 class="text-2xl font-semibold mb-1 text-cyan-400">
+          Your Action Plan
         </h2>
-        <p class="text-sm text-slate-400 mb-6">
-          Pathways open today, what is realistic with a small change, and what
-          bigger improvements would unlock next.
+        <p class="text-sm text-slate-400 mb-5">
+          See where you stand and what it would take to open more doors. Tap any
+          pathway for the exact subjects and grades.
         </p>
         <div id="resultsAdviceContainer"></div>
-      </section>
 
-      <section
-        id="improvementSuggestionsSection"
-        class="mb-10 p-6 bg-slate-800 shadow-2xl rounded-xl border border-slate-700 hidden"
-      >
-        <h2 class="text-2xl font-semibold mb-6 text-cyan-400 flex items-center">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            class="icon-lg mr-3 text-cyan-500"
-          >
-            <path
-              d="M3 17H5V19H3V17ZM7 5H9V19H7V5ZM11 13H13V19H11V13ZM15 9H17V19H15V9ZM19 12H21V19H19V12Z"
-            ></path>
-          </svg>
-          Improvement Suggestions
-        </h2>
-        <div id="improvementSuggestionsContainer" class="min-h-[100px]"></div>
-        <div
-          id="improvementPlaceholder"
-          class="text-center py-8 text-slate-400"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            class="icon-lg mx-auto mb-4 text-emerald-500 w-12 h-12"
-          >
-            <path
-              d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"
-            ></path>
-          </svg>
-          <p class="text-xl">Add subjects to see improvement suggestions.</p>
+        <div id="improvementSuggestionsSection" class="mt-6 hidden">
+          <h3 class="text-lg font-semibold text-slate-100 mb-1">Quick wins</h3>
+          <p class="text-xs text-slate-400 mb-3">
+            One grade up in a single subject can open these.
+          </p>
+          <div
+            id="improvementSuggestionsContainer"
+            class="grid gap-3 sm:grid-cols-2"
+          ></div>
+          <div
+            id="improvementPlaceholder"
+            class="text-center py-4 text-sm text-slate-400"
+          ></div>
         </div>
+
+        <div id="resultsExplorerContainer" class="mt-6"></div>
       </section>
 
       <footer class="text-center mt-12 text-sm text-slate-500">
@@ -1265,6 +1258,9 @@
         const rawMarkInput = document.getElementById("rawMark");
         const resultsAdviceSection = document.getElementById(
           "resultsAdviceSection",
+        );
+        const resultsExplorerContainer = document.getElementById(
+          "resultsExplorerContainer",
         );
         const resultsAdviceContainer = document.getElementById(
           "resultsAdviceContainer",
@@ -4282,6 +4278,12 @@
               parts.push({
                 gap,
                 text: `${nameOf(s)} ${s.level} ${s.grade} → ${grades[i][route.idx[i]]} (reach ${markAt(i, route.idx[i])} marks, +${marksText(gap)})`,
+                row: {
+                  subject: nameOf(s),
+                  now: `${s.level} ${s.grade}`,
+                  need: `${grades[i][route.idx[i]]} (${markAt(i, route.idx[i])}+ marks)`,
+                  marks: `+${marksText(gap)}`,
+                },
               });
             });
             parts.sort((x, y) => y.gap - x.gap);
@@ -4289,6 +4291,7 @@
             return {
               text: `Improve ${parts.map((x) => x.text).join("; ")}. ${summary}.`,
               parts: parts.map((x) => x.text),
+              rows: parts.map((x) => x.row),
               summary,
               total,
               maxGap,
@@ -4318,6 +4321,7 @@
             const tier = comboTier(d);
             return {
               parts: d.parts,
+              rows: d.rows,
               summary: d.summary,
               totalMarks: d.total,
               subjects: d.count,
@@ -4372,6 +4376,7 @@
                 subjects: d.count,
                 totalMarks: d.total,
                 parts: d.parts,
+                rows: d.rows,
                 summary: d.summary,
                 detail: d.text,
                 farOff: d.maxGap > 30 || d.total > 60,
@@ -4386,18 +4391,63 @@
                   : req.netELR2B2;
             const score =
               req.netELR2B2 !== undefined ? pw.netScore : pw.grossScore;
-            const unmet = ((pw.merCheck && pw.merCheck.merDetails) || [])
-              .filter((d) => !d.met && !d.isPlainBullet)
-              .slice(0, 2)
-              .map((d) =>
-                String(d.text)
-                  .replace(/<span class="tooltiptext">.*?<\/span>/g, "")
-                  .replace(/<sup>.*?<\/sup>/g, "")
-                  .replace(/<[^>]*>/g, "")
-                  .replace(/Infinity/g, "n/a")
-                  .replace(/\s+/g, " ")
-                  .trim(),
+            const cleanMer = (d) =>
+              String(d.text)
+                .replace(/<span class="tooltiptext">.*?<\/span>/g, "")
+                .replace(/<sup>.*?<\/sup>/g, "")
+                .replace(/<[^>]*>/g, "")
+                .replace(/Infinity/g, "n/a")
+                .replace(/\s+/g, " ")
+                .trim();
+            const unmetOf = (p) =>
+              ((p.merCheck && p.merCheck.merDetails) || [])
+                .filter((d) => !d.met && !d.isPlainBullet)
+                .map(cleanMer);
+            const unmetAll = unmetOf(pw);
+            const unmet = unmetAll.slice(0, 2);
+            // Explicit targets: what the pathway asks for versus where the
+            // student is now.
+            const needs = [];
+            if (cut !== undefined && Number.isFinite(score) && score > cut)
+              needs.push({
+                label:
+                  req.grossL1R4 !== undefined
+                    ? "L1R4 aggregate"
+                    : req.grossELMAB3 !== undefined
+                      ? "ELMAB3 aggregate"
+                      : "Net ELR2B2 aggregate",
+                now: String(score),
+                target: `${cut} or lower`,
+              });
+            unmetAll
+              .slice(0, 4)
+              .forEach((t) =>
+                needs.push({ label: t, now: "Not met", target: "Meet this" }),
               );
+            if (!needs.length)
+              needs.push({
+                label: "Entry requirements",
+                now: "Not met",
+                target: "Meet them",
+              });
+            // Best case: every subject at the top grade of its current level.
+            // If even that fails, the gap is subjects/levels, not marks.
+            const best = calculateAllPathwaysStatus(
+              base.map((s, i) =>
+                comboRoutes.grades[i]
+                  ? {
+                      ...s,
+                      grade: comboRoutes.grades[i][0],
+                      rawMark: comboRoutes.markAt(i, 0),
+                    }
+                  : s,
+              ),
+            ).find((x) => x.id === pw.id);
+            const blocker =
+              best && !best.isEligible
+                ? unmetOf(best).slice(0, 2).join("; ") ||
+                  "Top grades in your current subjects would still fall short"
+                : null;
             const parts = [];
             if (cut !== undefined && Number.isFinite(score) && score > cut)
               parts.push(`Aggregate ${score} against a cut-off of ${cut}.`);
@@ -4408,6 +4458,8 @@
               ...head,
               tier: 5,
               effort: 999,
+              needs,
+              blocker,
               detail: `${parts.join(" ")} No combination of improvements (up to +40 marks per subject) or level change was found that fixes this.`,
             };
           });
@@ -4458,20 +4510,61 @@
           };
         };
 
+        // ---- Pathway explorer filter state (kept across re-renders) ----
+        const explorerFilter = { group: "all", status: "all" };
+        const PILL_BASE =
+          "text-xs px-3 py-1.5 rounded-full border focus:outline-none focus:ring-2 focus:ring-cyan-500";
+        const PILL_OFF = "border-slate-600 text-slate-300 hover:bg-slate-700";
+        const PILL_ON = "border-cyan-500 bg-cyan-600 text-white";
+
+        function applyExplorerFilter() {
+          resultsExplorerContainer
+            .querySelectorAll("[data-filter]")
+            .forEach((btn) => {
+              const on =
+                explorerFilter[btn.dataset.filter] === btn.dataset.value;
+              btn.className = `${PILL_BASE} ${on ? PILL_ON : PILL_OFF}`;
+              btn.setAttribute("aria-pressed", on ? "true" : "false");
+            });
+          let shown = 0;
+          resultsExplorerContainer
+            .querySelectorAll("[data-pw]")
+            .forEach((row) => {
+              const show =
+                (explorerFilter.group === "all" ||
+                  row.dataset.group === explorerFilter.group) &&
+                (explorerFilter.status === "all" ||
+                  row.dataset.status === explorerFilter.status);
+              row.classList.toggle("hidden", !show);
+              if (show) shown++;
+            });
+          const empty =
+            resultsExplorerContainer.querySelector("#explorerEmpty");
+          if (empty) empty.classList.toggle("hidden", shown > 0);
+        }
+        resultsExplorerContainer.addEventListener("click", (e) => {
+          const btn = e.target.closest("[data-filter]");
+          if (!btn) return;
+          explorerFilter[btn.dataset.filter] = btn.dataset.value;
+          applyExplorerFilter();
+        });
+
         function renderResultsAdvice() {
           if (studentSubjects.length === 0) {
             resultsAdviceSection.classList.add("hidden");
             resultsAdviceContainer.innerHTML = "";
+            resultsExplorerContainer.innerHTML = "";
             return;
           }
           resultsAdviceSection.classList.remove("hidden");
           const a = buildResultsAdvice(studentSubjects);
           const rec = a.recommended;
+          const L2 = a.levels[1];
           const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
           const diffClass = {
             "within reach": "text-emerald-300",
             stretch: "text-amber-300",
-            remote: "text-red-300",
+            remote: "text-orange-300",
             unknown: "text-slate-400",
           };
           const gapText = (gap) =>
@@ -4480,59 +4573,32 @@
             items
               .map(
                 (c) =>
-                  `<div class="mt-3 p-3 rounded-lg ${tone === "warn" ? "bg-red-900/30 border-red-500" : "bg-amber-800/30 border-amber-500"} border text-sm"><p class="font-semibold ${tone === "warn" ? "text-red-300" : "text-amber-300"}">${tone === "warn" ? "Warning" : "Heads-up"}: ${esc(c.title)}</p><p class="text-slate-200 mt-1">${esc(c.text)}</p></div>`,
+                  `<div class="mt-3 p-3 rounded-lg ${tone === "warn" ? "bg-amber-900/30 border-amber-500" : "bg-sky-900/20 border-sky-500"} border text-sm"><p class="font-semibold ${tone === "warn" ? "text-amber-300" : "text-sky-300"}">${tone === "warn" ? "Heads-up" : "Good to know"}: ${esc(c.title)}</p><p class="text-slate-200 mt-1">${esc(c.text)}</p></div>`,
               )
               .join("");
           const groupChips = (byGroup) =>
             Object.keys(PATHWAY_TOTAL_BY_GROUP)
               .map(
                 (g) =>
-                  `<span class="text-xs px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-300">${esc(g)}: <strong class="text-emerald-300">${byGroup[g]}</strong> of ${PATHWAY_TOTAL_BY_GROUP[g]}</span>`,
+                  `<span class="text-xs px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-300">${esc(g)}: <strong class="text-emerald-300">${esc(byGroup[g])}</strong> of ${esc(PATHWAY_TOTAL_BY_GROUP[g])}</span>`,
               )
               .join(" ");
 
-          // ---- Staircase: one step per pathway, easiest route on each step ----
-          const tierTone = [
-            "border-emerald-500 bg-emerald-800/30",
-            "border-sky-500 bg-sky-800/30",
-            "border-teal-400 bg-teal-800/20",
-            "border-amber-500 bg-amber-800/20",
-            "border-orange-500 bg-orange-800/20",
-            "border-slate-500 bg-slate-800/60",
-          ];
-          const tierText = [
-            "text-emerald-300",
-            "text-sky-300",
-            "text-teal-300",
-            "text-amber-300",
-            "text-orange-300",
-            "text-slate-400",
-          ];
-          const indent = (tier) =>
-            `margin-left: calc(${tier} * min(4vw, 22px))`;
-          const tiersTopDown = [...a.staircase].sort((x, y) => y.tier - x.tier);
-          const hasToday = a.staircase.some((tr) => tr.tier === 0);
-          const stepHtml = (tr) =>
-            tr.steps
-              .map(
-                (s) =>
-                  `<div class="rounded border-l-4 ${tierTone[tr.tier]} p-3 mb-2" style="${indent(tr.tier)}"><p class="font-semibold text-slate-100">${tr.tier === 0 ? "✓ " : ""}${esc(s.name)} <span class="text-xs font-normal text-slate-400">· ${esc(s.group)}</span></p>${s.parts ? `<p class="text-sm text-slate-300 mt-1">${s.farOff ? "Would need" : "What it takes"}: ${esc(s.summary)}</p><ul class="list-disc list-inside text-sm text-slate-300 mt-1">${s.parts.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="text-sm text-slate-300 mt-1">${esc(s.detail)}</p>`}${s.alt ? `<div class="mt-2 pt-2 border-t border-slate-600"><p class="text-sm text-amber-300 font-semibold">Or keep your levels and improve <span class="font-normal ${diffClass[s.alt.difficulty === "within reach" ? "within reach" : s.alt.difficulty === "stretch" ? "stretch" : "remote"]}">[${esc(s.alt.difficulty)}]</span></p><p class="text-sm text-slate-300 mt-1">${esc(s.alt.summary)}</p><ul class="list-disc list-inside text-sm text-slate-300 mt-1">${s.alt.parts.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}</div>`,
-              )
-              .join("");
-          const bandHtml = (tr) => {
-            const label = `${tr.tier === 0 ? '<span class="text-amber-300">★ YOU ARE HERE</span> · ' : ""}${esc(tr.label)} <span class="font-normal text-slate-400">(${tr.steps.length})</span>`;
-            // Out-of-reach steps are long and numerous, so they start collapsed.
-            if (tr.tier === 5)
-              return `<details class="mt-4 mb-2"><summary class="cursor-pointer text-sm font-bold ${tierText[tr.tier]}" style="${indent(tr.tier)}">${label} (click to expand)</summary><div class="mt-2">${stepHtml(tr)}</div></details>`;
-            return `<div class="mt-4 mb-2" style="${indent(tr.tier)}"><p class="text-sm font-bold ${tierText[tr.tier]}">${label}</p></div>${stepHtml(tr)}`;
-          };
-          const freeHtml = a.freeMoves.length
-            ? `<div class="mt-3 p-3 rounded-lg bg-emerald-900/30 border border-emerald-500 text-sm"><p class="font-semibold text-emerald-300">Free move: no pathway depends on ${esc(a.freeMoves.map((f) => f.name).join(", "))}</p><ul class="list-disc list-inside text-slate-200 mt-1">${a.freeMoves.map((f) => `<li>${esc(f.text)}. ${esc(f.reason)}</li>`).join("")}</ul></div>`
-            : "";
-          const stairs = `<div class="mb-6 p-4 rounded-lg bg-slate-900/60 border border-slate-600"><p class="text-lg font-semibold text-slate-100">Pathway staircase</p><p class="text-xs text-slate-400 mt-1">Read from the bottom up. Each step is one pathway with the easiest way to reach it. The higher the step, the more effort it needs.</p>${freeHtml}${a.hasAnyRawMark ? "" : '<p class="text-sm text-amber-300 mt-2">Add raw marks so the steps can show how many marks each improvement needs.</p>'}${tiersTopDown.map(bandHtml).join("")}${hasToday ? "" : `<div class="mt-4" style="${indent(0)}"><p class="text-sm font-bold text-amber-300">★ YOU ARE HERE · No pathway is open yet</p></div>`}</div>`;
+          // ---- Flatten the staircase into one list of pathways ----
+          const steps = [...a.staircase]
+            .sort((x, y) => x.tier - y.tier)
+            .flatMap((tr) => tr.steps.map((s) => ({ ...s, tier: tr.tier })));
+          const statusOf = (tier) =>
+            tier === 0 ? "open" : tier <= 2 ? "close" : "further";
+          const count = (st) =>
+            steps.filter((s) => statusOf(s.tier) === st).length;
 
-          // ---- Recommended option (Level 2 detail) ----
-          const L2 = a.levels[1];
+          // ---- Summary strip ----
+          const tile = (n, label, tone) =>
+            `<div class="rounded-lg border ${tone} p-3 text-center"><p class="text-2xl font-bold text-slate-100">${esc(n)}</p><p class="text-xs text-slate-300">${esc(label)}</p></div>`;
+          const strip = `<div class="grid grid-cols-3 gap-2 mb-4">${tile(count("open"), "Open now", "border-emerald-500 bg-emerald-800/20")}${tile(count("close"), "Within reach", "border-sky-500 bg-sky-800/20")}${tile(count("further"), "Needs more work", "border-slate-600 bg-slate-900/40")}</div>${a.hasAnyRawMark ? "" : '<p class="text-xs text-slate-400 mb-4">Tip: add raw marks to your subjects to see exact mark targets.</p>'}`;
+
+          // ---- Suggested plan (short) + details collapsed ----
           const reachList = L2.reachActions.length
             ? `<p class="text-sm font-semibold text-sky-300 mt-4">Improve within ${REALISTIC_GAIN} marks</p><ul class="list-disc list-inside text-sm text-slate-300 space-y-1 mt-1">${L2.reachActions.map((r) => `<li>${esc(r.text)} unlocks ${esc(r.unlocks.join("; "))}</li>`).join("")}</ul>`
             : "";
@@ -4541,31 +4607,28 @@
             .filter((o) => !o.isRecommended)
             .map((o) => {
               const status = `${o.eligible} eligible today, ${o.realistic} realistic if you improve within reach (${a.after.realistic > o.realistic ? "fewer" : a.after.realistic === o.realistic ? "same" : "more"} than the recommended option)`;
-              return `<li class="mb-3"><p class="text-slate-100"><strong>${o.id === 0 ? "Status quo" : `Option ${o.id}`}: ${esc(o.title)}</strong></p><p class="text-slate-300">${esc(o.summary)}</p>${o.applicable ? `<p class="text-slate-400">${esc(status)}</p>${callouts(o.conflicts, "heads-up")}` : ""}</li>`;
+              return `<li class="mb-3"><p class="text-slate-100"><strong>${o.id === 0 ? "Status quo" : `Option ${esc(o.id)}`}: ${esc(o.title)}</strong></p><p class="text-slate-300">${esc(o.summary)}</p>${o.applicable ? `<p class="text-slate-400">${esc(status)}</p>${callouts(o.conflicts, "heads-up")}` : ""}</li>`;
             })
             .join("");
-          const others = `<details class="mt-4"><summary class="cursor-pointer text-sky-400 hover:text-sky-300 text-sm">Other options we checked</summary><ul class="mt-3 text-sm list-none">${otherRows}</ul></details>`;
-          const recCard = `<div class="p-5 rounded-lg border-2 border-emerald-500 bg-emerald-800/20 mb-4"><p class="text-xs font-semibold uppercase tracking-wide text-emerald-300">Recommended${rec.id ? `: Option ${rec.id}` : ": Status quo"} · ${plural(L2.count, "realistic pathway")}</p><h3 class="text-lg font-semibold text-slate-100 mt-1">${esc(rec.title)}</h3><div class="flex flex-wrap gap-2 mt-3">${groupChips(L2.byGroup)}</div><ol class="list-decimal list-inside text-base font-semibold text-slate-100 space-y-1 mt-3">${rec.checklist.map((t) => `<li>${esc(t)}</li>`).join("")}</ol><p class="text-sm font-semibold text-sky-300 mt-3">Why this option</p><ul class="list-disc list-inside text-sm text-slate-300 space-y-1 mt-1">${rec.reasons.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>${callouts(rec.warnings, "warn")}${callouts(rec.conflicts, "heads-up")}${reachList}${rec.id > 1 ? '<p class="text-xs text-slate-400 mt-3">Improvements after moving a subject down are not counted, because raw marks at the new level are unknown, so this is a cautious estimate.</p>' : ""}${others}</div>`;
-
-          // ---- Move now vs stay and push ----
+          const freeHtml = a.freeMoves.length
+            ? `<div class="mt-3 p-3 rounded-lg bg-emerald-900/30 border border-emerald-500 text-sm"><p class="font-semibold text-emerald-300">Free move: no pathway depends on ${esc(a.freeMoves.map((f) => f.name).join(", "))}</p><ul class="list-disc list-inside text-slate-200 mt-1">${a.freeMoves.map((f) => `<li>${esc(f.text)}. ${esc(f.reason)}</li>`).join("")}</ul></div>`
+            : "";
           const breakRows = a.decision.breakEvens
             .map(
               (b) =>
-                `<li class="mb-3"><strong>${esc(b.name)}</strong>: moving to ${esc(b.to)} secures <strong class="text-emerald-300">${b.movedCount}</strong> eligible pathways straight away (staying at ${esc(b.from)} gives ${b.stayNowCount} today). ${b.hit ? `Staying only matches that if ${esc(b.name)} reaches <strong>${esc(b.hit.grade)}</strong>, which needs ${b.hit.markNeeded} marks${esc(gapText(b.hit.gap))} <span class="${diffClass[b.hit.difficulty]}">[${esc(b.hit.difficulty)}]</span> and would give ${b.hit.count}.` : "Staying never matches this, even at the top grade."}${b.onlyIfStay.length ? ` Only possible if you stay: ${esc(b.onlyIfStay.join("; "))}.` : ""}</li>`,
+                `<li class="mb-3"><strong>${esc(b.name)}</strong>: moving to ${esc(b.to)} secures <strong class="text-emerald-300">${esc(b.movedCount)}</strong> eligible pathways straight away (staying at ${esc(b.from)} gives ${esc(b.stayNowCount)} today). ${b.hit ? `Staying only matches that if ${esc(b.name)} reaches <strong>${esc(b.hit.grade)}</strong>, which needs ${esc(b.hit.markNeeded)} marks${esc(gapText(b.hit.gap))} <span class="${diffClass[b.hit.difficulty]}">[${esc(b.hit.difficulty)}]</span> and would give ${esc(b.hit.count)}.` : "Staying never matches this, even at the top grade."}${b.onlyIfStay.length ? ` Only possible if you stay: ${esc(b.onlyIfStay.join("; "))}.` : ""}</li>`,
             )
             .join("");
           const breakBlock = breakRows
-            ? `<details open class="mb-4"><summary class="cursor-pointer text-sky-400 hover:text-sky-300 text-sm font-semibold">Move now vs stay and push</summary><p class="text-xs text-slate-400 mt-2">Moving a level is certain and immediate. Staying depends on raw marks: within ${REALISTIC_GAIN} marks is within reach, up to 15 is a stretch, more than 15 is remote.</p><ul class="list-none text-sm text-slate-300 mt-2">${breakRows}</ul></details>`
+            ? `<p class="text-sm font-semibold text-sky-300 mt-4">Move now vs stay and push</p><p class="text-xs text-slate-400 mt-1">Moving a level is certain and immediate. Staying depends on raw marks: within ${REALISTIC_GAIN} marks is within reach, up to 15 is a stretch, more than 15 is remote.</p><ul class="list-none text-sm text-slate-300 mt-2">${breakRows}</ul>`
             : "";
-
-          // ---- Reach check ----
           const reachLabel = (r) =>
             r.status === "top"
               ? "Top grade"
               : r.status === "reachable"
-                ? `<span class="text-emerald-300">✓ Within reach (+${r.needed} mark${r.needed === 1 ? "" : "s"})</span>`
+                ? `<span class="text-emerald-300">Within reach (+${esc(r.needed)} mark${r.needed === 1 ? "" : "s"})</span>`
                 : r.status === "stretch"
-                  ? `<span class="text-red-300">✗ Stretch (+${r.needed} marks)</span>`
+                  ? `<span class="text-amber-300">Needs +${esc(r.needed)} marks</span>`
                   : r.why === "g1"
                     ? "No raw marks at G1"
                     : r.why === "invalid"
@@ -4574,13 +4637,68 @@
           const reachRows = a.reach
             .map(
               (r) =>
-                `<tr><td class="px-3 py-2">${esc(r.name)}</td><td class="px-3 py-2">${esc(r.level)} ${esc(r.grade)}</td><td class="px-3 py-2">${r.rawMark ?? "—"}</td><td class="px-3 py-2">${esc(r.next ?? "—")}</td><td class="px-3 py-2">${reachLabel(r)}</td></tr>`,
+                `<tr><td class="px-3 py-2">${esc(r.name)}</td><td class="px-3 py-2">${esc(r.level)} ${esc(r.grade)}</td><td class="px-3 py-2">${esc(r.rawMark ?? "—")}</td><td class="px-3 py-2">${esc(r.next ?? "—")}</td><td class="px-3 py-2">${reachLabel(r)}</td></tr>`,
             )
             .join("");
-          const reachTable = `<details class="mb-2"><summary class="cursor-pointer text-sky-400 hover:text-sky-300 text-sm">Reach check: is the next grade realistic?</summary><div class="overflow-x-auto mt-2 rounded-lg border border-slate-700"><table class="min-w-full text-sm text-slate-300"><thead class="bg-slate-700 text-sky-300 text-xs uppercase"><tr><th class="px-3 py-2 text-left">Subject</th><th class="px-3 py-2 text-left">Now</th><th class="px-3 py-2 text-left">Raw mark</th><th class="px-3 py-2 text-left">Next grade</th><th class="px-3 py-2 text-left">Within ${REALISTIC_GAIN} marks?</th></tr></thead><tbody class="divide-y divide-slate-700">${reachRows}</tbody></table></div></details>`;
+          const reachTable = `<p class="text-sm font-semibold text-sky-300 mt-4">Is the next grade realistic?</p><div class="overflow-x-auto mt-2 rounded-lg border border-slate-700"><table class="min-w-full text-sm text-slate-300"><thead class="bg-slate-700 text-sky-300 text-xs uppercase"><tr><th class="px-3 py-2 text-left">Subject</th><th class="px-3 py-2 text-left">Now</th><th class="px-3 py-2 text-left">Raw mark</th><th class="px-3 py-2 text-left">Next grade</th><th class="px-3 py-2 text-left">Within ${REALISTIC_GAIN} marks?</th></tr></thead><tbody class="divide-y divide-slate-700">${reachRows}</tbody></table></div>`;
+          const details = `<details class="mt-4"><summary class="cursor-pointer text-sky-400 hover:text-sky-300 text-sm">Why this plan, and other options</summary><p class="text-sm font-semibold text-sky-300 mt-3">Why this option</p><ul class="list-disc list-inside text-sm text-slate-300 space-y-1 mt-1">${rec.reasons.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>${callouts(rec.warnings, "warn")}${callouts(rec.conflicts, "heads-up")}${reachList}${rec.id > 1 ? '<p class="text-xs text-slate-400 mt-3">Improvements after moving a subject down are not counted, because raw marks at the new level are unknown, so this is a cautious estimate.</p>' : ""}${breakBlock}${reachTable}<p class="text-sm font-semibold text-sky-300 mt-4">Other options we checked</p><ul class="mt-2 text-sm list-none">${otherRows}</ul></details>`;
+          const recCard = `<div class="p-4 rounded-lg border-2 border-emerald-500 bg-emerald-800/20"><p class="text-xs font-semibold uppercase tracking-wide text-emerald-300">Suggested plan${rec.id ? `: Option ${esc(rec.id)}` : ""} · ${plural(L2.count, "realistic pathway")}</p><h3 class="text-lg font-semibold text-slate-100 mt-1">${esc(rec.title)}</h3><div class="flex flex-wrap gap-2 mt-3">${groupChips(L2.byGroup)}</div>${rec.checklist.length ? `<ol class="list-decimal list-inside text-base font-semibold text-slate-100 space-y-1 mt-3">${rec.checklist.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>` : ""}${freeHtml}${details}</div>`;
 
-          resultsAdviceContainer.innerHTML =
-            stairs + recCard + breakBlock + reachTable;
+          resultsAdviceContainer.innerHTML = strip + recCard;
+
+          // ---- Pathway explorer: every pathway, open or not ----
+          const dot = {
+            open: "bg-emerald-400",
+            close: "bg-sky-400",
+            further: "bg-slate-400",
+          };
+          const shortText = (s) =>
+            s.tier === 0
+              ? "Open now"
+              : s.tier === 1
+                ? "Change a level, no marks needed"
+                : s.rows && s.totalMarks !== undefined
+                  ? `+${s.totalMarks} marks across ${plural(s.subjects, "subject")}`
+                  : s.blocker
+                    ? "Needs a different subject or level"
+                    : "Needs top grades across your subjects";
+          const table = (head, rows) =>
+            `<div class="overflow-x-auto mt-2"><table class="min-w-full text-sm"><thead><tr>${head.map((h) => `<th class="text-left text-xs uppercase text-slate-400 px-2 py-1">${esc(h)}</th>`).join("")}</tr></thead><tbody class="divide-y divide-slate-700">${rows.map((r) => `<tr>${r.map((c, i) => `<td class="px-2 py-1.5 ${i === 0 ? "text-slate-100" : "text-slate-300"}">${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+          const routeTable = (rows) =>
+            table(
+              ["Subject", "Now", "Need", "Marks"],
+              rows.map((r) => [r.subject, r.now, r.need, r.marks]),
+            );
+          const bodyOf = (s) => {
+            if (s.tier === 0)
+              return `<p class="text-sm text-slate-200">${esc(s.detail)}</p>`;
+            if (s.tier === 1)
+              return `<p class="text-sm text-slate-200">${esc(s.detail)}</p>${s.alt && s.alt.rows ? `<p class="mt-3 text-sm font-semibold text-sky-300">Or keep your levels and improve (${esc(s.alt.difficulty)})</p>${routeTable(s.alt.rows)}<p class="text-xs text-slate-400 mt-1">${esc(s.alt.summary)}</p>` : ""}`;
+            if (s.rows)
+              return `<p class="text-sm text-slate-200">Improve these to open it:</p>${routeTable(s.rows)}<p class="text-xs text-slate-400 mt-1">${esc(s.summary)}</p>`;
+            return `<p class="text-sm text-slate-200">This pathway asks for:</p>${table(
+              ["Requirement", "Now", "Need"],
+              (s.needs || []).map((n) => [n.label, n.now, n.target]),
+            )}<p class="text-sm text-slate-300 mt-3">${s.blocker ? `Marks alone will not be enough. Even top grades in your current subjects would leave: ${esc(s.blocker)}. This usually means taking a different subject or level.` : "Top grades across your current subjects would get you there. A longer-term goal worth keeping in view."}</p>`;
+          };
+          const rowHtml = (s) =>
+            `<details data-pw data-group="${esc(s.group)}" data-status="${statusOf(s.tier)}" class="group rounded-lg border border-slate-600 bg-slate-900/40 mb-2"><summary class="flex items-center gap-3 p-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden"><span class="w-3 h-3 rounded-full shrink-0 ${dot[statusOf(s.tier)]}"></span><span class="min-w-0 flex-1"><span class="block font-semibold text-slate-100">${esc(s.name)}</span><span class="block text-xs text-slate-400">${esc(s.group)} · ${esc(shortText(s))}</span></span><span class="text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span></summary><div class="px-3 pb-3 pt-1 border-t border-slate-700">${bodyOf(s)}</div></details>`;
+          const pill = (filter, value, label) =>
+            `<button type="button" data-filter="${filter}" data-value="${esc(value)}" aria-pressed="false" class="${PILL_BASE} ${PILL_OFF}">${esc(label)}</button>`;
+          const groupPills = [
+            pill("group", "all", "All pathways"),
+            ...Object.keys(PATHWAY_TOTAL_BY_GROUP).map((g) =>
+              pill("group", g, g),
+            ),
+          ].join(" ");
+          const statusPills = [
+            pill("status", "all", "Any status"),
+            pill("status", "open", "Open now"),
+            pill("status", "close", "Within reach"),
+            pill("status", "further", "Needs more work"),
+          ].join(" ");
+          resultsExplorerContainer.innerHTML = `<h3 class="text-lg font-semibold text-slate-100 mb-1">Explore every pathway</h3><p class="text-xs text-slate-400 mb-3">Tap a pathway to see exactly what it takes.</p><div class="flex flex-wrap gap-2 mb-2">${groupPills}</div><div class="flex flex-wrap gap-2 mb-4">${statusPills}</div>${steps.map(rowHtml).join("")}<p id="explorerEmpty" class="hidden text-sm text-slate-400 p-3">No pathways match these filters. Try "All pathways" or "Any status".</p>`;
+          applyExplorerFilter();
         }
 
         function checkEligibility() {
@@ -4616,7 +4734,7 @@
           if (studentSubjects.length === 0) {
             improvementSuggestionsSection.classList.add("hidden");
             improvementPlaceholder.classList.remove("hidden");
-            improvementPlaceholder.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-lg mx-auto mb-4 text-emerald-500 w-12 h-12"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg> <p class="text-xl">Add subjects to see improvement suggestions.</p>`;
+            improvementPlaceholder.innerHTML = `<p>Add subjects to see quick wins.</p>`;
             return;
           }
           improvementSuggestionsSection.classList.remove("hidden");
@@ -4751,7 +4869,7 @@
           });
           if (suggestions.length === 0) {
             improvementPlaceholder.classList.remove("hidden");
-            improvementPlaceholder.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-lg mx-auto mb-4 text-slate-500 w-12 h-12"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z"></path></svg><p class="text-xl mb-2">You're already optimised for your current subjects.</p><p class="text-sm text-slate-500">No single grade improvement would unlock a new pathway. Consider speaking with your school counsellor about your subject combination.</p>`;
+            improvementPlaceholder.innerHTML = `<p>No single grade change opens a new pathway right now. Check the pathways below for bigger steps, or speak with your school counsellor.</p>`;
           } else {
             improvementPlaceholder.classList.add("hidden");
             renderImprovementSuggestions(suggestions);
@@ -4760,24 +4878,21 @@
 
         function renderImprovementSuggestions(suggestions) {
           improvementSuggestionsContainer.innerHTML = "";
-          // MODIFIED: Removed the maxSuggestions limit to display all suggestions.
           const sortedSuggestions = suggestions.sort((a, b) => {
             if (b.pathwaysUnlockedCount !== a.pathwaysUnlockedCount)
               return b.pathwaysUnlockedCount - a.pathwaysUnlockedCount;
             return b.merImprovements.length - a.merImprovements.length;
           });
           sortedSuggestions.forEach((suggestion) => {
-            // Iterate through all sorted suggestions
             const suggestionCard = document.createElement("div");
             suggestionCard.className =
-              "bg-slate-700 p-4 rounded-lg shadow-md mb-4 border border-slate-600";
+              "bg-slate-700/60 p-3 rounded-lg border border-slate-600";
             const pathwayNamesList = suggestion.unlockedPathwayNames
-              .map((name) => `<li class="text-slate-300">${name}</li>`)
+              .map((name) => `<li class="text-slate-300">${esc(name)}</li>`)
               .join("");
-            // Removed the merImprovementList rendering
             let benefitsHtml = "";
             if (suggestion.unlockedPathwayNames.length > 0)
-              benefitsHtml += `<p class="text-slate-300 text-sm mb-1">Unlock <strong>${suggestion.pathwaysUnlockedCount}</strong> additional pathway(s):</p><ul class="list-disc list-inside text-sm ml-4 space-y-1 mb-2">${pathwayNamesList}</ul>`;
+              benefitsHtml += `<p class="text-xs text-emerald-300 mt-2">Opens ${esc(suggestion.pathwaysUnlockedCount)} more:</p><ul class="list-disc list-inside text-xs space-y-0.5 mt-1">${pathwayNamesList}</ul>`;
             if (
               suggestion.scoreImprovements &&
               suggestion.scoreImprovements.length > 0
@@ -4788,20 +4903,25 @@
                     arr.findIndex((x) => x.pathwayName === si.pathwayName) ===
                     idx,
                 );
-              const scoreList = dedupedScoreImprovements
+              const shownCloser = dedupedScoreImprovements.slice(0, 2);
+              const moreCloser =
+                dedupedScoreImprovements.length - shownCloser.length;
+              benefitsHtml += `<p class="text-xs text-slate-400 mt-2">Gets closer: ${shownCloser
                 .map(
                   (si) =>
-                    `<li class="text-slate-400">Reduce <strong>${si.pathwayName}</strong> score by <strong>${si.scoreDrop}</strong> pt${si.scoreDrop > 1 ? "s" : ""} → ${si.newScore} (need ${si.label})</li>`,
+                    `${esc(si.pathwayName)} (${esc(si.newScore)}, need ${esc(si.label)})`,
                 )
-                .join("");
-              benefitsHtml += `<p class="text-slate-400 text-sm mb-1 mt-1">Reduce the gap to:</p><ul class="list-disc list-inside text-sm ml-4 space-y-1 mb-2">${scoreList}</ul>`;
+                .join(
+                  "; ",
+                )}${moreCloser > 0 ? ` and ${moreCloser} more` : ""}</p>`;
             }
-            suggestionCard.innerHTML = `<h4 class="text-lg font-semibold text-emerald-300 mb-2">Improve ${suggestion.subjectName}</h4><p class="text-slate-300 text-sm mb-2">If you improve your <strong>${suggestion.subjectName}</strong> grade from <span class="font-bold text-cyan-300">${suggestion.originalGrade} (${suggestion.originalLevel})</span> to <span class="font-bold text-cyan-300">${suggestion.improvedGrade} (${suggestion.originalLevel})</span>, you could:</p>${benefitsHtml}`;
+            suggestionCard.innerHTML = `<h4 class="text-base font-semibold text-slate-100">Improve ${esc(suggestion.subjectName)}</h4><p class="text-sm text-slate-300 mt-1"><span class="font-bold text-cyan-300">${esc(suggestion.originalGrade)} (${esc(suggestion.originalLevel)})</span> → <span class="font-bold text-cyan-300">${esc(suggestion.improvedGrade)} (${esc(suggestion.originalLevel)})</span></p>${benefitsHtml}`;
             improvementSuggestionsContainer.appendChild(suggestionCard);
           });
           if (improvementSuggestionsContainer.innerHTML === "") {
             improvementPlaceholder.classList.remove("hidden");
-            improvementPlaceholder.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-lg mx-auto mb-4 text-emerald-500 w-12 h-12"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg> <p class="text-xl">No single grade improvement would unlock an additional pathway based on your current subjects.</p>`;
+            improvementPlaceholder.innerHTML =
+              "<p>No single grade change opens a new pathway right now.</p>";
           } else {
             improvementPlaceholder.classList.add("hidden");
           }

@@ -404,6 +404,27 @@ async function advise(page, subjects) {
       "P5d-1",
       "Profile A: all 17 pathways on the staircase (4 open, 2 immediate, 6 stretch, 2 remote, 3 out of reach)",
     );
+    ok(
+      tiers[5].every(
+        (s) =>
+          (s.rows && s.rows.length > 0) ||
+          (s.needs &&
+            s.needs.length > 0 &&
+            s.needs.every((n) => n.label && n.target)),
+      ),
+      "P5d-1b",
+      "Profile A: every out-of-reach pathway names what it needs (a mark route, or requirement + target)",
+    );
+    ok(
+      tiers[3].every(
+        (s) =>
+          s.rows &&
+          s.rows.length === s.parts.length &&
+          s.rows.every((r) => r.subject && r.now && r.need && r.marks),
+      ),
+      "P5d-1c",
+      "Profile A: stretch pathways carry structured Subject / Now / Need / Marks rows",
+    );
     const ite2 = tiers[3].filter((s) => /ITE Year 2/.test(s.name));
     ok(
       tiers[1].every((s) => /Mathematics at G2/.test(s.detail)) &&
@@ -575,6 +596,93 @@ async function advise(page, subjects) {
       result.length === 0,
       "P6-1",
       `invariants hold (${result.slice(0, 3).join("; ") || "none violated"})`,
+    );
+
+    console.log("\nPhase 8: Action Plan UI (explorer filters, rows, mobile)");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(FILE_URL, { waitUntil: "domcontentloaded" });
+    await page.selectOption("#school", SCHOOL);
+    await page.waitForTimeout(300);
+    for (const [id, lvl, grd, raw] of [
+      ["EL", "G3", "B3", "69"],
+      ["MT", "G3", "C6", "50"],
+      ["MATH", "G3", "F9", "31"],
+      ["COMB_SCI", "G3", "D7", "47"],
+      ["COMB_HUM", "G3", "E8", "43"],
+      ["POA", "G3", "F9", "38"],
+    ]) {
+      await page.selectOption("#subject", id);
+      await page.waitForTimeout(200);
+      await page.selectOption("#level", lvl);
+      await page.waitForTimeout(200);
+      await page.selectOption("#grade", grd);
+      await page.fill("#rawMark", raw);
+      await page.click("#addUpdateSubjectBtn");
+      await page.waitForTimeout(350);
+    }
+    const ROWS = "#resultsExplorerContainer details[data-pw]";
+    const visible = () =>
+      page.$$eval(ROWS, (rs) =>
+        rs
+          .filter((r) => !r.classList.contains("hidden"))
+          .map((r) => ({ g: r.dataset.group, s: r.dataset.status })),
+      );
+    const pick = (filter, value) =>
+      page.click(`[data-filter="${filter}"][data-value="${value}"]`);
+    ok(
+      (await page.$$(ROWS)).length === 17,
+      "P8-1",
+      "Explorer lists all 17 pathways, open or not",
+    );
+    await pick("status", "further");
+    let vis = await visible();
+    ok(
+      vis.length === 11 && vis.every((r) => r.s === "further"),
+      "P8-2",
+      `Status filter "Needs more work" shows only those rows (${vis.length})`,
+    );
+    await pick("status", "all");
+    await pick("group", "JC/MI");
+    vis = await visible();
+    ok(
+      vis.length === 2 && vis.every((r) => r.g === "JC/MI"),
+      "P8-3",
+      `Group filter JC/MI shows only JC and MI (${vis.length})`,
+    );
+    await pick("status", "open");
+    ok(
+      (await visible()).length === 0 &&
+        (await page.isVisible("#explorerEmpty")),
+      "P8-4",
+      "Filters with no match show a friendly empty message",
+    );
+    await pick("group", "all");
+    await pick("status", "all");
+    await page
+      .locator(`${ROWS}[data-group="JC/MI"]`)
+      .first()
+      .locator("summary")
+      .click();
+    const jcBody = await page
+      .locator(`${ROWS}[data-group="JC/MI"]`)
+      .first()
+      .innerText();
+    ok(
+      /subject/i.test(jcBody) && /need/i.test(jcBody) && /marks/i.test(jcBody),
+      "P8-5",
+      "An out-of-reach pathway expands to a Subject / Now / Need / Marks table",
+    );
+    ok(
+      (await page.$$("#improvementSuggestionsContainer > div h4")).length > 0,
+      "P8-6",
+      "Quick wins cards render inside the merged section",
+    );
+    ok(
+      !(await page.evaluate(
+        () => document.documentElement.scrollWidth > window.innerWidth,
+      )),
+      "P8-7",
+      "No horizontal page scroll at 390px wide",
     );
 
     ok(
