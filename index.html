@@ -3961,7 +3961,7 @@
                 : o.id === 4
                   ? [
                       "Keep your other subjects and levels.",
-                      `Lower: ${low.map(shortChange).join("; ")}.`,
+                      "Lower these subjects:",
                     ]
                   : o.id === 1
                     ? [`Drop ${droppedOf(o).map(nameOf).join(", ")}.`]
@@ -3970,11 +3970,8 @@
                           `Take ${nameOf(low[0])} at ${low[0].level} (${shortChange(low[0])}).`,
                         ]
                       : o.mode === "all"
-                        ? [
-                            "Take ALL subjects one level lower.",
-                            `${low.map(shortChange).join("; ")}.`,
-                          ]
-                        : [`Lower: ${low.map(shortChange).join("; ")}.`];
+                        ? ["Take ALL subjects one level lower:"]
+                        : ["Lower these subjects:"];
             if (o.id === 3)
               o.blocked.forEach((s) =>
                 lines.push(
@@ -4052,6 +4049,7 @@
                 ...low.map(shortChange),
               ],
               steps: stepsFor(o),
+              stepList: o.id === 3 || o.id === 4 ? low.map(shortChange) : [],
               count: o.eval.realistic.size,
               eligible: o.eval.eligible.size,
               lostIds,
@@ -4959,7 +4957,7 @@
         };
 
         const choicePanelHtml = (c) =>
-          `<p class="text-xs font-semibold uppercase tracking-wide text-emerald-300">What to do next · Choice ${esc(c.key)}${c.isRecommended ? " ★" : ""}</p><h3 class="text-lg font-semibold text-slate-100 mt-1">${esc(c.label)}</h3><ol class="list-decimal list-inside text-base font-semibold text-slate-100 space-y-1 mt-3">${c.steps.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>${c.gained.length ? `<p class="text-sm text-emerald-300 mt-2">Opens ${c.gained.length} more: ${esc(c.gained.join(", "))}.</p>` : ""}${checkHtml(c.check)}<div class="mt-2">${resetLink()}</div>${beforeDecideHtml(c)}`;
+          `<p class="text-xs font-semibold uppercase tracking-wide text-emerald-300">What to do next · Choice ${esc(c.key)}${c.isRecommended ? " ★" : ""}</p><h3 class="text-lg font-semibold text-slate-100 mt-1">${esc(c.label)}</h3><ol class="list-decimal list-inside text-base font-semibold text-slate-100 space-y-1 mt-3">${c.steps.map((t) => `<li>${esc(t)}${t.endsWith(":") && c.stepList.length ? `<ul data-step-list class="list-disc list-inside text-sm font-normal text-slate-200 ml-5 mt-1 space-y-0.5">${c.stepList.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</li>`).join("")}</ol>${c.gained.length ? `<p class="text-sm text-emerald-300 mt-2">Opens ${c.gained.length} more: ${esc(c.gained.join(", "))}.</p>` : ""}${checkHtml(c.check)}<div class="mt-2">${resetLink()}</div>${beforeDecideHtml(c)}`;
 
         // Badges on explorer rows follow the selected choice.
         function applyPlanBadges() {

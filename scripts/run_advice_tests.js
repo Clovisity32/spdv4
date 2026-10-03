@@ -961,6 +961,21 @@ async function advise(page, subjects) {
       "P9-U3",
       "Selecting each choice swaps the panel, and explorer badges match exactly what it opens / closes",
     );
+    const dChoice = a6.choices[3];
+    await page.click('[data-choice="D"]');
+    const stepItems = await page.$$eval("#planPanel ol > li", (ls) =>
+      ls.map((l) => l.firstChild.textContent),
+    );
+    ok(
+      dChoice.stepList.length > 1 &&
+        (await page.$$eval(
+          "#planPanel [data-step-list] li",
+          (l) => l.length,
+        )) === dChoice.stepList.length &&
+        stepItems.every((t) => t.split(/\s+/).length <= 12),
+      "P9-U3b",
+      `Choice D lists each lowered subject on its own line (${dChoice.stepList.length}); every step lead-in is 12 words or fewer`,
+    );
     // Try your own mix
     await page.click("#customDetails summary");
     await page.click('[data-seg="MATH"][data-mode="lower"]');
