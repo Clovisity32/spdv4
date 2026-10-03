@@ -1371,7 +1371,7 @@ function ok(cond, id, msg) {
     // ════════════════════════════════════════════════════════════════════════
     // PHASE 10 — ITE Year 2 Higher Nitec
     // Two clusters: Applied Science/Eng/ICT (EL MER ≤ G2:4) and Biz/Services/Hosp (EL MER ≤ G2:3).
-    // calcOptions: allowG3F9=true, maxG2GradeForCalc=5 (different from PFP defaults).
+    // Same ELMAB3 exclusions as PFP: G3 grade 9 and G2 grades 5–6 cannot be used.
     // ════════════════════════════════════════════════════════════════════════
     console.log("\n── Phase 10: ITE Year 2 Higher Nitec ──");
 
@@ -1431,10 +1431,10 @@ function ok(cond, id, msg) {
       );
     }
 
-    // ITE2-03: G3 F9 counts toward ITE Year 2 score but is excluded from PFP computation
-    // EL G3 A1(→G2:1) + MA G3 A1(→G2:1) + HIST G3 F9(→G2:5) + GEOG G3 D7(→G2:3) + BIO G3 D7(→G2:3)
-    // ITE Year 2 score = 1+1+5+3+3 = 13 (F9 included) → Applied Sci Eligible (EL G2:1 ≤ 4 MER passes)
-    // PFP-Hum: HIST G3 F9 excluded → only 4 valid subjects → insufficient B subjects → Not Eligible
+    // ITE2-03: G3 F9 is excluded from ELMAB3 computation for ITE Year 2 and PFP alike
+    // EL G3 A1 + MA G3 A1 + HIST G3 F9 (excluded) + GEOG G3 D7 + BIO G3 D7
+    // Only 2 valid B subjects remain → ITE Year 2 needs 3 → Not Eligible
+    // PFP-Hum: only 4 valid subjects → insufficient B subjects → Not Eligible
     await reset(page);
     await addMany(page, [
       ["EL", "G3", "A1"],
@@ -1447,14 +1447,9 @@ function ok(cond, id, msg) {
       const applied = await getResult(page, "Applied Science, Engineering");
       const pfp = await getResult(page, "PFP) - Humanities");
       ok(
-        applied.isEligible,
+        !applied.isEligible,
         "ITE2-03",
-        `Applied Sci Eligible (HIST G3 F9 counts as G2:5; gross=${applied.gross})`,
-      );
-      ok(
-        applied.gross === 13,
-        "ITE2-03",
-        `Applied Sci gross=13 (F9→G2:5 included; actual:${applied.gross})`,
+        `Applied Sci Not Eligible (HIST G3 F9 excluded → <3 B subjects; gross=${applied.gross})`,
       );
       ok(
         !pfp.isEligible,
@@ -1511,6 +1506,69 @@ function ok(cond, id, msg) {
         !biz.isEligible,
         "ITE2-05",
         "Biz Not Eligible (EL G2:4 > Biz MER threshold G2:3)",
+      );
+    }
+
+    // ITE2-06: G2 grade 5 is excluded from the aggregate; next-best subject used instead
+    // EL G3 A1 + MA G3 A1 + [HIST G2 5 excluded] + GEOG/BIO/CHEM G3 D7 (G2:3 each) → 1+1+9 = 11
+    await reset(page);
+    await addMany(page, [
+      ["EL", "G3", "A1"],
+      ["MATH", "G3", "A1"],
+      ["HIST", "G2", "5"],
+      ["GEOG", "G3", "D7"],
+      ["BIO", "G3", "D7"],
+      ["CHEM", "G3", "D7"],
+    ]);
+    {
+      const applied = await getResult(page, "Applied Science, Engineering");
+      ok(
+        applied.isEligible && applied.gross === 11,
+        "ITE2-06",
+        `Applied Sci gross=11 with HIST G2 5 excluded (actual:${applied.gross})`,
+      );
+    }
+
+    // ITE2-07: B subjects ranked on G2-equivalent grade (G3 C5 = G2:2 beats G2 4)
+    // EL G3 A1 + MA G3 A1 + GEOG/BIO/CHEM G3 C5 (G2:2 each) + HIST G2 4 unused → 1+1+6 = 8
+    await reset(page);
+    await addMany(page, [
+      ["EL", "G3", "A1"],
+      ["MATH", "G3", "A1"],
+      ["HIST", "G2", "4"],
+      ["GEOG", "G3", "C5"],
+      ["BIO", "G3", "C5"],
+      ["CHEM", "G3", "C5"],
+    ]);
+    {
+      const applied = await getResult(page, "Applied Science, Engineering");
+      ok(
+        applied.gross === 8,
+        "ITE2-07",
+        `Applied Sci gross=8 (G3 C5 ranked as G2:2; actual:${applied.gross})`,
+      );
+    }
+
+    // MER-F9: EL G3 F9 / EL G2 6 can neither be computed nor fulfil a MER → all ELMAB3 Not Eligible
+    for (const [lvl, gr] of [
+      ["G3", "F9"],
+      ["G2", "6"],
+    ]) {
+      await reset(page);
+      await addMany(page, [
+        ["EL", lvl, gr],
+        ["MATH", "G3", "A1"],
+        ["HIST", "G3", "A1"],
+        ["GEOG", "G3", "A1"],
+        ["BIO", "G3", "A1"],
+      ]);
+      const applied = await getResult(page, "Applied Science, Engineering");
+      const biz = await getResult(page, "Business, Services");
+      const pfp = await getResult(page, "PFP) - Humanities");
+      ok(
+        !applied.isEligible && !biz.isEligible && !pfp.isEligible,
+        "MER-F9",
+        `EL ${lvl} ${gr} → ITE Yr2 + PFP Not Eligible`,
       );
     }
 

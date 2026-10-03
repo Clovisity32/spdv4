@@ -1070,11 +1070,10 @@
             id: "ite_yr2_hnitec_applied_sci_eng_ict",
             name: "ITE Year 2 — Applied Science, Engineering & ICT",
             tooltipText:
-              "Direct Year 2 entry to 3-Year Higher Nitec. For Applied Science, Engineering, and Info-Comms Technology clusters. ELMAB3 ≤ 19 (G2). G3 F9 and G2 grade 5 included in computation.",
+              "Direct Year 2 entry to 3-Year Higher Nitec. For Applied Science, Engineering, and Info-Comms Technology clusters. ELMAB3 ≤ 19 (G2). G3 grade 9 and G2 grades 5–6 cannot be used in computation.",
             group: "ITE Year 2 Higher Nitec",
             calcType: "ELMAB3_G2",
             requirements: { grossELMAB3: 19 },
-            calcOptions: { allowG3F9: true, maxG2GradeForCalc: 5 },
             mer: {
               el_g2: "4",
               math_am_g2: "4",
@@ -1085,11 +1084,10 @@
             id: "ite_yr2_hnitec_biz_services_hosp",
             name: "ITE Year 2 — Business, Services & Hospitality",
             tooltipText:
-              "Direct Year 2 entry to 3-Year Higher Nitec. For Business & Services, and Hospitality clusters. ELMAB3 ≤ 19 (G2). G3 F9 and G2 grade 5 included in computation.",
+              "Direct Year 2 entry to 3-Year Higher Nitec. For Business & Services, and Hospitality clusters. ELMAB3 ≤ 19 (G2). G3 grade 9 and G2 grades 5–6 cannot be used in computation.",
             group: "ITE Year 2 Higher Nitec",
             calcType: "ELMAB3_G2",
             requirements: { grossELMAB3: 19 },
-            calcOptions: { allowG3F9: true, maxG2GradeForCalc: 5 },
             mer: {
               el_g2: "3",
               math_am_g2: "4",
@@ -1683,37 +1681,28 @@
           pathwayId = null,
         ) => {
           const pathwayConfig = PATHWAYS.find((p) => p.id === pathwayId);
-          const calcOpts = pathwayConfig?.calcOptions || {};
-          const maxG3Numeric = calcOpts.allowG3F9
-            ? G3_TO_NUMERIC_RAW["F9"]
-            : G3_TO_NUMERIC_RAW["E8"];
-          const maxG2Numeric =
-            G2_TO_NUMERIC_RAW[String(calcOpts.maxG2GradeForCalc ?? 4)];
 
-          // Add numericOriginalGrade to all subjects for consistent sorting
+          // ELMAB3 is computed at G2: G3 grade 9 and G2 grades 5-6 cannot be used,
+          // and G1 subjects have no G2 grade so they are excluded.
+          // Sort on the G2-equivalent grade so G3 and G2 subjects rank on one scale.
           const allSubjectsWithOriginalNumericGrade = currentStudentSubjects
+            .filter((s) => {
+              if (s.level === "G3")
+                return (
+                  getNumericGrade(s.grade, "G3") <= G3_TO_NUMERIC_RAW["E8"]
+                );
+              if (s.level === "G2")
+                return getNumericGrade(s.grade, "G2") <= G2_TO_NUMERIC_RAW["4"];
+              return false;
+            })
             .map((s) => ({
               ...s,
-              numericOriginalGrade: getNumericGrade(s.grade, s.level),
+              numericOriginalGrade: getNumericGrade(
+                getStudentSubjectG2Grade(s),
+                "G2",
+              ),
               category: getSubjectById(s.subjectId)?.category,
-            }))
-            .filter((s) => {
-              // Exclude G1 Mother Tongue
-              const isG1MotherTongue =
-                s.level === "G1" &&
-                SUBJECT_CATEGORIES_DEF.MT_ALL.includes(s.category);
-              if (isG1MotherTongue) return false;
-
-              if (s.level === "G3")
-                return getNumericGrade(s.grade, "G3") <= maxG3Numeric;
-              if (s.level === "G2")
-                return getNumericGrade(s.grade, "G2") <= maxG2Numeric;
-              if (s.level === "G1")
-                return (
-                  getNumericGrade(s.grade, "G1") <= G1_TO_NUMERIC_RAW_ITE["D"]
-                );
-              return false;
-            });
+            }));
 
           let subjectsUsedWithRoles = [];
           let scoreDetailsParts = [];
@@ -1803,7 +1792,7 @@
             otherSubjects.forEach((s, index) => {
               subjectsUsedWithRoles.push({ ...s, role: `B${index + 2}` });
               scoreDetailsParts.push(
-                `B${index + 2}(${getSubjectById(s.subjectId)?.name} ${s.level} ${s.level} ${s.grade} (G2 equiv ${getStudentSubjectG2Grade(s)})`,
+                `B${index + 2}(${getSubjectById(s.subjectId)?.name} ${s.level} ${s.grade} (G2 equiv ${getStudentSubjectG2Grade(s)})`,
               );
             });
           } else if (
@@ -2660,8 +2649,17 @@
             });
             if (!scoreCheck) overallMerMet = false;
 
-            // Retrieve best EL subject from all student subjects for MER check
-            const elCandidates = currentStudentSubjects
+            // G3 grade 9 and G2 grade 6 cannot fulfil a MER (G1 has no G2 grade).
+            const merPool = currentStudentSubjects.filter(
+              (s) =>
+                (s.level === "G3" &&
+                  getNumericGrade(s.grade, "G3") <= G3_TO_NUMERIC_RAW["E8"]) ||
+                (s.level === "G2" &&
+                  getNumericGrade(s.grade, "G2") <= G2_TO_NUMERIC_RAW["5"]),
+            );
+
+            // Retrieve best EL subject from the MER-eligible pool
+            const elCandidates = merPool
               .filter((s) => SUBJECT_CATEGORIES_DEF.EL.includes(s.subjectId))
               .sort(
                 (a, b) =>
@@ -2684,7 +2682,7 @@
             if (!elCheck) overallMerMet = false;
 
             // Retrieve best Math/Add Math subject from all student subjects for MER check
-            const mathCandidates = currentStudentSubjects
+            const mathCandidates = merPool
               .filter((s) =>
                 SUBJECT_CATEGORIES_DEF.MATH_PURE.includes(
                   getSubjectById(s.subjectId)?.category,
@@ -2713,7 +2711,7 @@
 
             if (pathway.group === "PFP") {
               // Find the best relevant subject from all student subjects for MER check
-              const relevantSubjCandidates = currentStudentSubjects
+              const relevantSubjCandidates = merPool
                 .filter((s) =>
                   pathway.mer.relevant_subj_ids.includes(s.subjectId),
                 )
@@ -2755,7 +2753,7 @@
               if (!relevantSubjFound) overallMerMet = false;
 
               // Find the best 2 other subjects from all student subjects, excluding those *already used for MER checks*
-              const subjectsForOtherTwo = currentStudentSubjects.filter(
+              const subjectsForOtherTwo = merPool.filter(
                 (s) =>
                   s.subjectId !== elForMer?.subjectId &&
                   s.subjectId !== mathForMer?.subjectId &&
@@ -2786,7 +2784,7 @@
             if (pathway.group === "ITE Year 2 Higher Nitec") {
               merDetails.push({
                 merId: "ite_yr2_b3_info",
-                text: `3 other subjects at G2 ≤ 5 (automatically verified by score computation)`,
+                text: `3 other subjects at G2 ≤ 4 (G3 grade 9 and G2 grades 5–6 excluded; automatically verified by score computation)`,
                 met: true,
                 isPlainBullet: true,
               });

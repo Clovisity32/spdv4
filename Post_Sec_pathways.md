@@ -58,7 +58,7 @@ For students taking subjects at more demanding levels, downward grade mapping is
 ## 4. Invalid Grade Exceptions
 
 - **For Polytechnic ELR2B2 and PFP ELMAB3:** G3 grade 9 and G2 grades 5 & 6 **cannot** be used for computation.
-- **For ITE 2-Year ELMAB3:** G3 grade 9 and G2 grade 6 **can** be used for aggregate computation, but **cannot** fulfil subject-specific Minimum Entry Requirements (MER).
+- **For all ELMAB3 aggregates (PFP, ITE Year 2):** G3 grade 9 and G2 grades 5 & 6 **cannot** be used for computation. G3 grade 9 and G2 grade 6 **cannot** fulfil subject-specific Minimum Entry Requirements (MER).
 - **For ITE 3-Year R2B2/R1B3/B4:** G3 grade 9, G2 grade 6, and G1 Grade E **can** be used for aggregate computation, but **cannot** fulfil subject-specific Minimum Entry Requirements (MER).
 
 ---

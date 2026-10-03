@@ -64,16 +64,17 @@ function buildPFPProfile(elG2, mathG2, relevantId, otherIds, targetScore) {
 /**
  * Build an ITE Year 2 G2 profile:
  *   EL(elG2) + MATH(mathG2) + HIST(b1) + GEOG(b2) + ECON(b3)
- * Returns null when the target score is not achievable with maxG2=5 per B subject.
+ * Returns null when the target score is not achievable with maxG2=4 per B subject
+ * (G2 grades 5-6 and G3 grade 9 cannot be used in ELMAB3 computation).
  */
 function buildITEYr2Profile(elG2, mathG2, targetScore) {
   const remaining = targetScore - elG2 - mathG2;
-  if (remaining < 3 || remaining > 15) return null; // B1+B2+B3 ∈ [3,15] for maxG2=5
-  const b1 = Math.min(5, remaining - 2);
+  if (remaining < 3 || remaining > 12) return null; // B1+B2+B3 ∈ [3,12] for maxG2=4
+  const b1 = Math.min(4, remaining - 2);
   const rem2 = remaining - b1;
-  const b2 = Math.min(5, rem2 - 1);
+  const b2 = Math.min(4, rem2 - 1);
   const b3 = rem2 - b2;
-  if (b3 < 1 || b3 > 5) return null;
+  if (b3 < 1 || b3 > 4) return null;
   return [
     { subjectId: "EL", level: "G2", grade: String(elG2) },
     { subjectId: "MATH", level: "G2", grade: String(mathG2) },

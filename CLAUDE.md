@@ -115,6 +115,7 @@ Eligible groups sort before not-eligible groups; original insertion order preser
 
 ## Changelog
 
-| Date    | Section Updated          | What Changed                                                                                                                   |
-| ------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| 2026-06 | Known Gotchas + Commands | Added `run_invariant_tests.js` (123 assertions across 3 phases); `window.__spdTest` hook; CA masking gotcha + `isCA` flag docs |
+| Date    | Section Updated          | What Changed                                                                                                                                                                                                                                                  |
+| ------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-06 | Known Gotchas + Commands | Added `run_invariant_tests.js` (123 assertions across 3 phases); `window.__spdTest` hook; CA masking gotcha + `isCA` flag docs                                                                                                                                |
+| 2026-10 | Do Not Touch / calc      | `calculateELMAB3_G2` + ELMAB3 MER branch: G3 grade 9 and G2 grades 5–6 excluded from every ELMAB3 aggregate (PFP + ITE Yr 2); G3 9 / G2 6 cannot fulfil MER; G1 excluded; B subjects ranked by G2 equivalent. Removed ITE Yr 2 `calcOptions`. User-authorised |
