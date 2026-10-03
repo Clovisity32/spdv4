@@ -22,6 +22,7 @@
 | Dev server      | _(none — open file directly in browser)_ |
 | Tests           | `node scripts/run_edge_case_tests.js`    |
 | Invariant tests | `node scripts/run_invariant_tests.js`    |
+| Advice tests    | `node scripts/run_advice_tests.js`       |
 | Screenshot      | `node scripts/screenshot.js`             |
 
 ## DEV_URL
@@ -85,7 +86,8 @@ spdv4/
 │       └── screenshot.md
 └── scripts/
     ├── screenshot.js
-    └── run_edge_case_tests.js   ← 135 assertions across 14 phases
+    ├── run_edge_case_tests.js   ← 135 assertions across 14 phases
+    └── run_advice_tests.js      ← Results Action Plan engine (37 checks)
 ```
 
 ## Pathway Groups (2027 cohort)
@@ -115,7 +117,8 @@ Eligible groups sort before not-eligible groups; original insertion order preser
 
 ## Changelog
 
-| Date    | Section Updated          | What Changed                                                                                                                                                                                                                                                  |
-| ------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-06 | Known Gotchas + Commands | Added `run_invariant_tests.js` (123 assertions across 3 phases); `window.__spdTest` hook; CA masking gotcha + `isCA` flag docs                                                                                                                                |
-| 2026-10 | Do Not Touch / calc      | `calculateELMAB3_G2` + ELMAB3 MER branch: G3 grade 9 and G2 grades 5–6 excluded from every ELMAB3 aggregate (PFP + ITE Yr 2); G3 9 / G2 6 cannot fulfil MER; G1 excluded; B subjects ranked by G2 equivalent. Removed ITE Yr 2 `calcOptions`. User-authorised |
+| Date    | Section Updated          | What Changed                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-06 | Known Gotchas + Commands | Added `run_invariant_tests.js` (123 assertions across 3 phases); `window.__spdTest` hook; CA masking gotcha + `isCA` flag docs                                                                                                                                                                                                                                                                                                                                      |
+| 2026-10 | Do Not Touch / calc      | `calculateELMAB3_G2` + ELMAB3 MER branch: G3 grade 9 and G2 grades 5–6 excluded from every ELMAB3 aggregate (PFP + ITE Yr 2); G3 9 / G2 6 cannot fulfil MER; G1 excluded; B subjects ranked by G2 equivalent. Removed ITE Yr 2 `calcOptions`. User-authorised                                                                                                                                                                                                       |
+| 2026-10 | Results Action Plan      | New `#resultsAdviceSection` + optional Raw Mark field. Engine `buildResultsAdvice` (exposed as `window.__spdTest.advise`) recommends: (1) drop at most 1 subject, (2) one voluntary move down, (3) compulsory lower level (G3 E8/F9, G2 6; all subjects if weak). Realistic = within 5 raw marks of next grade. Surfaces conflicts C1–C5 where data disagrees with priority order. Read-only use of calc functions and conversion maps. `run_advice_tests.js` added |

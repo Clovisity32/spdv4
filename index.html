@@ -184,7 +184,7 @@
           Enter Your Subjects & Grades
         </h2>
 
-        <div class="grid md:grid-cols-5 gap-4 mb-4 items-end">
+        <div class="grid md:grid-cols-4 lg:grid-cols-7 gap-4 mb-4 items-end">
           <div>
             <label
               for="school"
@@ -242,6 +242,27 @@
               id="grade"
               class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100"
             ></select>
+          </div>
+          <div>
+            <label
+              for="rawMark"
+              class="block text-sm font-medium text-sky-300 mb-1 tooltip"
+            >
+              Raw Mark (optional)<sup><small>i</small></sup>
+              <span class="tooltiptext"
+                >Your actual mark out of 100. It helps us check whether the next
+                grade up is realistically within reach. G1 subjects do not use
+                raw marks.</span
+              >
+            </label>
+            <input
+              type="number"
+              id="rawMark"
+              min="0"
+              max="100"
+              placeholder="0–100"
+              class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100"
+            />
           </div>
           <div>
             <label
@@ -306,6 +327,11 @@
                     Grade
                   </th>
                   <th
+                    class="px-6 py-3 text-left text-xs font-medium text-sky-300 uppercase tracking-wider"
+                  >
+                    Raw Mark
+                  </th>
+                  <th
                     class="px-6 py-3 text-right text-xs font-medium text-sky-300 uppercase tracking-wider"
                   >
                     Actions
@@ -360,6 +386,20 @@
             </p>
           </div>
         </div>
+      </section>
+
+      <section
+        id="resultsAdviceSection"
+        class="mb-10 p-6 bg-slate-800 shadow-2xl rounded-xl border border-slate-700 hidden"
+      >
+        <h2 class="text-2xl font-semibold mb-2 text-cyan-400">
+          Results Action Plan
+        </h2>
+        <p class="text-sm text-slate-400 mb-6">
+          Pathways open today, what is realistic with a small change, and what
+          bigger improvements would unlock next.
+        </p>
+        <div id="resultsAdviceContainer"></div>
       </section>
 
       <section
@@ -1221,6 +1261,13 @@
         );
         const improvementPlaceholder = document.getElementById(
           "improvementPlaceholder",
+        );
+        const rawMarkInput = document.getElementById("rawMark");
+        const resultsAdviceSection = document.getElementById(
+          "resultsAdviceSection",
+        );
+        const resultsAdviceContainer = document.getElementById(
+          "resultsAdviceContainer",
         );
         const currentYearSpan = document.getElementById("currentYear");
         const customMessageBox = document.getElementById("customMessageBox");
@@ -3062,6 +3109,1353 @@
           return allPathwaysStatus;
         };
 
+        // --- Results Action Plan (advice engine) ---
+        // Policy maps (G3_TO_G2_CONVERSION_MAP, G2_TO_G1_EQUIV_MAP) are read only here.
+        const G3_RAW_BANDS = {
+          A1: [75, 100],
+          A2: [70, 74],
+          B3: [65, 69],
+          B4: [60, 64],
+          C5: [55, 59],
+          C6: [50, 54],
+          D7: [45, 49],
+          E8: [40, 44],
+          F9: [0, 39],
+        };
+        const G2_RAW_BANDS = {
+          1: [75, 100],
+          2: [70, 74],
+          3: [65, 69],
+          4: [60, 64],
+          5: [50, 59],
+          6: [0, 49],
+        };
+        const RAW_BANDS = { G3: G3_RAW_BANDS, G2: G2_RAW_BANDS };
+        const REALISTIC_GAIN = 5; // max raw marks a student can realistically gain
+        const MIN_SUBJECTS_AFTER_DROP = 5;
+        const MAX_SUBJECT_DROPS = 1;
+        const PATHWAY_NAME_BY_ID = {};
+        const PATHWAY_GROUP_BY_ID = {};
+        const PATHWAY_TOTAL_BY_GROUP = {};
+        PATHWAYS.forEach((p) => {
+          PATHWAY_NAME_BY_ID[p.id] = p.name;
+          PATHWAY_GROUP_BY_ID[p.id] = p.group;
+          PATHWAY_TOTAL_BY_GROUP[p.group] =
+            (PATHWAY_TOTAL_BY_GROUP[p.group] || 0) + 1;
+        });
+
+        const esc = (v) =>
+          String(v ?? "").replace(
+            /[&<>"']/g,
+            (c) =>
+              ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;",
+              })[c],
+          );
+
+        const getAllowedLevels = (subjectId) => {
+          let restrictions = {};
+          if (selectedSchool === "Yuhua Secondary School")
+            restrictions = YUHUA_SECONDARY_SCHOOL_LEVEL_RESTRICTIONS;
+          else if (selectedSchool === "Broadrick Secondary School")
+            restrictions = BROADRICK_SECONDARY_SCHOOL_LEVEL_RESTRICTIONS;
+          else if (selectedSchool === "School A")
+            restrictions = SCHOOL_A_LEVEL_RESTRICTIONS;
+          return restrictions[subjectId]
+            ? [...restrictions[subjectId]]
+            : [...GRADE_LEVELS];
+        };
+
+        // Lower number = dropped / moved down first.
+        const getLdlTier = (subjectId) => {
+          const subj = getSubjectById(subjectId);
+          if (!subj || subjectId === "AM") return 1;
+          const c = subj.category;
+          if (c === "EL" || c === "MATH_PURE") return 4;
+          if (c.startsWith("HUMANITIES")) return 2;
+          if (c.startsWith("SCIENCE")) return 3;
+          return 1;
+        };
+
+        const bandText = (level, grade) => {
+          const b = RAW_BANDS[level]?.[grade];
+          if (!b) return "";
+          if (b[0] === 0) return `below ${b[1] + 1}`;
+          return b[1] === 100 ? `${b[0]} and above` : `${b[0]}–${b[1]}`;
+        };
+
+        const hasRawMark = (s) =>
+          s.rawMark !== null && s.rawMark !== undefined && s.rawMark !== "";
+
+        const getValidRaw = (s) => {
+          const band = RAW_BANDS[s.level]?.[s.grade];
+          if (!band || !hasRawMark(s) || !Number.isFinite(Number(s.rawMark)))
+            return null;
+          const n = Number(s.rawMark);
+          return n >= band[0] && n <= band[1] ? n : null;
+        };
+
+        const isCompulsoryLower = (s) =>
+          (s.level === "G3" && (s.grade === "E8" || s.grade === "F9")) ||
+          (s.level === "G2" && s.grade === "6");
+
+        const weakness = (s) =>
+          getNumericGrade(s.grade, s.level) /
+          ({ G3: 9, G2: 6, G1: 5 }[s.level] || 9);
+
+        const reachInfo = (s) => {
+          const next = getNextBetterGrade(s.grade, s.level);
+          if (!next) return { next: null, needed: null, status: "top" };
+          if (s.level === "G1")
+            return { next, needed: null, status: "unknown", why: "g1" };
+          if (!hasRawMark(s))
+            return { next, needed: null, status: "unknown", why: "none" };
+          const raw = getValidRaw(s);
+          if (raw === null)
+            return { next, needed: null, status: "unknown", why: "invalid" };
+          const needed = RAW_BANDS[s.level][next][0] - raw;
+          return {
+            next,
+            needed,
+            status: needed <= REALISTIC_GAIN ? "reachable" : "stretch",
+          };
+        };
+
+        const moveDown = (s) => {
+          const allowed = getAllowedLevels(s.subjectId);
+          let toLevel = null,
+            toGrade = null;
+          if (s.level === "G3" && allowed.includes("G2")) {
+            toLevel = "G2";
+            toGrade = G3_TO_G2_CONVERSION_MAP[s.grade];
+          } else if (s.level === "G2" && allowed.includes("G1")) {
+            toLevel = "G1";
+            toGrade = G2_TO_G1_EQUIV_MAP[s.grade];
+          }
+          if (!toLevel || !toGrade) return null;
+          return {
+            ...s,
+            level: toLevel,
+            grade: toGrade,
+            rawMark: null,
+            moved: { fromLevel: s.level, fromGrade: s.grade },
+          };
+        };
+
+        // eligible = eligible today; realistic = eligible today + unlocked by one
+        // single-grade improvement that is within REALISTIC_GAIN raw marks.
+        const evaluateRealistic = (subjects) => {
+          const eligibleIds = (list) =>
+            calculateAllPathwaysStatus(list)
+              .filter((p) => p.isEligible)
+              .map((p) => p.id);
+          const eligible = new Set(eligibleIds(subjects));
+          const realistic = new Set(eligible);
+          // needs[pathwayId] = the within-reach improvements that unlock it.
+          const needs = {};
+          const improvements = [];
+          const bump = (x, r) => ({
+            ...x,
+            grade: r.next,
+            rawMark: RAW_BANDS[x.level][r.next][0],
+          });
+          const needOf = (s, r, combined) => ({
+            subjectId: s.subjectId,
+            level: s.level,
+            from: s.grade,
+            to: r.next,
+            marks: r.needed,
+            combined,
+          });
+          subjects.forEach((s, i) => {
+            const r = reachInfo(s);
+            if (r.status !== "reachable") return;
+            improvements.push({ i, r });
+            eligibleIds(subjects.map((x, j) => (j === i ? bump(x, r) : x)))
+              .filter((id) => !eligible.has(id))
+              .forEach((id) => {
+                realistic.add(id);
+                (needs[id] = needs[id] || []).push(needOf(s, r, false));
+              });
+          });
+          // Every within-reach improvement happening together.
+          if (improvements.length > 1) {
+            const jointSubjects = subjects.map((x, j) => {
+              const m = improvements.find((k) => k.i === j);
+              return m ? bump(x, m.r) : x;
+            });
+            eligibleIds(jointSubjects)
+              .filter((id) => !realistic.has(id))
+              .forEach((id) => {
+                realistic.add(id);
+                needs[id] = improvements.map((m) =>
+                  needOf(subjects[m.i], m.r, true),
+                );
+              });
+          }
+          return { eligible, realistic, needs };
+        };
+
+        const idsMissing = (from, to) => [...from].filter((id) => !to.has(id));
+        const pwNames = (ids) =>
+          ids.map((id) => (PATHWAY_NAME_BY_ID[id] || id).replace(/\.+$/, ""));
+        const countByGroup = (set) => {
+          const out = {};
+          Object.keys(PATHWAY_TOTAL_BY_GROUP).forEach((g) => (out[g] = 0));
+          set.forEach((id) => {
+            const g = PATHWAY_GROUP_BY_ID[id];
+            if (g) out[g]++;
+          });
+          return out;
+        };
+
+        const OPTION_TITLES = {
+          0: "Stay with your current subjects",
+          1: "Reduce the number of subjects",
+          2: "Move one elective down a level",
+          3: "Compulsory lower level",
+        };
+        const OPTION_NOT_APPLICABLE = {
+          1: "No subject can be dropped without losing a realistic pathway, or you are already at the minimum number of subjects.",
+          2: "Moving any one subject down a level would not add a realistic pathway.",
+          3: "No subject is at G3 E8/F9 or G2 grade 6.",
+        };
+
+        // Scores three alternative options from the student's original results
+        // and recommends the single best one (most realistic pathways, then most
+        // eligible today, then the least disruptive option number).
+        const buildResultsAdvice = (subjects) => {
+          const base = subjects.map((s) => ({ ...s }));
+          if (base.length === 0) return { empty: true };
+          const nameOf = (s) =>
+            getSubjectById(s.subjectId)?.name || s.subjectId;
+          const gradeText = (s) => `${s.level} ${s.grade}`;
+          const baseEval = evaluateRealistic(base);
+          const baseOf = (s) => base.find((b) => b.subjectId === s.subjectId);
+
+          const reach = base.map((s) => ({
+            name: nameOf(s),
+            level: s.level,
+            grade: s.grade,
+            rawMark: hasRawMark(s) ? Number(s.rawMark) : null,
+            ...reachInfo(s),
+          }));
+
+          // ---- Option 3: compulsory lower level ----
+          const opt3 = (() => {
+            const conflicts = [];
+            const selective = base.map((s) => ({ ...s }));
+            const moves = [];
+            const blocked = [];
+            base.forEach((s, i) => {
+              if (!isCompulsoryLower(s)) return;
+              const moved = moveDown(s);
+              const r = reachInfo(s);
+              if (!moved) {
+                blocked.push(s);
+                return;
+              }
+              selective[i] = moved;
+              const single = evaluateRealistic(
+                base.map((x, j) => (j === i ? moved : x)),
+              );
+              const lost = idsMissing(baseEval.realistic, single.realistic);
+              moves.push(moved);
+              if (lost.length > 0)
+                conflicts.push({
+                  id: "C3",
+                  title: `Moving ${nameOf(s)} down costs pathways`,
+                  text: `${nameOf(s)} (${gradeText(s)}) would move to ${gradeText(moved)}, but these pathways would no longer be realistic: ${pwNames(lost).join(", ")}. Check with your teacher or HOD before confirming.`,
+                });
+              if (r.status === "reachable")
+                conflicts.push({
+                  id: "C4",
+                  title: `${nameOf(s)} is close to passing`,
+                  text: `At ${s.rawMark} marks you need only ${r.needed} more for ${r.next}. Staying at ${s.level} looks realistic: it keeps ${baseEval.realistic.size} pathway${baseEval.realistic.size === 1 ? "" : "s"} realistic, versus ${single.realistic.size} after moving.`,
+                });
+            });
+
+            const allDown = base.map((s) => moveDown(s) || { ...s });
+            const anyMovable = allDown.some((s) => s.moved);
+            const selEval = evaluateRealistic(selective);
+            const allEval = evaluateRealistic(allDown);
+            const compulsoryCount = moves.length + blocked.length;
+            const halfCompulsory =
+              compulsoryCount > 0 && compulsoryCount * 2 >= base.length;
+            const triggered = halfCompulsory || selEval.realistic.size === 0;
+            const strictWin = allEval.realistic.size > selEval.realistic.size;
+            const tie = allEval.realistic.size === selEval.realistic.size;
+            // A tie keeps strong subjects where they are, unless the compulsory
+            // moves already cover every movable subject (then "all" is accurate).
+            const selectiveCoversAll = allDown.every(
+              (s, i) => !s.moved || !!selective[i].moved,
+            );
+            const useAll =
+              anyMovable &&
+              triggered &&
+              (strictWin || (selectiveCoversAll && halfCompulsory));
+            const allTie = anyMovable && triggered && tie && !useAll;
+            if (anyMovable && !useAll && strictWin && !triggered)
+              conflicts.push({
+                id: "C5",
+                title: "Moving everything down would help more",
+                text: `Fewer than half your subjects are compulsory, but taking ALL subjects one level lower would make ${allEval.realistic.size} pathways realistic, versus ${selEval.realistic.size} with only the compulsory moves. Discuss with your teacher.`,
+              });
+            if (
+              anyMovable &&
+              triggered &&
+              allEval.realistic.size < selEval.realistic.size
+            )
+              conflicts.push({
+                id: "C5",
+                title: "Moving everything down is not better",
+                text: `Your results are weak across subjects, but taking ALL subjects one level lower would make ${allEval.realistic.size} pathways realistic, versus ${selEval.realistic.size} with only the compulsory moves, so only the compulsory moves are used.`,
+              });
+
+            const moveList = useAll ? allDown.filter((s) => s.moved) : moves;
+            moveList.forEach((s) => {
+              const orig = baseOf(s);
+              const r = orig ? reachInfo(orig) : { status: "unknown" };
+              let why =
+                orig && isCompulsoryLower(orig)
+                  ? `${nameOf(s)} was ${s.moved.fromLevel} ${s.moved.fromGrade}, which is at or below the lowest passing grade, so it moves to ${gradeText(s)}.`
+                  : `${nameOf(s)} moves from ${s.moved.fromLevel} ${s.moved.fromGrade} to ${gradeText(s)} so every subject is taken at the lower level.`;
+              if (r.status === "stretch")
+                why += ` You would need ${r.needed} more marks for ${r.next}, which is a stretch.`;
+              else if (r.status === "unknown" && r.why === "none")
+                why +=
+                  " Add the raw mark to check whether staying is realistic.";
+              s.reason = why;
+            });
+            return {
+              id: 3,
+              applicable: moveList.length > 0,
+              mode: useAll ? "all" : moveList.length ? "selective" : "none",
+              moves: moveList,
+              blocked,
+              subjects: useAll ? allDown : selective,
+              eval: useAll ? allEval : selEval,
+              allCount: allEval.realistic.size,
+              selectiveCount: selEval.realistic.size,
+              allTie,
+              conflicts,
+            };
+          })();
+
+          // ---- Option 1: drop one subject, others stay at the same level ----
+          const opt1 = (() => {
+            const conflicts = [];
+            const drops = [];
+            const kept = [];
+            let stage = base.map((s) => ({ ...s }));
+            let stageEval = baseEval;
+            stage
+              .map((s) => ({ s, tier: getLdlTier(s.subjectId) }))
+              .filter((c) => c.tier <= 3)
+              .sort(
+                (a, b) =>
+                  a.tier - b.tier ||
+                  (reachInfo(a.s).status === "stretch" ? 0 : 1) -
+                    (reachInfo(b.s).status === "stretch" ? 0 : 1) ||
+                  weakness(b.s) - weakness(a.s),
+              )
+              .forEach((c) => {
+                if (
+                  drops.length >= MAX_SUBJECT_DROPS ||
+                  stage.length <= MIN_SUBJECTS_AFTER_DROP
+                )
+                  return;
+                // Never advise dropping a subject that is within reach of the
+                // next grade: that improvement could still lift the aggregate.
+                const close = reachInfo(c.s);
+                if (close.status === "reachable") {
+                  kept.push({ subject: c.s, tier: c.tier, lost: [], close });
+                  return;
+                }
+                const remaining = stage.filter(
+                  (x) => x.subjectId !== c.s.subjectId,
+                );
+                const e = evaluateRealistic(remaining);
+                const lost = idsMissing(stageEval.realistic, e.realistic);
+                if (lost.length === 0) {
+                  drops.push({ subject: c.s, tier: c.tier });
+                  stage = remaining;
+                  stageEval = e;
+                } else kept.push({ subject: c.s, tier: c.tier, lost });
+              });
+            drops.forEach((d) => {
+              const blocker = kept.find((k) => k.tier < d.tier);
+              if (blocker)
+                conflicts.push({
+                  id: "C2",
+                  title: `Dropped ${nameOf(d.subject)} instead of ${nameOf(blocker.subject)}`,
+                  text: blocker.close
+                    ? `The usual order drops ${nameOf(blocker.subject)} first, but at ${baseOf(blocker.subject).rawMark} marks it is only ${blocker.close.needed} mark${blocker.close.needed === 1 ? "" : "s"} from ${blocker.close.next}, so it is kept and ${nameOf(d.subject)} is dropped instead.`
+                    : `The usual order drops ${nameOf(blocker.subject)} first, but it is needed for ${pwNames(blocker.lost).join(", ")}, so ${nameOf(d.subject)} is dropped instead.`,
+                });
+              const helped = reach
+                .filter(
+                  (r) =>
+                    r.status === "reachable" && r.name !== nameOf(d.subject),
+                )
+                .sort((a, b) => a.needed - b.needed)[0];
+              const dr = reachInfo(baseOf(d.subject));
+              const distance =
+                dr.status === "stretch"
+                  ? ` At ${baseOf(d.subject).rawMark} marks it needs ${dr.needed} more for ${dr.next}, which is a stretch.`
+                  : dr.status === "top"
+                    ? ""
+                    : " Add its raw mark to confirm that dropping it is safe.";
+              d.reason = `${nameOf(d.subject)} (${gradeText(baseOf(d.subject))}) is not needed for any of your ${stageEval.realistic.size} realistic pathways, and you still keep ${stage.length} subjects.${distance}`;
+              d.focus = helped
+                ? `Use the time to push ${helped.name} (${helped.level} ${helped.grade} → ${helped.next}, needs ${helped.needed} more mark${helped.needed === 1 ? "" : "s"}).`
+                : "";
+            });
+            return {
+              id: 1,
+              applicable: drops.length > 0,
+              drops,
+              subjects: stage,
+              eval: stageEval,
+              conflicts,
+            };
+          })();
+
+          // ---- Option 2: move one subject down a level ----
+          const opt2 = (() => {
+            const conflicts = [];
+            const options = base
+              .map((s, i) => {
+                const moved = moveDown(s);
+                if (!moved) return null;
+                const e = evaluateRealistic(
+                  base.map((x, j) => (j === i ? moved : x)),
+                );
+                return {
+                  subject: s,
+                  moved,
+                  tier: getLdlTier(s.subjectId),
+                  eval: e,
+                  gainIds: [...e.realistic].filter(
+                    (id) => !baseEval.realistic.has(id),
+                  ),
+                  gainEligible: e.eligible.size - baseEval.eligible.size,
+                };
+              })
+              .filter(Boolean);
+            const qualifies = (o) =>
+              o.eval.realistic.size > baseEval.realistic.size ||
+              (o.eval.realistic.size === baseEval.realistic.size &&
+                o.eval.eligible.size > baseEval.eligible.size);
+            const cmp = (a, b) =>
+              b.eval.realistic.size - a.eval.realistic.size ||
+              b.eval.eligible.size - a.eval.eligible.size ||
+              weakness(b.subject) - weakness(a.subject);
+            const good = options.filter(qualifies);
+            let pick = null;
+            for (let t = 1; t <= 4 && !pick; t++) {
+              const inTier = good.filter((o) => o.tier === t).sort(cmp);
+              if (inTier.length) pick = inTier[0];
+            }
+            const best = [...good].sort(cmp)[0];
+            if (
+              pick &&
+              best &&
+              best.eval.realistic.size > pick.eval.realistic.size
+            )
+              conflicts.push({
+                id: "C1",
+                title: `${nameOf(best.subject)} would help more than ${nameOf(pick.subject)}`,
+                text: `The usual order says move ${nameOf(pick.subject)}, but moving ${nameOf(best.subject)} instead makes ${best.eval.realistic.size - pick.eval.realistic.size} more pathway(s) realistic (${pwNames(idsMissing(best.eval.realistic, pick.eval.realistic)).join(", ")}). Your teacher can choose.`,
+              });
+            if (pick) {
+              const g = pick.gainIds.length;
+              pick.reason = `Moving ${nameOf(pick.subject)} from ${gradeText(pick.subject)} to ${gradeText(pick.moved)} ${
+                g > 0
+                  ? `makes ${g} more pathway${g === 1 ? "" : "s"} realistic: ${pwNames(pick.gainIds).join(", ")}.`
+                  : `makes ${pick.gainEligible} more pathway${pick.gainEligible === 1 ? "" : "s"} eligible today.`
+              } It is priority tier ${pick.tier} in your order (electives and mother tongue, then humanities, science, English and maths).`;
+            }
+            return {
+              id: 2,
+              applicable: !!pick,
+              pick,
+              subjects: pick
+                ? base.map((s) =>
+                    s.subjectId === pick.subject.subjectId ? pick.moved : s,
+                  )
+                : base,
+              eval: pick ? pick.eval : baseEval,
+              conflicts,
+            };
+          })();
+
+          // ---- Status quo: keep the current combination ----
+          const compulsoryNow = base.filter(isCompulsoryLower);
+          const opt0 = {
+            id: 0,
+            applicable: true,
+            subjects: base,
+            eval: baseEval,
+            conflicts: compulsoryNow.length
+              ? [
+                  {
+                    id: "C6",
+                    title: "Some subjects would normally move to a lower level",
+                    text: `${compulsoryNow.map((s) => `${nameOf(s)} (${gradeText(s)})`).join(", ")} would normally move to a lower level. Staying keeps ${baseEval.realistic.size} realistic pathway${baseEval.realistic.size === 1 ? "" : "s"}, versus ${opt3.eval.realistic.size} if they move. Confirm with your teacher or HOD that staying is acceptable.`,
+                  },
+                  ...opt3.conflicts.filter((c) => c.id === "C4"),
+                ]
+              : [],
+          };
+
+          // ---- Choose the single best option ----
+          // Ties go to the least disruptive: drop a subject, then stay, then
+          // move one subject, then the compulsory moves.
+          const tieRank = { 1: 0, 0: 1, 2: 2, 3: 3 };
+          const best = [opt0, opt1, opt2, opt3]
+            .filter((o) => o.applicable)
+            .sort(
+              (a, b) =>
+                b.eval.realistic.size - a.eval.realistic.size ||
+                b.eval.eligible.size - a.eval.eligible.size ||
+                tieRank[a.id] - tieRank[b.id],
+            )[0];
+
+          const summaryFor = (o) =>
+            !o.applicable
+              ? OPTION_NOT_APPLICABLE[o.id]
+              : o.id === 0
+                ? "Keep all subjects and levels as they are"
+                : o.id === 1
+                  ? `Drop ${nameOf(o.drops[0].subject)}`
+                  : o.id === 2
+                    ? `Take ${nameOf(o.pick.subject)} at ${o.pick.moved.level}`
+                    : o.mode === "all"
+                      ? "Take ALL subjects one level lower"
+                      : `Take ${o.moves.map(nameOf).join(", ")} at the lower level`;
+          const checklistFor = (o) => {
+            if (o.id === 0) return ["Keep your current subjects and levels."];
+            if (o.id === 1)
+              return o.drops.map((d) => `Drop ${nameOf(d.subject)}.`);
+            if (o.id === 2)
+              return [
+                `Take ${nameOf(o.pick.subject)} at ${o.pick.moved.level} (projected grade ${o.pick.moved.grade}).`,
+              ];
+            const lines =
+              o.mode === "all"
+                ? [
+                    `Take ALL subjects one level lower: ${o.moves.map((s) => `${nameOf(s)} → ${gradeText(s)}`).join("; ")}.`,
+                  ]
+                : o.moves.map(
+                    (s) =>
+                      `Take ${nameOf(s)} at ${s.level} (was ${s.moved.fromLevel} ${s.moved.fromGrade}, projected ${s.grade}).`,
+                  );
+            o.blocked.forEach((s) =>
+              lines.push(
+                `${nameOf(s)} (${gradeText(s)}) should move down, but a lower level is not offered at this school. Talk to your teacher.`,
+              ),
+            );
+            return lines;
+          };
+          const reasonsFor = (o) => {
+            if (o.id === 0)
+              return [
+                `Staying keeps ${o.eval.realistic.size} realistic pathway${o.eval.realistic.size === 1 ? "" : "s"}, which is as many as or more than any other option.`,
+                ...[opt1, opt2, opt3]
+                  .filter((x) => x.applicable)
+                  .map(
+                    (x) =>
+                      `Option ${x.id} (${summaryFor(x)}) would give ${x.eval.realistic.size}.`,
+                  ),
+              ];
+            if (o.id === 1)
+              return [
+                ...new Set(
+                  o.drops.flatMap((d) => [d.reason, d.focus]).filter(Boolean),
+                ),
+              ];
+            if (o.id === 2) return [o.pick.reason];
+            return [
+              ...o.moves.map((s) => s.reason),
+              ...(o.allTie
+                ? [
+                    `Moving every other subject down as well would give the same ${o.allCount} realistic pathways, so your stronger subjects stay at their current level.`,
+                  ]
+                : []),
+            ];
+          };
+
+          // ---- Decision aid: what staying would take vs moving now ----
+          const eligibleSetOf = (list) =>
+            new Set(
+              calculateAllPathwaysStatus(list)
+                .filter((p) => p.isEligible)
+                .map((p) => p.id),
+            );
+          const difficultyOf = (gap) =>
+            gap === null
+              ? "unknown"
+              : gap <= REALISTIC_GAIN
+                ? "within reach"
+                : gap <= 15
+                  ? "stretch"
+                  : "remote";
+          // Rungs: each better grade of one subject (others unchanged), with the
+          // raw mark it needs and the pathways eligible at that point.
+          const climbs = base.map((s, i) => {
+            if (s.level === "G1") return [];
+            const list =
+              s.level === "G3" ? G3_GRADES_OPTIONS : G2_GRADES_OPTIONS;
+            const raw = getValidRaw(s);
+            const rungs = [];
+            let prev = baseEval.eligible;
+            for (let k = list.indexOf(s.grade) - 1; k >= 0; k--) {
+              const g = list[k];
+              const min = RAW_BANDS[s.level][g][0];
+              const elig = eligibleSetOf(
+                base.map((x, j) =>
+                  j === i ? { ...x, grade: g, rawMark: min } : x,
+                ),
+              );
+              const gap = raw === null ? null : min - raw;
+              rungs.push({
+                grade: g,
+                markNeeded: min,
+                gap,
+                difficulty: difficultyOf(gap),
+                eligible: elig,
+                gained: [...elig].filter((id) => !prev.has(id)),
+              });
+              prev = elig;
+            }
+            return rungs;
+          });
+          const ladder = [];
+          base.forEach((s, i) =>
+            climbs[i]
+              .filter((r) => r.gained.length > 0)
+              .forEach((r) =>
+                ladder.push({
+                  name: nameOf(s),
+                  level: s.level,
+                  from: s.grade,
+                  grade: r.grade,
+                  markNeeded: r.markNeeded,
+                  gap: r.gap,
+                  difficulty: r.difficulty,
+                  unlocks: pwNames(r.gained),
+                }),
+              ),
+          );
+          ladder.sort(
+            (a, b) =>
+              (a.gap === null ? 999 : a.gap) - (b.gap === null ? 999 : b.gap),
+          );
+          const breakEvens = [];
+          const seenBreak = new Set();
+          [
+            ...(opt2.pick ? [opt2.pick.subject] : []),
+            ...opt3.moves.map(baseOf),
+          ].forEach((s) => {
+            if (!s || seenBreak.has(s.subjectId)) return;
+            seenBreak.add(s.subjectId);
+            const i = base.findIndex((b) => b.subjectId === s.subjectId);
+            const moved = moveDown(base[i]);
+            if (!moved) return;
+            const movedElig = eligibleSetOf(
+              base.map((x, j) => (j === i ? moved : x)),
+            );
+            if (movedElig.size <= baseEval.eligible.size) return;
+            const hit = climbs[i].find(
+              (r) => r.eligible.size >= movedElig.size,
+            );
+            const stayAll = new Set();
+            climbs[i].forEach((r) =>
+              r.eligible.forEach((id) => stayAll.add(id)),
+            );
+            breakEvens.push({
+              name: nameOf(s),
+              from: gradeText(base[i]),
+              to: gradeText(moved),
+              movedCount: movedElig.size,
+              stayNowCount: baseEval.eligible.size,
+              hit: hit
+                ? {
+                    grade: hit.grade,
+                    markNeeded: hit.markNeeded,
+                    gap: hit.gap,
+                    difficulty: hit.difficulty,
+                    count: hit.eligible.size,
+                  }
+                : null,
+              onlyIfStay: pwNames(
+                [...stayAll].filter((id) => !movedElig.has(id)),
+              ),
+            });
+          });
+
+          const afterEval = best ? best.eval : baseEval;
+          // Which pathways are open today, and which only if within-reach
+          // grades improve (and which improvements they depend on).
+          const describeEval = (ev) => ({
+            eligibleNow: pwNames([...ev.eligible]),
+            potential: [...ev.realistic]
+              .filter((id) => !ev.eligible.has(id))
+              .map((id) => ({
+                name: pwNames([id])[0],
+                needs: (ev.needs[id] || []).map((n) => ({
+                  ...n,
+                  name: getSubjectById(n.subjectId)?.name || n.subjectId,
+                })),
+              })),
+          });
+          const finalSubjects = best ? best.subjects : base;
+          const warnings = [];
+          if (finalSubjects.length <= 5) {
+            const finalNames = new Set(finalSubjects.map(nameOf));
+            const focus = reach
+              .filter((r) => r.status === "reachable" && finalNames.has(r.name))
+              .sort((a, b) => a.needed - b.needed);
+            warnings.push({
+              id: "W1",
+              title: `Only ${finalSubjects.length} subjects, so every grade counts`,
+              text: `With ${finalSubjects.length} subjects you are putting all your eggs in a small basket: there is no spare subject to cover a weak result. Spend your study time wisely on these subjects.${
+                focus.length
+                  ? ` Best use of time: ${focus.map((f) => `${f.name} (${f.needed} mark${f.needed === 1 ? "" : "s"} to ${f.next})`).join(", ")}.`
+                  : ""
+              }`,
+            });
+          }
+          const recommended = best
+            ? {
+                id: best.id,
+                title: OPTION_TITLES[best.id],
+                checklist: checklistFor(best),
+                reasons: reasonsFor(best),
+                conflicts: best.conflicts,
+                warnings,
+              }
+            : {
+                id: 0,
+                title: "No change needed",
+                checklist: [
+                  "No change needed. Keep your subjects as they are.",
+                ],
+                reasons: [
+                  "None of the three options adds a realistic pathway.",
+                ],
+                conflicts: [],
+                warnings,
+              };
+
+          // ---- Pathway levels: today -> realistic -> bigger improvements ----
+          const marksText = (n) => `${n} mark${n === 1 ? "" : "s"}`;
+          const afterDesc = describeEval(afterEval);
+          const reachMap = new Map();
+          afterDesc.potential.forEach((pw) =>
+            pw.needs.forEach((n) => {
+              const key = n.combined ? "combined" : `${n.subjectId}|${n.to}`;
+              if (!reachMap.has(key))
+                reachMap.set(key, {
+                  text: n.combined
+                    ? `Improve all of: ${pw.needs.map((x) => `${x.name} ${x.level} ${x.from} → ${x.to} (+${marksText(x.marks)})`).join("; ")}`
+                    : `Improve ${n.name} ${n.level} ${n.from} → ${n.to} (+${marksText(n.marks)})`,
+                  marks: n.combined
+                    ? pw.needs.reduce((sum, x) => sum + x.marks, 0)
+                    : n.marks,
+                  combined: !!n.combined,
+                  unlocks: [],
+                });
+              reachMap.get(key).unlocks.push(pw.name);
+            }),
+          );
+          const reachActions = [...reachMap.values()].sort(
+            (a, b) => a.combined - b.combined || a.marks - b.marks,
+          );
+          const stepText = (c) =>
+            `Improve ${c.name} (${c.level} ${c.from}) to ${c.grade}: needs ${c.markNeeded} marks${c.gap === null ? " (add the raw mark to see the gap)" : ` (${c.gap > 0 ? "+" : ""}${c.gap} from now, ${c.difficulty})`}`;
+
+          // Level 3+: greedy over single-subject improvements, easiest first,
+          // counting only pathways not already reached by the levels above.
+          let frontier = new Set(afterEval.realistic);
+          const candidates = [];
+          base.forEach((s, i) =>
+            climbs[i].forEach((r) =>
+              candidates.push({
+                name: nameOf(s),
+                level: s.level,
+                from: s.grade,
+                grade: r.grade,
+                markNeeded: r.markNeeded,
+                gap: r.gap,
+                difficulty: r.difficulty,
+                eligible: r.eligible,
+              }),
+            ),
+          );
+          candidates.sort(
+            (a, b) =>
+              (a.gap === null ? 999 : a.gap) - (b.gap === null ? 999 : b.gap) ||
+              a.markNeeded - b.markNeeded,
+          );
+          const upperLevels = [];
+          for (let guard = 0; guard < 4; guard++) {
+            const next = candidates.find((c) =>
+              [...c.eligible].some((id) => !frontier.has(id)),
+            );
+            if (!next) break;
+            const gainedIds = [...next.eligible].filter(
+              (id) => !frontier.has(id),
+            );
+            next.eligible.forEach((id) => frontier.add(id));
+            upperLevels.push({
+              n: 3 + guard,
+              title: "Needs a bigger improvement",
+              count: frontier.size,
+              step: stepText(next),
+              stepData: {
+                name: next.name,
+                grade: next.grade,
+                markNeeded: next.markNeeded,
+                gap: next.gap,
+                difficulty: next.difficulty,
+              },
+              unlocks: pwNames(gainedIds),
+              byGroup: countByGroup(frontier),
+            });
+          }
+          const level1 = {
+            n: 1,
+            title: "Today: eligible with your current grades",
+            count: baseEval.eligible.size,
+            pathways: pwNames([...baseEval.eligible]),
+            byGroup: countByGroup(baseEval.eligible),
+          };
+          const level2 = {
+            n: 2,
+            title: "Realistic: within reach",
+            count: afterEval.realistic.size,
+            added: pwNames(
+              [...afterEval.realistic].filter(
+                (id) => !baseEval.eligible.has(id),
+              ),
+            ),
+            structural: recommended.id !== 0 ? recommended.checklist : [],
+            reachActions,
+            byGroup: countByGroup(afterEval.realistic),
+          };
+          const levelsList = [level1, level2, ...upperLevels];
+          const easiestOf = (L) => {
+            if (!L) return null;
+            if (L.n === 2) {
+              if (L.structural.length)
+                return `${L.structural[0]} (no marks needed)`;
+              if (L.reachActions.length) return L.reachActions[0].text;
+              return null;
+            }
+            return L.step;
+          };
+          levelsList.forEach((L, i) => {
+            L.nextStep = easiestOf(levelsList[i + 1]);
+          });
+
+          // ---- Staircase: the easiest route to each individual pathway ----
+          const TIER_LABELS = [
+            "Open today",
+            "Immediate: change level, no marks needed",
+            "Within reach: up to 5 marks per subject",
+            "Stretch: up to 15 marks in a subject",
+            "Remote: large gains across several subjects",
+            "Out of reach: far beyond a realistic gain",
+          ];
+          const statusBase = calculateAllPathwaysStatus(base);
+          const moveOpts = base
+            .map((s, i) => {
+              const moved = moveDown(s);
+              if (!moved) return null;
+              return {
+                s,
+                moved,
+                elig: eligibleSetOf(base.map((x, j) => (j === i ? moved : x))),
+              };
+            })
+            .filter(Boolean);
+          // Cheapest combination of improvements (any number of subjects) that
+          // opens each pathway. Uniform-cost search over grade steps; cost is the
+          // sum of squared marks per subject, so several small gains rank easier
+          // than one big gain. One search serves every pathway.
+          const comboRoutes = (() => {
+            const found = new Map();
+            const grades = base.map((s) =>
+              s.level === "G3"
+                ? G3_GRADES_OPTIONS
+                : s.level === "G2"
+                  ? G2_GRADES_OPTIONS
+                  : null,
+            );
+            const startIdx = base.map((s, i) =>
+              grades[i] ? grades[i].indexOf(s.grade) : -1,
+            );
+            const raws = base.map(getValidRaw);
+            const markAt = (i, k) => RAW_BANDS[base[i].level][grades[i][k]][0];
+            const gapTo = (i, k) =>
+              k === startIdx[i]
+                ? 0
+                : raws[i] === null
+                  ? markAt(i, k) - markAt(i, startIdx[i])
+                  : markAt(i, k) - raws[i];
+            const MAX_GAP = 40;
+            const MAX_POPS = 1200;
+            const targets = new Set(
+              statusBase
+                .filter((x) => !baseEval.eligible.has(x.id))
+                .map((x) => x.id),
+            );
+            const heap = [];
+            const push = (node) => {
+              heap.push(node);
+              let c = heap.length - 1;
+              while (c > 0) {
+                const par = (c - 1) >> 1;
+                if (heap[par].cost <= heap[c].cost) break;
+                [heap[par], heap[c]] = [heap[c], heap[par]];
+                c = par;
+              }
+            };
+            const pop = () => {
+              const top = heap[0];
+              const last = heap.pop();
+              if (heap.length) {
+                heap[0] = last;
+                let c = 0;
+                for (;;) {
+                  const l = 2 * c + 1;
+                  const r = l + 1;
+                  let m = c;
+                  if (l < heap.length && heap[l].cost < heap[m].cost) m = l;
+                  if (r < heap.length && heap[r].cost < heap[m].cost) m = r;
+                  if (m === c) break;
+                  [heap[m], heap[c]] = [heap[c], heap[m]];
+                  c = m;
+                }
+              }
+              return top;
+            };
+            const seen = new Set();
+            push({ cost: 0, idx: [...startIdx] });
+            let pops = 0;
+            while (
+              heap.length &&
+              pops < MAX_POPS &&
+              found.size < targets.size
+            ) {
+              const node = pop();
+              const key = node.idx.join(",");
+              if (seen.has(key)) continue;
+              seen.add(key);
+              pops++;
+              if (node.cost > 0) {
+                const trial = base.map((s, i) =>
+                  node.idx[i] !== startIdx[i]
+                    ? {
+                        ...s,
+                        grade: grades[i][node.idx[i]],
+                        rawMark: markAt(i, node.idx[i]),
+                      }
+                    : s,
+                );
+                eligibleSetOf(trial).forEach((id) => {
+                  if (targets.has(id) && !found.has(id))
+                    found.set(id, { idx: [...node.idx], cost: node.cost });
+                });
+              }
+              for (let i = 0; i < base.length; i++) {
+                if (!grades[i] || node.idx[i] <= 0) continue;
+                const nk = node.idx[i] - 1;
+                const newGap = gapTo(i, nk);
+                if (newGap > MAX_GAP) continue;
+                const oldGap = gapTo(i, node.idx[i]);
+                const nextIdx = [...node.idx];
+                nextIdx[i] = nk;
+                push({
+                  cost: node.cost + newGap * newGap - oldGap * oldGap,
+                  idx: nextIdx,
+                });
+              }
+            }
+            // Pathways the cheapest-first search did not reach in its budget:
+            // greedily take the step that most reduces the pathway's deficit
+            // (score above cut-off plus unmet requirements) per mark.
+            const cutOf = (pw) => {
+              const req = pw.requirements || {};
+              return req.grossL1R4 !== undefined
+                ? req.grossL1R4
+                : req.grossELMAB3 !== undefined
+                  ? req.grossELMAB3
+                  : req.netELR2B2;
+            };
+            const deficitOf = (pw) => {
+              if (pw.isEligible) return 0;
+              const req = pw.requirements || {};
+              const cut = cutOf(pw);
+              const score =
+                req.netELR2B2 !== undefined ? pw.netScore : pw.grossScore;
+              const unmet = (
+                (pw.merCheck && pw.merCheck.merDetails) ||
+                []
+              ).filter((d) => !d.met && !d.isPlainBullet).length;
+              return (
+                (cut !== undefined && Number.isFinite(score)
+                  ? Math.max(0, score - cut)
+                  : 30) +
+                6 * unmet
+              );
+            };
+            const trialOf = (idx) =>
+              base.map((s, i) =>
+                idx[i] !== startIdx[i]
+                  ? {
+                      ...s,
+                      grade: grades[i][idx[i]],
+                      rawMark: markAt(i, idx[i]),
+                    }
+                  : s,
+              );
+            let budget = 2400;
+            [...targets]
+              .filter((id) => !found.has(id))
+              .forEach((pid) => {
+                const idx = [...startIdx];
+                let cur = deficitOf(statusBase.find((x) => x.id === pid));
+                for (let step = 0; step < 40 && budget > 0 && cur > 0; step++) {
+                  let pick = null;
+                  for (let i = 0; i < base.length; i++) {
+                    if (!grades[i] || idx[i] <= 0) continue;
+                    const nk = idx[i] - 1;
+                    if (gapTo(i, nk) > MAX_GAP) continue;
+                    const marks = Math.max(1, gapTo(i, nk) - gapTo(i, idx[i]));
+                    const trial = trialOf(
+                      idx.map((v, j) => (j === i ? nk : v)),
+                    );
+                    budget--;
+                    const d = deficitOf(
+                      calculateAllPathwaysStatus(trial).find(
+                        (x) => x.id === pid,
+                      ),
+                    );
+                    const score = (cur - d) / marks;
+                    if (
+                      !pick ||
+                      score > pick.score ||
+                      (score === pick.score && marks < pick.marks)
+                    )
+                      pick = { i, nk, d, marks, score };
+                  }
+                  if (!pick) break;
+                  idx[pick.i] = pick.nk;
+                  cur = pick.d;
+                }
+                if (cur === 0) {
+                  let cost = 0;
+                  base.forEach((s, i) => {
+                    if (grades[i] && idx[i] !== startIdx[i]) {
+                      const g = gapTo(i, idx[i]);
+                      cost += g * g;
+                    }
+                  });
+                  found.set(pid, { idx, cost, greedy: true });
+                }
+              });
+            return { found, startIdx, grades, raws, markAt, gapTo };
+          })();
+          const comboDetail = (route) => {
+            const { startIdx, grades, raws, markAt, gapTo } = comboRoutes;
+            const parts = [];
+            let total = 0;
+            let maxGap = 0;
+            let estimated = false;
+            base.forEach((s, i) => {
+              if (!grades[i] || route.idx[i] === startIdx[i]) return;
+              const gap = gapTo(i, route.idx[i]);
+              total += gap;
+              maxGap = Math.max(maxGap, gap);
+              if (raws[i] === null) estimated = true;
+              parts.push({
+                gap,
+                text: `${nameOf(s)} ${s.level} ${s.grade} → ${grades[i][route.idx[i]]} (reach ${markAt(i, route.idx[i])} marks, +${marksText(gap)})`,
+              });
+            });
+            parts.sort((x, y) => y.gap - x.gap);
+            const summary = `Total +${marksText(total)} across ${parts.length} subject${parts.length === 1 ? "" : "s"}${estimated ? " (estimated: add raw marks to confirm)" : ""}${route.greedy ? ". One workable route, not necessarily the cheapest" : ""}`;
+            return {
+              text: `Improve ${parts.map((x) => x.text).join("; ")}. ${summary}.`,
+              parts: parts.map((x) => x.text),
+              summary,
+              total,
+              maxGap,
+              count: parts.length,
+              estimated,
+            };
+          };
+          const stairSteps = statusBase.map((pw) => {
+            const head = {
+              id: pw.id,
+              name: pwNames([pw.id])[0],
+              group: pw.group,
+            };
+            if (baseEval.eligible.has(pw.id))
+              return {
+                ...head,
+                tier: 0,
+                effort: 0,
+                detail: "Already open: nothing to change.",
+              };
+            const mv = moveOpts
+              .filter((o) => o.elig.has(pw.id))
+              .sort(
+                (x, y) =>
+                  getLdlTier(x.s.subjectId) - getLdlTier(y.s.subjectId) ||
+                  weakness(y.s) - weakness(x.s),
+              )[0];
+            if (mv)
+              return {
+                ...head,
+                tier: 1,
+                effort: 0,
+                detail: `Take ${nameOf(mv.s)} at ${mv.moved.level} (${gradeText(mv.s)} → projected ${gradeText(mv.moved)}). Immediate, no marks needed.`,
+              };
+            if (opt3.applicable && opt3.eval.eligible.has(pw.id))
+              return {
+                ...head,
+                tier: 1,
+                effort: 0,
+                detail: `Take at the lower level: ${opt3.moves.map((s) => `${nameOf(s)} (${s.moved.fromLevel} ${s.moved.fromGrade} → ${gradeText(s)})`).join("; ")}. Immediate, no marks needed.`,
+              };
+            const route = comboRoutes.found.get(pw.id);
+            if (route) {
+              const d = comboDetail(route);
+              return {
+                ...head,
+                tier:
+                  d.maxGap <= REALISTIC_GAIN && d.total <= 25
+                    ? 2
+                    : d.maxGap <= 15 && d.total <= 40
+                      ? 3
+                      : d.maxGap <= 30 && d.total <= 60
+                        ? 4
+                        : 5,
+                effort: route.cost,
+                subjects: d.count,
+                totalMarks: d.total,
+                parts: d.parts,
+                summary: d.summary,
+                detail: d.text,
+                farOff: d.maxGap > 30 || d.total > 60,
+              };
+            }
+            const req = pw.requirements || {};
+            const cut =
+              req.grossL1R4 !== undefined
+                ? req.grossL1R4
+                : req.grossELMAB3 !== undefined
+                  ? req.grossELMAB3
+                  : req.netELR2B2;
+            const score =
+              req.netELR2B2 !== undefined ? pw.netScore : pw.grossScore;
+            const unmet = ((pw.merCheck && pw.merCheck.merDetails) || [])
+              .filter((d) => !d.met && !d.isPlainBullet)
+              .slice(0, 2)
+              .map((d) =>
+                String(d.text)
+                  .replace(/<span class="tooltiptext">.*?<\/span>/g, "")
+                  .replace(/<sup>.*?<\/sup>/g, "")
+                  .replace(/<[^>]*>/g, "")
+                  .replace(/Infinity/g, "n/a")
+                  .replace(/\s+/g, " ")
+                  .trim(),
+              );
+            const parts = [];
+            if (cut !== undefined && Number.isFinite(score) && score > cut)
+              parts.push(`Aggregate ${score} against a cut-off of ${cut}.`);
+            if (unmet.length) parts.push(`Not met: ${unmet.join("; ")}.`);
+            if (!parts.length)
+              parts.push("The entry requirements are not met.");
+            return {
+              ...head,
+              tier: 5,
+              effort: 999,
+              detail: `${parts.join(" ")} No combination of improvements (up to +40 marks per subject) or level change was found that fixes this.`,
+            };
+          });
+          const staircase = TIER_LABELS.map((label, tier) => ({
+            tier,
+            label,
+            steps: stairSteps
+              .filter((s) => s.tier === tier)
+              .sort(
+                (x, y) => x.effort - y.effort || x.name.localeCompare(y.name),
+              ),
+          })).filter((tr) => tr.steps.length > 0);
+
+          return {
+            empty: false,
+            hasAnyRawMark: base.some(hasRawMark),
+            before: {
+              eligible: baseEval.eligible.size,
+              realistic: baseEval.realistic.size,
+              byGroup: countByGroup(baseEval.realistic),
+              ...describeEval(baseEval),
+            },
+            after: {
+              eligible: afterEval.eligible.size,
+              realistic: afterEval.realistic.size,
+              byGroup: countByGroup(afterEval.realistic),
+              ...describeEval(afterEval),
+            },
+            recommended,
+            options: [opt1, opt2, opt3, opt0].map((o) => ({
+              ...o,
+              title: OPTION_TITLES[o.id],
+              summary: summaryFor(o),
+              realistic: o.eval.realistic.size,
+              eligible: o.eval.eligible.size,
+              isRecommended: !!best && best.id === o.id,
+            })),
+            reach,
+            decision: { ladder, breakEvens },
+            levels: levelsList,
+            staircase,
+            final: best ? best.subjects : base,
+          };
+        };
+
+        function renderResultsAdvice() {
+          if (studentSubjects.length === 0) {
+            resultsAdviceSection.classList.add("hidden");
+            resultsAdviceContainer.innerHTML = "";
+            return;
+          }
+          resultsAdviceSection.classList.remove("hidden");
+          const a = buildResultsAdvice(studentSubjects);
+          const rec = a.recommended;
+          const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+          const diffClass = {
+            "within reach": "text-emerald-300",
+            stretch: "text-amber-300",
+            remote: "text-red-300",
+            unknown: "text-slate-400",
+          };
+          const gapText = (gap) =>
+            gap === null ? "" : ` (${gap > 0 ? "+" : ""}${gap} from now)`;
+          const callouts = (items, tone) =>
+            items
+              .map(
+                (c) =>
+                  `<div class="mt-3 p-3 rounded-lg ${tone === "warn" ? "bg-red-900/30 border-red-500" : "bg-amber-800/30 border-amber-500"} border text-sm"><p class="font-semibold ${tone === "warn" ? "text-red-300" : "text-amber-300"}">${tone === "warn" ? "Warning" : "Heads-up"}: ${esc(c.title)}</p><p class="text-slate-200 mt-1">${esc(c.text)}</p></div>`,
+              )
+              .join("");
+          const groupChips = (byGroup) =>
+            Object.keys(PATHWAY_TOTAL_BY_GROUP)
+              .map(
+                (g) =>
+                  `<span class="text-xs px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-300">${esc(g)}: <strong class="text-emerald-300">${byGroup[g]}</strong> of ${PATHWAY_TOTAL_BY_GROUP[g]}</span>`,
+              )
+              .join(" ");
+
+          // ---- Staircase: one step per pathway, easiest route on each step ----
+          const tierTone = [
+            "border-emerald-500 bg-emerald-800/30",
+            "border-sky-500 bg-sky-800/30",
+            "border-teal-400 bg-teal-800/20",
+            "border-amber-500 bg-amber-800/20",
+            "border-orange-500 bg-orange-800/20",
+            "border-slate-500 bg-slate-800/60",
+          ];
+          const tierText = [
+            "text-emerald-300",
+            "text-sky-300",
+            "text-teal-300",
+            "text-amber-300",
+            "text-orange-300",
+            "text-slate-400",
+          ];
+          const indent = (tier) =>
+            `margin-left: calc(${tier} * min(4vw, 22px))`;
+          const tiersTopDown = [...a.staircase].sort((x, y) => y.tier - x.tier);
+          const hasToday = a.staircase.some((tr) => tr.tier === 0);
+          const stepHtml = (tr) =>
+            tr.steps
+              .map(
+                (s) =>
+                  `<div class="rounded border-l-4 ${tierTone[tr.tier]} p-3 mb-2" style="${indent(tr.tier)}"><p class="font-semibold text-slate-100">${tr.tier === 0 ? "✓ " : ""}${esc(s.name)} <span class="text-xs font-normal text-slate-400">· ${esc(s.group)}</span></p>${s.parts ? `<p class="text-sm text-slate-300 mt-1">${s.farOff ? "Would need" : "What it takes"}: ${esc(s.summary)}</p><ul class="list-disc list-inside text-sm text-slate-300 mt-1">${s.parts.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="text-sm text-slate-300 mt-1">${esc(s.detail)}</p>`}</div>`,
+              )
+              .join("");
+          const bandHtml = (tr) => {
+            const label = `${tr.tier === 0 ? '<span class="text-amber-300">★ YOU ARE HERE</span> · ' : ""}${esc(tr.label)} <span class="font-normal text-slate-400">(${tr.steps.length})</span>`;
+            // Out-of-reach steps are long and numerous, so they start collapsed.
+            if (tr.tier === 5)
+              return `<details class="mt-4 mb-2"><summary class="cursor-pointer text-sm font-bold ${tierText[tr.tier]}" style="${indent(tr.tier)}">${label} (click to expand)</summary><div class="mt-2">${stepHtml(tr)}</div></details>`;
+            return `<div class="mt-4 mb-2" style="${indent(tr.tier)}"><p class="text-sm font-bold ${tierText[tr.tier]}">${label}</p></div>${stepHtml(tr)}`;
+          };
+          const stairs = `<div class="mb-6 p-4 rounded-lg bg-slate-900/60 border border-slate-600"><p class="text-lg font-semibold text-slate-100">Pathway staircase</p><p class="text-xs text-slate-400 mt-1">Read from the bottom up. Each step is one pathway with the easiest way to reach it. The higher the step, the more effort it needs.</p>${a.hasAnyRawMark ? "" : '<p class="text-sm text-amber-300 mt-2">Add raw marks so the steps can show how many marks each improvement needs.</p>'}${tiersTopDown.map(bandHtml).join("")}${hasToday ? "" : `<div class="mt-4" style="${indent(0)}"><p class="text-sm font-bold text-amber-300">★ YOU ARE HERE · No pathway is open yet</p></div>`}</div>`;
+
+          // ---- Recommended option (Level 2 detail) ----
+          const L2 = a.levels[1];
+          const reachList = L2.reachActions.length
+            ? `<p class="text-sm font-semibold text-sky-300 mt-4">Improve within ${REALISTIC_GAIN} marks</p><ul class="list-disc list-inside text-sm text-slate-300 space-y-1 mt-1">${L2.reachActions.map((r) => `<li>${esc(r.text)} unlocks ${esc(r.unlocks.join("; "))}</li>`).join("")}</ul>`
+            : "";
+          const otherRows = [...a.options]
+            .sort((x, y) => x.id - y.id)
+            .filter((o) => !o.isRecommended)
+            .map((o) => {
+              const status = `${o.eligible} eligible today, ${o.realistic} realistic if you improve within reach (${a.after.realistic > o.realistic ? "fewer" : a.after.realistic === o.realistic ? "same" : "more"} than the recommended option)`;
+              return `<li class="mb-3"><p class="text-slate-100"><strong>${o.id === 0 ? "Status quo" : `Option ${o.id}`}: ${esc(o.title)}</strong></p><p class="text-slate-300">${esc(o.summary)}</p>${o.applicable ? `<p class="text-slate-400">${esc(status)}</p>${callouts(o.conflicts, "heads-up")}` : ""}</li>`;
+            })
+            .join("");
+          const others = `<details class="mt-4"><summary class="cursor-pointer text-sky-400 hover:text-sky-300 text-sm">Other options we checked</summary><ul class="mt-3 text-sm list-none">${otherRows}</ul></details>`;
+          const recCard = `<div class="p-5 rounded-lg border-2 border-emerald-500 bg-emerald-800/20 mb-4"><p class="text-xs font-semibold uppercase tracking-wide text-emerald-300">Recommended${rec.id ? `: Option ${rec.id}` : ": Status quo"} · ${plural(L2.count, "realistic pathway")}</p><h3 class="text-lg font-semibold text-slate-100 mt-1">${esc(rec.title)}</h3><div class="flex flex-wrap gap-2 mt-3">${groupChips(L2.byGroup)}</div><ol class="list-decimal list-inside text-base font-semibold text-slate-100 space-y-1 mt-3">${rec.checklist.map((t) => `<li>${esc(t)}</li>`).join("")}</ol><p class="text-sm font-semibold text-sky-300 mt-3">Why this option</p><ul class="list-disc list-inside text-sm text-slate-300 space-y-1 mt-1">${rec.reasons.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>${callouts(rec.warnings, "warn")}${callouts(rec.conflicts, "heads-up")}${reachList}${rec.id > 1 ? '<p class="text-xs text-slate-400 mt-3">Improvements after moving a subject down are not counted, because raw marks at the new level are unknown, so this is a cautious estimate.</p>' : ""}${others}</div>`;
+
+          // ---- Move now vs stay and push ----
+          const breakRows = a.decision.breakEvens
+            .map(
+              (b) =>
+                `<li class="mb-3"><strong>${esc(b.name)}</strong>: moving to ${esc(b.to)} secures <strong class="text-emerald-300">${b.movedCount}</strong> eligible pathways straight away (staying at ${esc(b.from)} gives ${b.stayNowCount} today). ${b.hit ? `Staying only matches that if ${esc(b.name)} reaches <strong>${esc(b.hit.grade)}</strong>, which needs ${b.hit.markNeeded} marks${esc(gapText(b.hit.gap))} <span class="${diffClass[b.hit.difficulty]}">[${esc(b.hit.difficulty)}]</span> and would give ${b.hit.count}.` : "Staying never matches this, even at the top grade."}${b.onlyIfStay.length ? ` Only possible if you stay: ${esc(b.onlyIfStay.join("; "))}.` : ""}</li>`,
+            )
+            .join("");
+          const breakBlock = breakRows
+            ? `<details open class="mb-4"><summary class="cursor-pointer text-sky-400 hover:text-sky-300 text-sm font-semibold">Move now vs stay and push</summary><p class="text-xs text-slate-400 mt-2">Moving a level is certain and immediate. Staying depends on raw marks: within ${REALISTIC_GAIN} marks is within reach, up to 15 is a stretch, more than 15 is remote.</p><ul class="list-none text-sm text-slate-300 mt-2">${breakRows}</ul></details>`
+            : "";
+
+          // ---- Reach check ----
+          const reachLabel = (r) =>
+            r.status === "top"
+              ? "Top grade"
+              : r.status === "reachable"
+                ? `<span class="text-emerald-300">✓ Within reach (+${r.needed} mark${r.needed === 1 ? "" : "s"})</span>`
+                : r.status === "stretch"
+                  ? `<span class="text-red-300">✗ Stretch (+${r.needed} marks)</span>`
+                  : r.why === "g1"
+                    ? "No raw marks at G1"
+                    : r.why === "invalid"
+                      ? '<span class="text-amber-300">Mark does not match grade</span>'
+                      : '<span class="text-slate-400">Add raw mark</span>';
+          const reachRows = a.reach
+            .map(
+              (r) =>
+                `<tr><td class="px-3 py-2">${esc(r.name)}</td><td class="px-3 py-2">${esc(r.level)} ${esc(r.grade)}</td><td class="px-3 py-2">${r.rawMark ?? "—"}</td><td class="px-3 py-2">${esc(r.next ?? "—")}</td><td class="px-3 py-2">${reachLabel(r)}</td></tr>`,
+            )
+            .join("");
+          const reachTable = `<details class="mb-2"><summary class="cursor-pointer text-sky-400 hover:text-sky-300 text-sm">Reach check: is the next grade realistic?</summary><div class="overflow-x-auto mt-2 rounded-lg border border-slate-700"><table class="min-w-full text-sm text-slate-300"><thead class="bg-slate-700 text-sky-300 text-xs uppercase"><tr><th class="px-3 py-2 text-left">Subject</th><th class="px-3 py-2 text-left">Now</th><th class="px-3 py-2 text-left">Raw mark</th><th class="px-3 py-2 text-left">Next grade</th><th class="px-3 py-2 text-left">Within ${REALISTIC_GAIN} marks?</th></tr></thead><tbody class="divide-y divide-slate-700">${reachRows}</tbody></table></div></details>`;
+
+          resultsAdviceContainer.innerHTML =
+            stairs + recCard + breakBlock + reachTable;
+        }
+
         function checkEligibility() {
           if (studentSubjects.length < 1) {
             renderEligibilityResults(
@@ -3332,19 +4726,7 @@
           const selectedSubject = getSubjectById(selectedSubjectId);
           let applicableLevels = [];
           if (selectedSubject) {
-            let currentLevelRestrictions = {};
-            if (selectedSchool === "Yuhua Secondary School") {
-              currentLevelRestrictions =
-                YUHUA_SECONDARY_SCHOOL_LEVEL_RESTRICTIONS;
-            } else if (selectedSchool === "Broadrick Secondary School") {
-              currentLevelRestrictions =
-                BROADRICK_SECONDARY_SCHOOL_LEVEL_RESTRICTIONS;
-            } else if (selectedSchool === "School A") {
-              currentLevelRestrictions = SCHOOL_A_LEVEL_RESTRICTIONS;
-            }
-            if (currentLevelRestrictions[selectedSubject.id])
-              applicableLevels = currentLevelRestrictions[selectedSubject.id];
-            else applicableLevels = [...GRADE_LEVELS];
+            applicableLevels = getAllowedLevels(selectedSubject.id);
           } else {
             const defaultOption = document.createElement("option");
             defaultOption.value = "";
@@ -3404,6 +4786,19 @@
             gradeSelect.value = grades[0];
           else if (grades.length === 0) gradeSelect.value = "";
           gradeSelect.disabled = grades.length === 0;
+          updateRawMarkHint();
+        }
+
+        function updateRawMarkHint() {
+          const lvl = levelSelect.value;
+          const usable = lvl === "G3" || lvl === "G2";
+          rawMarkInput.disabled = !usable;
+          if (!usable) rawMarkInput.value = "";
+          rawMarkInput.placeholder = usable
+            ? bandText(lvl, gradeSelect.value) || "0–100"
+            : lvl === "G1"
+              ? "n/a at G1"
+              : "0–100";
         }
 
         const populateRowGradeDropdown = (
@@ -3443,24 +4838,7 @@
             const levelSelectEl = document.createElement("select");
             levelSelectEl.className =
               "w-full px-3 py-2 min-w-[70px] bg-slate-700 border border-slate-600 rounded-md shadow-sm focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100 text-sm";
-            let applicableLevelsForRow = [];
-            const subjectInfoForRow = getSubjectById(s.subjectId);
-            if (subjectInfoForRow) {
-              let currentLevelRestrictions = {};
-              if (selectedSchool === "Yuhua Secondary School") {
-                currentLevelRestrictions =
-                  YUHUA_SECONDARY_SCHOOL_LEVEL_RESTRICTIONS;
-              } else if (selectedSchool === "Broadrick Secondary School") {
-                currentLevelRestrictions =
-                  BROADRICK_SECONDARY_SCHOOL_LEVEL_RESTRICTIONS;
-              } else if (selectedSchool === "School A") {
-                currentLevelRestrictions = SCHOOL_A_LEVEL_RESTRICTIONS;
-              }
-              if (currentLevelRestrictions[subjectInfoForRow.id])
-                applicableLevelsForRow =
-                  currentLevelRestrictions[subjectInfoForRow.id];
-              else applicableLevelsForRow = [...GRADE_LEVELS];
-            } else applicableLevelsForRow = [...GRADE_LEVELS];
+            const applicableLevelsForRow = getAllowedLevels(s.subjectId);
             applicableLevelsForRow.forEach((levelOption) => {
               const option = document.createElement("option");
               option.value = levelOption;
@@ -3479,6 +4857,7 @@
               else if (newLevel === "G1" && G1_GRADES_OPTIONS.length > 0)
                 defaultNewGrade = G1_GRADES_OPTIONS[0];
               studentSubjects[index].grade = defaultNewGrade;
+              studentSubjects[index].rawMark = null;
               const gradeSelectEl = row.querySelector(".grade-select");
               populateRowGradeDropdown(
                 gradeSelectEl,
@@ -3500,6 +4879,35 @@
               updateAllCalculationsAndRender();
             };
             gradeCell.appendChild(gradeSelectEl);
+            const rawCell = row.insertCell();
+            rawCell.className =
+              "px-6 py-4 whitespace-nowrap text-sm text-gray-300";
+            if (s.level === "G1") {
+              rawCell.innerHTML =
+                '<span class="text-slate-500">n/a at G1</span>';
+            } else {
+              const rawInvalid = hasRawMark(s) && getValidRaw(s) === null;
+              const rawEl = document.createElement("input");
+              rawEl.type = "number";
+              rawEl.min = "0";
+              rawEl.max = "100";
+              rawEl.placeholder = bandText(s.level, s.grade);
+              rawEl.setAttribute("aria-label", "Raw mark");
+              rawEl.value = hasRawMark(s) ? s.rawMark : "";
+              rawEl.className = `w-full px-3 py-2 min-w-[90px] bg-slate-700 border ${rawInvalid ? "border-red-500" : "border-slate-600"} rounded-md shadow-sm focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100 text-sm`;
+              rawEl.onchange = (e) => {
+                const v = e.target.value.trim();
+                studentSubjects[index].rawMark = v === "" ? null : Number(v);
+                updateAllCalculationsAndRender();
+              };
+              rawCell.appendChild(rawEl);
+              if (rawInvalid) {
+                const hint = document.createElement("p");
+                hint.className = "text-xs text-red-400 mt-1";
+                hint.textContent = `${s.grade} is ${bandText(s.level, s.grade)}. Mark ignored.`;
+                rawCell.appendChild(hint);
+              }
+            }
             const actionsCell = row.insertCell();
             actionsCell.className =
               "px-6 py-4 whitespace-nowrap text-sm font-medium text-right";
@@ -3706,11 +5114,30 @@
             );
             return;
           }
+          let rawMarkVal = null;
+          if (rawMarkInput.value.trim() !== "" && currentLevelVal !== "G1") {
+            const typed = Number(rawMarkInput.value);
+            const probe = {
+              level: currentLevelVal,
+              grade: currentGradeVal,
+              rawMark: typed,
+            };
+            if (getValidRaw(probe) === null) {
+              showMessage(
+                `A grade of ${currentGradeVal} at ${currentLevelVal} means a raw mark of ${bandText(currentLevelVal, currentGradeVal)}. Please correct the raw mark, or leave it blank.`,
+                "Raw mark does not match grade",
+              );
+              return;
+            }
+            rawMarkVal = typed;
+          }
           studentSubjects.push({
             subjectId: currentSubjectVal,
             level: currentLevelVal,
             grade: currentGradeVal,
+            rawMark: rawMarkVal,
           });
+          rawMarkInput.value = "";
           subjectSelect.value = "";
           populateLevelDropdown("", "");
           populateGradeDropdown("");
@@ -3738,6 +5165,7 @@
           bonusInput.value = bonusPoints;
           checkEligibility();
           renderStudentSubjectsTable();
+          renderResultsAdvice();
           generateImprovementSuggestions();
         }
 
@@ -3758,6 +5186,7 @@
           levelSelect.addEventListener("change", (e) =>
             populateGradeDropdown(e.target.value),
           );
+          gradeSelect.addEventListener("change", updateRawMarkHint);
           addUpdateSubjectBtn.addEventListener(
             "click",
             handleAddOrUpdateSubject,
@@ -3784,6 +5213,11 @@
             return calculateAllPathwaysStatus(subjects);
           },
           pathways: PATHWAYS,
+          advise: (subjects, bonus, school) => {
+            if (bonus !== undefined) bonusPoints = bonus;
+            if (school !== undefined) selectedSchool = school;
+            return buildResultsAdvice(subjects);
+          },
         };
       })();
     </script>
