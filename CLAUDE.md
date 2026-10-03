@@ -86,8 +86,10 @@ spdv4/
 │       └── screenshot.md
 └── scripts/
     ├── screenshot.js
-    ├── run_edge_case_tests.js   ← 135 assertions across 14 phases
-    └── run_advice_tests.js      ← Results Action Plan engine (43 checks)
+    ├── run_edge_case_tests.js   ← 152 assertions across 14 phases
+    ├── run_invariant_tests.js   ← 102 assertions across 3 phases
+    ├── run_ca_tests.js          ← 18 conditional-admission checks
+    └── run_advice_tests.js      ← Action Plan engine + UI (52 checks)
 ```
 
 ## Pathway Groups (2027 cohort)
