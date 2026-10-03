@@ -410,6 +410,12 @@ function buildITEYr2Profile(elG2, mathG2, targetScore) {
       true,
       true, // MI: Eligible via CA ("all R ≤ 2" path fires)
     );
+  } catch (err) {
+    // A thrown error mid-run must fail the suite, not print "All checks passed!".
+    console.log(`
+  ✗ RUNNER CRASHED: ${err && err.stack ? err.stack : err}`);
+    FAILED++;
+    FAILURES.push(`runner crashed: ${err && err.message ? err.message : err}`);
   } finally {
     await browser.close();
 

@@ -421,21 +421,6 @@
         </p>
         <div id="resultsAdviceContainer"></div>
 
-        <div id="improvementSuggestionsSection" class="mt-6 hidden">
-          <h3 class="text-lg font-semibold text-slate-100 mb-1">Quick wins</h3>
-          <p class="text-xs text-slate-400 mb-3">
-            One grade up in a single subject can open these.
-          </p>
-          <div
-            id="improvementSuggestionsContainer"
-            class="grid gap-3 sm:grid-cols-2"
-          ></div>
-          <div
-            id="improvementPlaceholder"
-            class="text-center py-4 text-sm text-slate-400"
-          ></div>
-        </div>
-
         <div id="resultsExplorerContainer" class="mt-6"></div>
       </section>
 
@@ -1253,15 +1238,6 @@
         );
         const eligibilityPlaceholder = document.getElementById(
           "eligibilityPlaceholder",
-        );
-        const improvementSuggestionsSection = document.getElementById(
-          "improvementSuggestionsSection",
-        );
-        const improvementSuggestionsContainer = document.getElementById(
-          "improvementSuggestionsContainer",
-        );
-        const improvementPlaceholder = document.getElementById(
-          "improvementPlaceholder",
         );
         const rawMarkInput = document.getElementById("rawMark");
         const resultsAdviceSection = document.getElementById(
@@ -4542,7 +4518,9 @@
                 (explorerFilter.group === "all" ||
                   row.dataset.group === explorerFilter.group) &&
                 (explorerFilter.status === "all" ||
-                  row.dataset.status === explorerFilter.status);
+                  (explorerFilter.status === "quick"
+                    ? row.dataset.quick === "1"
+                    : row.dataset.status === explorerFilter.status));
               row.classList.toggle("hidden", !show);
               if (show) shown++;
             });
@@ -4577,14 +4555,6 @@
           const rec = a.recommended;
           const L2 = a.levels[1];
           const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
-          const diffClass = {
-            "within reach": "text-emerald-300",
-            stretch: "text-amber-300",
-            remote: "text-orange-300",
-            unknown: "text-slate-400",
-          };
-          const gapText = (gap) =>
-            gap === null ? "" : ` (${gap > 0 ? "+" : ""}${gap} from now)`;
           const callouts = (items, tone) =>
             items
               .map(
@@ -4592,14 +4562,6 @@
                   `<div class="mt-3 p-3 rounded-lg ${tone === "warn" ? "bg-amber-900/30 border-amber-500" : "bg-sky-900/20 border-sky-500"} border text-sm"><p class="font-semibold ${tone === "warn" ? "text-amber-300" : "text-sky-300"}">${tone === "warn" ? "Heads-up" : "Good to know"}: ${esc(c.title)}</p><p class="text-slate-200 mt-1">${esc(c.text)}</p></div>`,
               )
               .join("");
-          const groupChips = (byGroup) =>
-            Object.keys(PATHWAY_TOTAL_BY_GROUP)
-              .map(
-                (g) =>
-                  `<span class="text-xs px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-300">${esc(g)}: <strong class="text-emerald-300">${esc(byGroup[g])}</strong> of ${esc(PATHWAY_TOTAL_BY_GROUP[g])}</span>`,
-              )
-              .join(" ");
-
           // ---- Flatten the staircase into one list of pathways ----
           const orderIdx = Object.fromEntries(
             PATHWAYS.map((pw, i) => [pw.id, i]),
@@ -4617,51 +4579,30 @@
             `<div class="rounded-lg border ${tone} p-3 text-center"><p class="text-2xl font-bold text-slate-100">${esc(n)}</p><p class="text-xs text-slate-300">${esc(label)}</p></div>`;
           const strip = `<div class="grid grid-cols-3 gap-2 mb-4">${tile(count("open"), "Open now", "border-emerald-500 bg-emerald-800/20")}${tile(count("close"), "Within reach", "border-sky-500 bg-sky-800/20")}${tile(count("further"), "Needs more work", "border-slate-600 bg-slate-900/40")}</div>${a.hasAnyRawMark ? "" : '<p class="text-xs text-slate-400 mb-4">Tip: add raw marks to your subjects to see exact mark targets.</p>'}`;
 
-          // ---- Suggested plan (short) + details collapsed ----
-          const reachList = L2.reachActions.length
-            ? `<p class="text-sm font-semibold text-sky-300 mt-4">Improve within ${REALISTIC_GAIN} marks</p><ul class="list-disc list-inside text-sm text-slate-300 space-y-1 mt-1">${L2.reachActions.map((r) => `<li>${esc(r.text)} unlocks ${esc(r.unlocks.join("; "))}</li>`).join("")}</ul>`
+          // ---- Suggested plan: headline, steps, and a short dropdown ----
+          const checklistText = rec.checklist.join(" ");
+          const alsoFree = a.freeMoves.filter(
+            (f) => !checklistText.includes(f.name),
+          );
+          const freeLine = alsoFree.length
+            ? `<p class="text-sm text-emerald-300 mt-3">Also free: ${alsoFree.map((f) => esc(f.text)).join("; ")}. No pathway uses ${alsoFree.length === 1 ? "it" : "them"}.</p>`
             : "";
-          const otherRows = [...a.options]
+          const warnLines = rec.warnings
+            .map(
+              (w) =>
+                `<p class="text-sm text-amber-300 mt-2">Heads-up: ${esc(w.title)}</p>`,
+            )
+            .join("");
+          const optionLines = [...a.options]
             .sort((x, y) => x.id - y.id)
-            .filter((o) => !o.isRecommended)
-            .map((o) => {
-              const status = `${o.eligible} eligible today, ${o.realistic} realistic if you improve within reach (${a.after.realistic > o.realistic ? "fewer" : a.after.realistic === o.realistic ? "same" : "more"} than the recommended option)`;
-              return `<li class="mb-3"><p class="text-slate-100"><strong>${o.id === 0 ? "Status quo" : `Option ${esc(o.id)}`}: ${esc(o.title)}</strong></p><p class="text-slate-300">${esc(o.summary)}</p>${o.applicable ? `<p class="text-slate-400">${esc(status)}</p>${callouts(o.conflicts, "heads-up")}` : ""}</li>`;
-            })
-            .join("");
-          const freeHtml = a.freeMoves.length
-            ? `<div class="mt-3 p-3 rounded-lg bg-emerald-900/30 border border-emerald-500 text-sm"><p class="font-semibold text-emerald-300">Free move: no pathway depends on ${esc(a.freeMoves.map((f) => f.name).join(", "))}</p><ul class="list-disc list-inside text-slate-200 mt-1">${a.freeMoves.map((f) => `<li>${esc(f.text)}. ${esc(f.reason)}</li>`).join("")}</ul></div>`
-            : "";
-          const breakRows = a.decision.breakEvens
+            .filter((o) => !o.isRecommended && o.applicable)
             .map(
-              (b) =>
-                `<li class="mb-3"><strong>${esc(b.name)}</strong>: moving to ${esc(b.to)} secures <strong class="text-emerald-300">${esc(b.movedCount)}</strong> eligible pathways straight away (staying at ${esc(b.from)} gives ${esc(b.stayNowCount)} today). ${b.hit ? `Staying only matches that if ${esc(b.name)} reaches <strong>${esc(b.hit.grade)}</strong>, which needs ${esc(b.hit.markNeeded)} marks${esc(gapText(b.hit.gap))} <span class="${diffClass[b.hit.difficulty]}">[${esc(b.hit.difficulty)}]</span> and would give ${esc(b.hit.count)}.` : "Staying never matches this, even at the top grade."}${b.onlyIfStay.length ? ` Only possible if you stay: ${esc(b.onlyIfStay.join("; "))}.` : ""}</li>`,
+              (o) =>
+                `<li>${o.id === 0 ? "Status quo" : `Option ${esc(o.id)}`}: ${esc(o.summary)} · ${esc(o.realistic)} realistic</li>`,
             )
             .join("");
-          const breakBlock = breakRows
-            ? `<p class="text-sm font-semibold text-sky-300 mt-4">Move now vs stay and push</p><p class="text-xs text-slate-400 mt-1">Moving a level is certain and immediate. Staying depends on raw marks: within ${REALISTIC_GAIN} marks is within reach, up to 15 is a stretch, more than 15 is remote.</p><ul class="list-none text-sm text-slate-300 mt-2">${breakRows}</ul>`
-            : "";
-          const reachLabel = (r) =>
-            r.status === "top"
-              ? "Top grade"
-              : r.status === "reachable"
-                ? `<span class="text-emerald-300">Within reach (+${esc(r.needed)} mark${r.needed === 1 ? "" : "s"})</span>`
-                : r.status === "stretch"
-                  ? `<span class="text-amber-300">Needs +${esc(r.needed)} marks</span>`
-                  : r.why === "g1"
-                    ? "No raw marks at G1"
-                    : r.why === "invalid"
-                      ? '<span class="text-amber-300">Mark does not match grade</span>'
-                      : '<span class="text-slate-400">Add raw mark</span>';
-          const reachRows = a.reach
-            .map(
-              (r) =>
-                `<tr><td class="px-3 py-2">${esc(r.name)}</td><td class="px-3 py-2">${esc(r.level)} ${esc(r.grade)}</td><td class="px-3 py-2">${esc(r.rawMark ?? "—")}</td><td class="px-3 py-2">${esc(r.next ?? "—")}</td><td class="px-3 py-2">${reachLabel(r)}</td></tr>`,
-            )
-            .join("");
-          const reachTable = `<p class="text-sm font-semibold text-sky-300 mt-4">Is the next grade realistic?</p><div class="overflow-x-auto mt-2 rounded-lg border border-slate-700"><table class="min-w-full text-sm text-slate-300"><thead class="bg-slate-700 text-sky-300 text-xs uppercase"><tr><th class="px-3 py-2 text-left">Subject</th><th class="px-3 py-2 text-left">Now</th><th class="px-3 py-2 text-left">Raw mark</th><th class="px-3 py-2 text-left">Next grade</th><th class="px-3 py-2 text-left">Within ${REALISTIC_GAIN} marks?</th></tr></thead><tbody class="divide-y divide-slate-700">${reachRows}</tbody></table></div>`;
-          const details = `<details class="mt-4"><summary class="cursor-pointer text-sky-400 hover:text-sky-300 text-sm font-medium py-3">Why this plan, and other options</summary><p class="text-sm font-semibold text-sky-300 mt-3">Why this option</p><ul class="list-disc list-inside text-sm text-slate-300 space-y-1 mt-1">${rec.reasons.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>${callouts(rec.warnings, "warn")}${callouts(rec.conflicts, "heads-up")}${reachList}${rec.id > 1 ? '<p class="text-xs text-slate-400 mt-3">Improvements after moving a subject down are not counted, because raw marks at the new level are unknown, so this is a cautious estimate.</p>' : ""}${breakBlock}${reachTable}<p class="text-sm font-semibold text-sky-300 mt-4">Other options we checked</p><ul class="mt-2 text-sm list-none">${otherRows}</ul></details>`;
-          const recCard = `<div class="p-4 rounded-lg border-2 border-emerald-500 bg-emerald-800/20"><p class="text-xs font-semibold uppercase tracking-wide text-emerald-300">Suggested plan${rec.id ? `: Option ${esc(rec.id)}` : ""} · ${plural(L2.count, "realistic pathway")}</p><h3 class="text-lg font-semibold text-slate-100 mt-1">${esc(rec.title)}</h3><div class="flex flex-wrap gap-2 mt-3">${groupChips(L2.byGroup)}</div>${rec.checklist.length ? `<ol class="list-decimal list-inside text-base font-semibold text-slate-100 space-y-1 mt-3">${rec.checklist.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>` : ""}${freeHtml}${details}</div>`;
+          const details = `<details class="mt-3"><summary class="cursor-pointer text-sky-400 hover:text-sky-300 text-sm font-medium py-3">Why this plan, and other options</summary><ul class="list-disc list-inside text-sm text-slate-300 space-y-1">${rec.reasons.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>${callouts(rec.warnings, "warn")}${callouts(rec.conflicts, "heads-up")}${rec.id > 1 ? '<p class="text-xs text-slate-400 mt-3">Improvements after moving a subject down are not counted, because raw marks at the new level are unknown.</p>' : ""}${optionLines ? `<p class="text-sm font-semibold text-sky-300 mt-3">Other options</p><ul class="list-disc list-inside text-sm text-slate-300 space-y-1 mt-1">${optionLines}</ul>` : ""}</details>`;
+          const recCard = `<div class="p-4 rounded-lg border-2 border-emerald-500 bg-emerald-800/20"><p class="text-xs font-semibold uppercase tracking-wide text-emerald-300">Suggested plan${rec.id ? `: Option ${esc(rec.id)}` : ""} · ${plural(L2.count, "realistic pathway")}</p><h3 class="text-lg font-semibold text-slate-100 mt-1">${esc(rec.title)}</h3>${rec.checklist.length ? `<ol class="list-decimal list-inside text-base font-semibold text-slate-100 space-y-1 mt-3">${rec.checklist.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>` : ""}${freeLine}${warnLines}${details}</div>`;
 
           resultsAdviceContainer.innerHTML = strip + recCard;
 
@@ -4671,16 +4612,28 @@
             close: "bg-sky-400",
             further: "bg-slate-400",
           };
+          const qw = computeQuickWins();
+          const winsFor = (s) =>
+            s.tier === 0 ? [] : qw.filter((w) => w.unlocked.includes(s.name));
+          const marksFor = (w) => {
+            const r = a.reach.find(
+              (x) => x.name === w.subject && typeof x.needed === "number",
+            );
+            return r ? ` (+${r.needed} mark${r.needed === 1 ? "" : "s"})` : "";
+          };
+          const quickCount = steps.filter((s) => winsFor(s).length).length;
           const shortText = (s) =>
             s.tier === 0
               ? "Open now"
               : s.tier === 1
                 ? "Change a level, no marks needed"
-                : s.rows && s.totalMarks !== undefined
-                  ? `+${s.totalMarks} marks across ${plural(s.subjects, "subject")}`
-                  : s.blocker
-                    ? "Needs a different subject or level"
-                    : "Needs top grades across your subjects";
+                : s.farOff
+                  ? "Long-term goal"
+                  : s.rows && s.totalMarks !== undefined
+                    ? `+${s.totalMarks} marks across ${plural(s.subjects, "subject")}`
+                    : s.blocker
+                      ? "Needs a different subject or level"
+                      : "Needs top grades across your subjects";
           const table = (head, rows) =>
             `<div class="overflow-x-auto mt-2"><table class="min-w-full text-sm"><thead><tr>${head.map((h) => `<th class="text-left text-xs uppercase text-slate-400 px-2 py-1">${esc(h)}</th>`).join("")}</tr></thead><tbody class="divide-y divide-slate-700">${rows.map((r) => `<tr>${r.map((c, i) => `<td class="px-2 py-1.5 ${i === 0 ? "text-slate-100" : "text-slate-300"}">${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
           const routeTable = (rows) =>
@@ -4689,6 +4642,15 @@
               rows.map((r) => [r.subject, r.now, r.need, r.marks]),
             );
           const bodyOf = (s) => {
+            const wins = winsFor(s)
+              .map(
+                (w) =>
+                  `<p data-qw data-subject="${esc(w.subject)}" data-from="${esc(w.from)}" data-to="${esc(w.to)}" class="text-sm text-emerald-300 mb-2">Quick win: ${esc(w.subject)} ${esc(w.from)} → ${esc(w.to)}${esc(marksFor(w))} opens this.</p>`,
+              )
+              .join("");
+            return wins + bodyCore(s);
+          };
+          const bodyCore = (s) => {
             if (s.tier === 0)
               return `<p class="text-sm text-slate-200">${esc(s.detail)}</p>`;
             if (s.tier === 1)
@@ -4701,7 +4663,7 @@
             )}<p class="text-sm text-slate-300 mt-3">${s.blocker ? `Marks alone will not be enough. Even top grades in your current subjects would leave: ${esc(s.blocker)}. This usually means taking a different subject or level.` : "Top grades across your current subjects would get you there. A longer-term goal worth keeping in view."}</p>`;
           };
           const rowHtml = (s) =>
-            `<details data-pw data-group="${esc(s.group)}" data-status="${statusOf(s.tier)}" class="group rounded-lg border border-slate-600 bg-slate-900/40 mb-2"><summary class="flex items-center gap-3 p-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden"><span class="w-3 h-3 rounded-full shrink-0 ${dot[statusOf(s.tier)]}"></span><span class="min-w-0 flex-1"><span class="block font-semibold text-slate-100">${esc(s.name)}</span><span class="block text-xs text-slate-400">${esc(shortText(s))}</span></span><span class="text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span></summary><div class="px-3 pb-3 pt-1 border-t border-slate-700">${bodyOf(s)}</div></details>`;
+            `<details data-pw data-group="${esc(s.group)}" data-name="${esc(s.name)}" data-quick="${winsFor(s).length ? 1 : 0}" data-status="${statusOf(s.tier)}" class="group rounded-lg border border-slate-600 bg-slate-900/40 mb-2"><summary class="flex items-center gap-3 p-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden"><span class="w-3 h-3 rounded-full shrink-0 ${dot[statusOf(s.tier)]}"></span><span class="min-w-0 flex-1"><span class="block font-semibold text-slate-100">${esc(s.name)}</span><span class="block text-xs text-slate-400">${esc(shortText(s))}${winsFor(s).length ? ` · <span class="text-emerald-300">Quick win: ${esc(winsFor(s)[0].subject)} ${esc(winsFor(s)[0].short)}${winsFor(s).length > 1 ? ` (+${winsFor(s).length - 1})` : ""}</span>` : ""}</span></span><span class="text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span></summary><div class="px-3 pb-3 pt-1 border-t border-slate-700">${bodyOf(s)}</div></details>`;
           // One stair per group, each indented further than the one above
           const stairs = Object.keys(PATHWAY_TOTAL_BY_GROUP)
             .map((g, i) => {
@@ -4724,6 +4686,9 @@
             pill("status", "open", "Open now"),
             pill("status", "close", "Within reach"),
             pill("status", "further", "Needs more work"),
+            ...(quickCount
+              ? [pill("status", "quick", `Quick wins (${quickCount})`)]
+              : []),
           ].join(" ");
           resultsExplorerContainer.innerHTML = `<h3 class="text-lg font-semibold text-slate-100 mb-1">Explore every pathway</h3><p class="text-xs text-slate-400 mb-3">Steps run from JC/MI down to ITE 3-Year. Tap a pathway to see exactly what it takes.</p><div class="flex flex-wrap gap-2 mb-2">${groupPills}</div><div class="flex flex-wrap gap-2 mb-4">${statusPills}</div>${stairs}<p id="explorerEmpty" class="hidden text-sm text-slate-400 p-3">No pathways match these filters. Try "All pathways" or "Any status".</p>`;
           applyExplorerFilter();
@@ -4757,202 +4722,36 @@
           renderEligibilityResults(allPathwaysStatus);
         }
 
-        function generateImprovementSuggestions() {
-          improvementSuggestionsContainer.innerHTML = "";
-          if (studentSubjects.length === 0) {
-            improvementSuggestionsSection.classList.add("hidden");
-            improvementPlaceholder.classList.remove("hidden");
-            improvementPlaceholder.innerHTML = `<p>Add subjects to see quick wins.</p>`;
-            return;
-          }
-          improvementSuggestionsSection.classList.remove("hidden");
-          const currentAllPathwaysStatus =
-            calculateAllPathwaysStatus(studentSubjects);
-          const currentEligiblePathwayNames = new Set(
-            currentAllPathwaysStatus
+        // Single-grade improvements that open a pathway that is not open today.
+        function computeQuickWins() {
+          const openNow = new Set(
+            calculateAllPathwaysStatus(studentSubjects)
               .filter((p) => p.isEligible)
-              .map((p) => p.name),
+              .map((p) => p.name.replace(/\.+$/, "")),
           );
-          const suggestions = [];
+          const wins = [];
           studentSubjects.forEach((subject, index) => {
-            const originalGrade = subject.grade;
-            const originalLevel = subject.level;
-            const nextBetterGrade = getNextBetterGrade(
-              originalGrade,
-              originalLevel,
-            );
-            if (nextBetterGrade) {
-              const tempSubjects = studentSubjects.map((s, i) =>
-                i === index ? { ...s, grade: nextBetterGrade } : { ...s },
-              );
-              const newAllPathwaysStatus =
-                calculateAllPathwaysStatus(tempSubjects);
-              const newEligiblePathwayNames = new Set(
-                newAllPathwaysStatus
-                  .filter((p) => p.isEligible)
-                  .map((p) => p.name),
-              );
-              const newlyEligiblePathways = [];
-              newEligiblePathwayNames.forEach((name) => {
-                if (!currentEligiblePathwayNames.has(name))
-                  newlyEligiblePathways.push(name);
+            const next = getNextBetterGrade(subject.grade, subject.level);
+            if (!next) return;
+            const unlocked = calculateAllPathwaysStatus(
+              studentSubjects.map((s, i) =>
+                i === index ? { ...s, grade: next } : { ...s },
+              ),
+            )
+              .map((p) => ({ ...p, name: p.name.replace(/\.+$/, "") }))
+              .filter((p) => p.isEligible && !openNow.has(p.name))
+              .map((p) => p.name);
+            if (unlocked.length)
+              wins.push({
+                subject:
+                  getSubjectById(subject.subjectId)?.name || subject.subjectId,
+                from: `${subject.grade} (${subject.level})`,
+                to: `${next} (${subject.level})`,
+                short: `${subject.grade} → ${next}`,
+                unlocked,
               });
-              const merImprovements = [];
-              const scoreImprovements = [];
-              newAllPathwaysStatus.forEach((newPathway) => {
-                const currentPathway = currentAllPathwaysStatus.find(
-                  (p) => p.id === newPathway.id,
-                );
-                if (currentPathway) {
-                  newPathway.merCheck.merDetails.forEach((newDetail) => {
-                    const currentDetail =
-                      currentPathway.merCheck.merDetails.find(
-                        (d) =>
-                          d.merId === newDetail.merId ||
-                          d.text === newDetail.text,
-                      );
-                    if (
-                      currentDetail &&
-                      !currentDetail.met &&
-                      newDetail.met &&
-                      !newDetail.isPlainBullet
-                    )
-                      merImprovements.push({
-                        pathwayName: newPathway.name,
-                        merText: newDetail.text,
-                      });
-                  });
-                  if (!currentPathway.isEligible && !newPathway.isEligible) {
-                    const req = currentPathway.requirements;
-                    if (req.grossL1R4 !== undefined) {
-                      const oldS = currentPathway.grossScore,
-                        newS = newPathway.grossScore;
-                      if (
-                        oldS !== Infinity &&
-                        newS !== Infinity &&
-                        newS < oldS &&
-                        newS > req.grossL1R4
-                      )
-                        scoreImprovements.push({
-                          pathwayName: newPathway.name,
-                          scoreDrop: oldS - newS,
-                          newScore: newS,
-                          threshold: req.grossL1R4,
-                          label: `L1R4 ≤ ${req.grossL1R4}`,
-                        });
-                    } else if (req.netELR2B2 !== undefined) {
-                      const oldS = currentPathway.netScore,
-                        newS = newPathway.netScore;
-                      if (
-                        oldS !== Infinity &&
-                        newS !== Infinity &&
-                        newS < oldS &&
-                        newS > req.netELR2B2
-                      )
-                        scoreImprovements.push({
-                          pathwayName: newPathway.name,
-                          scoreDrop: oldS - newS,
-                          newScore: newS,
-                          threshold: req.netELR2B2,
-                          label: `Net ELR2B2 ≤ ${req.netELR2B2}`,
-                        });
-                    } else if (req.grossELMAB3 !== undefined) {
-                      const oldS = currentPathway.grossScore,
-                        newS = newPathway.grossScore;
-                      if (
-                        oldS !== Infinity &&
-                        newS !== Infinity &&
-                        newS < oldS &&
-                        newS > req.grossELMAB3
-                      )
-                        scoreImprovements.push({
-                          pathwayName: newPathway.name,
-                          scoreDrop: oldS - newS,
-                          newScore: newS,
-                          threshold: req.grossELMAB3,
-                          label: `ELMAB3 ≤ ${req.grossELMAB3}`,
-                        });
-                    }
-                  }
-                }
-              });
-              if (
-                newlyEligiblePathways.length > 0 ||
-                scoreImprovements.length > 0
-              )
-                suggestions.push({
-                  subjectName:
-                    getSubjectById(subject.subjectId)?.name ||
-                    subject.subjectId,
-                  originalGrade,
-                  originalLevel,
-                  improvedGrade: nextBetterGrade,
-                  improvedLevel: originalLevel,
-                  pathwaysUnlockedCount: newlyEligiblePathways.length,
-                  unlockedPathwayNames: newlyEligiblePathways.sort(),
-                  merImprovements,
-                  scoreImprovements,
-                });
-            }
           });
-          if (suggestions.length === 0) {
-            improvementPlaceholder.classList.remove("hidden");
-            improvementPlaceholder.innerHTML = `<p>No single grade change opens a new pathway right now. Check the pathways below for bigger steps, or speak with your school counsellor.</p>`;
-          } else {
-            improvementPlaceholder.classList.add("hidden");
-            renderImprovementSuggestions(suggestions);
-          }
-        }
-
-        function renderImprovementSuggestions(suggestions) {
-          improvementSuggestionsContainer.innerHTML = "";
-          const sortedSuggestions = suggestions.sort((a, b) => {
-            if (b.pathwaysUnlockedCount !== a.pathwaysUnlockedCount)
-              return b.pathwaysUnlockedCount - a.pathwaysUnlockedCount;
-            return b.merImprovements.length - a.merImprovements.length;
-          });
-          sortedSuggestions.forEach((suggestion) => {
-            const suggestionCard = document.createElement("div");
-            suggestionCard.className =
-              "bg-slate-700/60 p-3 rounded-lg border border-slate-600";
-            const pathwayNamesList = suggestion.unlockedPathwayNames
-              .map((name) => `<li class="text-slate-300">${esc(name)}</li>`)
-              .join("");
-            let benefitsHtml = "";
-            if (suggestion.unlockedPathwayNames.length > 0)
-              benefitsHtml += `<p class="text-xs text-emerald-300 mt-2">Opens ${esc(suggestion.pathwaysUnlockedCount)} more:</p><ul class="list-disc list-inside text-xs space-y-0.5 mt-1">${pathwayNamesList}</ul>`;
-            if (
-              suggestion.scoreImprovements &&
-              suggestion.scoreImprovements.length > 0
-            ) {
-              const dedupedScoreImprovements =
-                suggestion.scoreImprovements.filter(
-                  (si, idx, arr) =>
-                    arr.findIndex((x) => x.pathwayName === si.pathwayName) ===
-                    idx,
-                );
-              const shownCloser = dedupedScoreImprovements.slice(0, 2);
-              const moreCloser =
-                dedupedScoreImprovements.length - shownCloser.length;
-              benefitsHtml += `<p class="text-xs text-slate-400 mt-2">Gets closer: ${shownCloser
-                .map(
-                  (si) =>
-                    `${esc(si.pathwayName)} (${esc(si.newScore)}, need ${esc(si.label)})`,
-                )
-                .join(
-                  "; ",
-                )}${moreCloser > 0 ? ` and ${moreCloser} more` : ""}</p>`;
-            }
-            suggestionCard.innerHTML = `<h4 class="text-base font-semibold text-slate-100">Improve ${esc(suggestion.subjectName)}</h4><p class="text-sm text-slate-300 mt-1"><span class="font-bold text-cyan-300">${esc(suggestion.originalGrade)} (${esc(suggestion.originalLevel)})</span> → <span class="font-bold text-cyan-300">${esc(suggestion.improvedGrade)} (${esc(suggestion.originalLevel)})</span></p>${benefitsHtml}`;
-            improvementSuggestionsContainer.appendChild(suggestionCard);
-          });
-          if (improvementSuggestionsContainer.innerHTML === "") {
-            improvementPlaceholder.classList.remove("hidden");
-            improvementPlaceholder.innerHTML =
-              "<p>No single grade change opens a new pathway right now.</p>";
-          } else {
-            improvementPlaceholder.classList.add("hidden");
-          }
+          return wins;
         }
 
         function showMessage(message, title = "Notification") {
@@ -5441,7 +5240,6 @@
           checkEligibility();
           renderStudentSubjectsTable();
           renderResultsAdvice();
-          generateImprovementSuggestions();
         }
 
         document.addEventListener("DOMContentLoaded", () => {

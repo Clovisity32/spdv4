@@ -102,25 +102,25 @@ async function getGroupOrder(page) {
   });
 }
 
-/** Extract all improvement suggestion cards from the page. */
+/** Extract quick-win suggestions (one-grade improvements) from the pathway explorer. */
 async function getSuggestions(page) {
   await page.waitForTimeout(600);
   return page.evaluate(() => {
-    const c = document.getElementById("improvementSuggestionsContainer");
-    if (!c) return [];
-    return Array.from(c.children).map((card) => {
-      const h4 = card.querySelector("h4");
-      const spans = Array.from(card.querySelectorAll("span"));
-      const pathways = Array.from(card.querySelectorAll("li")).map((li) =>
-        li.textContent.trim(),
-      );
-      return {
-        subject: h4 ? h4.textContent.replace("Improve ", "").trim() : "",
-        fromGrade: spans[0] ? spans[0].textContent.trim() : "",
-        toGrade: spans[1] ? spans[1].textContent.trim() : "",
-        pathways,
-      };
-    });
+    const bySug = new Map();
+    document
+      .querySelectorAll("#resultsExplorerContainer [data-qw]")
+      .forEach((el) => {
+        const key = `${el.dataset.subject}|${el.dataset.from}|${el.dataset.to}`;
+        if (!bySug.has(key))
+          bySug.set(key, {
+            subject: el.dataset.subject,
+            fromGrade: el.dataset.from,
+            toGrade: el.dataset.to,
+            pathways: [],
+          });
+        bySug.get(key).pathways.push(el.closest("[data-pw]").dataset.name);
+      });
+    return [...bySug.values()];
   });
 }
 
@@ -1923,6 +1923,12 @@ function ok(cond, id, msg) {
         `Eligible "ITE 3-Year Higher Nitec" (pos ${iY3}) before Not-Eligible "ITE Year 2 Higher Nitec" (pos ${iY2})`,
       );
     }
+  } catch (err) {
+    // A thrown error mid-run must fail the suite, not print "All checks passed!".
+    console.log(`
+  ✗ RUNNER CRASHED: ${err && err.stack ? err.stack : err}`);
+    FAILED++;
+    FAILURES.push(`runner crashed: ${err && err.message ? err.message : err}`);
   } finally {
     await browser.close();
 

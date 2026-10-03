@@ -692,11 +692,24 @@ async function advise(page, subjects) {
       "P8-5",
       "An out-of-reach pathway expands to a Subject / Now / Need / Marks table",
     );
+    await pick("status", "quick");
+    vis = await visible();
     ok(
-      (await page.$$("#improvementSuggestionsContainer > div h4")).length > 0,
+      vis.length > 0 &&
+        (await page.$$eval(`${ROWS}:not(.hidden)`, (rs) =>
+          rs.every(
+            (r) => r.dataset.quick === "1" && r.querySelector("[data-qw]"),
+          ),
+        )),
       "P8-6",
-      "Quick wins cards render inside the merged section",
+      `Quick wins filter shows only rows a single grade can open, each naming the grade change (${vis.length})`,
     );
+    ok(
+      (await page.$("#improvementSuggestionsSection")) === null,
+      "P8-6b",
+      "No separate Improvement Suggestions block remains",
+    );
+    await pick("status", "all");
     ok(
       !(await page.evaluate(
         () => document.documentElement.scrollWidth > window.innerWidth,
@@ -710,6 +723,12 @@ async function advise(page, subjects) {
       "P7-1",
       `no page errors (${pageErrors[0] || "none"})`,
     );
+  } catch (err) {
+    // A thrown error mid-run must fail the suite, not print "All checks passed!".
+    console.log(`
+  ✗ RUNNER CRASHED: ${err && err.stack ? err.stack : err}`);
+    FAILED++;
+    FAILURES.push(`runner crashed: ${err && err.message ? err.message : err}`);
   } finally {
     await browser.close();
     console.log("\n══════════════════════════════════════════════════════");
