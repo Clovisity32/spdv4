@@ -4296,6 +4296,36 @@
               estimated,
             };
           };
+          const comboTier = (d) =>
+            d.maxGap <= REALISTIC_GAIN && d.total <= 25
+              ? 2
+              : d.maxGap <= 15 && d.total <= 40
+                ? 3
+                : d.maxGap <= 30 && d.total <= 60
+                  ? 4
+                  : 5;
+          const ALT_LABELS = {
+            2: "within reach",
+            3: "stretch",
+            4: "remote",
+            5: "far beyond a realistic gain",
+          };
+          // The "maintain your levels and improve" alternative to a level move.
+          const altOf = (pid) => {
+            const route = comboRoutes.found.get(pid);
+            if (!route) return null;
+            const d = comboDetail(route);
+            const tier = comboTier(d);
+            return {
+              parts: d.parts,
+              summary: d.summary,
+              totalMarks: d.total,
+              subjects: d.count,
+              tier,
+              difficulty: ALT_LABELS[tier],
+              farOff: tier === 5,
+            };
+          };
           const stairSteps = statusBase.map((pw) => {
             const head = {
               id: pw.id,
@@ -4322,6 +4352,7 @@
                 tier: 1,
                 effort: 0,
                 detail: `Take ${nameOf(mv.s)} at ${mv.moved.level} (${gradeText(mv.s)} → projected ${gradeText(mv.moved)}). Immediate, no marks needed.`,
+                alt: altOf(pw.id),
               };
             if (opt3.applicable && opt3.eval.eligible.has(pw.id))
               return {
@@ -4329,20 +4360,14 @@
                 tier: 1,
                 effort: 0,
                 detail: `Take at the lower level: ${opt3.moves.map((s) => `${nameOf(s)} (${s.moved.fromLevel} ${s.moved.fromGrade} → ${gradeText(s)})`).join("; ")}. Immediate, no marks needed.`,
+                alt: altOf(pw.id),
               };
             const route = comboRoutes.found.get(pw.id);
             if (route) {
               const d = comboDetail(route);
               return {
                 ...head,
-                tier:
-                  d.maxGap <= REALISTIC_GAIN && d.total <= 25
-                    ? 2
-                    : d.maxGap <= 15 && d.total <= 40
-                      ? 3
-                      : d.maxGap <= 30 && d.total <= 60
-                        ? 4
-                        : 5,
+                tier: comboTier(d),
                 effort: route.cost,
                 subjects: d.count,
                 totalMarks: d.total,
@@ -4491,7 +4516,7 @@
             tr.steps
               .map(
                 (s) =>
-                  `<div class="rounded border-l-4 ${tierTone[tr.tier]} p-3 mb-2" style="${indent(tr.tier)}"><p class="font-semibold text-slate-100">${tr.tier === 0 ? "✓ " : ""}${esc(s.name)} <span class="text-xs font-normal text-slate-400">· ${esc(s.group)}</span></p>${s.parts ? `<p class="text-sm text-slate-300 mt-1">${s.farOff ? "Would need" : "What it takes"}: ${esc(s.summary)}</p><ul class="list-disc list-inside text-sm text-slate-300 mt-1">${s.parts.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="text-sm text-slate-300 mt-1">${esc(s.detail)}</p>`}</div>`,
+                  `<div class="rounded border-l-4 ${tierTone[tr.tier]} p-3 mb-2" style="${indent(tr.tier)}"><p class="font-semibold text-slate-100">${tr.tier === 0 ? "✓ " : ""}${esc(s.name)} <span class="text-xs font-normal text-slate-400">· ${esc(s.group)}</span></p>${s.parts ? `<p class="text-sm text-slate-300 mt-1">${s.farOff ? "Would need" : "What it takes"}: ${esc(s.summary)}</p><ul class="list-disc list-inside text-sm text-slate-300 mt-1">${s.parts.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="text-sm text-slate-300 mt-1">${esc(s.detail)}</p>`}${s.alt ? `<div class="mt-2 pt-2 border-t border-slate-600"><p class="text-sm text-amber-300 font-semibold">Or keep your levels and improve <span class="font-normal ${diffClass[s.alt.difficulty === "within reach" ? "within reach" : s.alt.difficulty === "stretch" ? "stretch" : "remote"]}">[${esc(s.alt.difficulty)}]</span></p><p class="text-sm text-slate-300 mt-1">${esc(s.alt.summary)}</p><ul class="list-disc list-inside text-sm text-slate-300 mt-1">${s.alt.parts.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}</div>`,
               )
               .join("");
           const bandHtml = (tr) => {

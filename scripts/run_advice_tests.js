@@ -447,6 +447,66 @@ async function advise(page, subjects) {
       "Staircase tiers run from open today up to out of reach",
     );
 
+    console.log(
+      "\nPhase 5e: second route on immediate steps (maintain and improve)",
+    );
+    const immediate = (adv) => adv.staircase.find((tr) => tr.tier === 1).steps;
+    // Profile A: both immediate steps can alternatively be reached by Maths F9 -> E8.
+    const altA = immediate(a);
+    ok(
+      altA.length === 2 &&
+        altA.every(
+          (s) =>
+            s.alt &&
+            s.alt.totalMarks === 9 &&
+            s.alt.difficulty === "stretch" &&
+            /Mathematics G3 F9 → E8 \(reach 40 marks, \+9 marks\)/.test(
+              s.alt.parts[0],
+            ),
+        ),
+      "P5e-1",
+      "Profile A: each immediate step also shows Maths F9 → E8 (+9, stretch) as the keep-your-levels route",
+    );
+    a = await advise(page, [
+      S("EL", "G2", "5", 55),
+      S("MATH", "G2", "6", 33),
+      S("COMB_SCI", "G2", "6", 36),
+      S("COMB_HUM", "G2", "6", 45),
+      S("POA", "G2", "6", 34),
+    ]);
+    const dSteps = immediate(a);
+    const passEl = dSteps.find((s) => s.name === "MER (Pass EL)");
+    const passElMath = dSteps.find((s) => s.name === "MER (Pass EL & Math)");
+    ok(
+      passEl &&
+        passEl.alt.totalMarks === 19 &&
+        passEl.alt.subjects === 2 &&
+        passEl.alt.parts.some((x) =>
+          /Combined Science G2 6 → 5 \(reach 50 marks, \+14 marks\)/.test(x),
+        ) &&
+        passEl.alt.parts.some((x) =>
+          /Combined Humanities G2 6 → 5 \(reach 50 marks, \+5 marks\)/.test(x),
+        ),
+      "P5e-2",
+      "Profile D: Pass EL can also be reached by keeping G2 with Science +14 and Humanities +5",
+    );
+    ok(
+      passElMath &&
+        passElMath.alt.totalMarks === 22 &&
+        passElMath.alt.parts.some((x) =>
+          /Mathematics G2 6 → 5 \(reach 50 marks, \+17 marks\)/.test(x),
+        ),
+      "P5e-3",
+      "Profile D: Pass EL & Math needs Maths +17 and Humanities +5 if the levels are kept",
+    );
+    ok(
+      a.staircase
+        .filter((tr) => tr.tier !== 1)
+        .every((tr) => tr.steps.every((s) => !s.alt)),
+      "P5e-4",
+      "Only immediate level-move steps carry an alternative route",
+    );
+
     console.log("\nPhase 6: randomized invariants (400 profiles)");
     const result = await page.evaluate((school) => {
       const G3 = ["A1", "A2", "B3", "B4", "C5", "C6", "D7", "E8", "F9"];
