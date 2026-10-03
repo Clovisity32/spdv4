@@ -649,6 +649,26 @@ async function advise(page, subjects) {
       "P8-3",
       `Group filter JC/MI shows only JC and MI (${vis.length})`,
     );
+    ok(
+      (await page.$$eval(
+        "#resultsExplorerContainer [data-gblock]",
+        (bs) => bs.filter((b) => !b.classList.contains("hidden")).length,
+      )) === 1,
+      "P8-3b",
+      "Filtering to one group hides the other stair steps",
+    );
+    await pick("group", "all");
+    const groupSeq = await page.$$eval(ROWS, (rs) => [
+      ...new Set(rs.map((r) => r.dataset.group)),
+    ]);
+    ok(
+      groupSeq[0] === "JC/MI" &&
+        groupSeq[groupSeq.length - 1] === "ITE 3-Year Higher Nitec" &&
+        groupSeq.length === 5,
+      "P8-3c",
+      `Cards run in pathway order, JC/MI first and ITE 3-Year last (${groupSeq.join(" > ")})`,
+    );
+    await pick("group", "JC/MI");
     await pick("status", "open");
     ok(
       (await visible()).length === 0 &&

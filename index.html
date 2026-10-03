@@ -103,13 +103,21 @@
         left: 50%;
         transform: translateX(-50%);
         opacity: 0;
-        transition: opacity 0.3s;
         font-size: 0.75rem;
         border: 1px solid #334155; /* slate-700 */
       }
       .tooltip:hover .tooltiptext {
         display: block;
         opacity: 1;
+        animation: tooltip-fade 0.3s;
+      }
+      @keyframes tooltip-fade {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
       }
       /* Keep hidden tooltips from widening the page on phones */
       body {
@@ -4513,7 +4521,7 @@
         // ---- Pathway explorer filter state (kept across re-renders) ----
         const explorerFilter = { group: "all", status: "all" };
         const PILL_BASE =
-          "text-xs px-3 py-1.5 rounded-full border focus:outline-none focus:ring-2 focus:ring-cyan-500";
+          "text-sm px-4 min-h-[44px] sm:min-h-[36px] rounded-full border focus:outline-none focus:ring-2 focus:ring-cyan-500";
         const PILL_OFF = "border-slate-600 text-slate-300 hover:bg-slate-700";
         const PILL_ON = "border-cyan-500 bg-cyan-600 text-white";
 
@@ -4538,6 +4546,14 @@
               row.classList.toggle("hidden", !show);
               if (show) shown++;
             });
+          resultsExplorerContainer
+            .querySelectorAll("[data-gblock]")
+            .forEach((blk) =>
+              blk.classList.toggle(
+                "hidden",
+                !blk.querySelector("[data-pw]:not(.hidden)"),
+              ),
+            );
           const empty =
             resultsExplorerContainer.querySelector("#explorerEmpty");
           if (empty) empty.classList.toggle("hidden", shown > 0);
@@ -4585,9 +4601,12 @@
               .join(" ");
 
           // ---- Flatten the staircase into one list of pathways ----
-          const steps = [...a.staircase]
-            .sort((x, y) => x.tier - y.tier)
-            .flatMap((tr) => tr.steps.map((s) => ({ ...s, tier: tr.tier })));
+          const orderIdx = Object.fromEntries(
+            PATHWAYS.map((pw, i) => [pw.id, i]),
+          );
+          const steps = a.staircase
+            .flatMap((tr) => tr.steps.map((s) => ({ ...s, tier: tr.tier })))
+            .sort((x, y) => orderIdx[x.id] - orderIdx[y.id]);
           const statusOf = (tier) =>
             tier === 0 ? "open" : tier <= 2 ? "close" : "further";
           const count = (st) =>
@@ -4641,7 +4660,7 @@
             )
             .join("");
           const reachTable = `<p class="text-sm font-semibold text-sky-300 mt-4">Is the next grade realistic?</p><div class="overflow-x-auto mt-2 rounded-lg border border-slate-700"><table class="min-w-full text-sm text-slate-300"><thead class="bg-slate-700 text-sky-300 text-xs uppercase"><tr><th class="px-3 py-2 text-left">Subject</th><th class="px-3 py-2 text-left">Now</th><th class="px-3 py-2 text-left">Raw mark</th><th class="px-3 py-2 text-left">Next grade</th><th class="px-3 py-2 text-left">Within ${REALISTIC_GAIN} marks?</th></tr></thead><tbody class="divide-y divide-slate-700">${reachRows}</tbody></table></div>`;
-          const details = `<details class="mt-4"><summary class="cursor-pointer text-sky-400 hover:text-sky-300 text-sm">Why this plan, and other options</summary><p class="text-sm font-semibold text-sky-300 mt-3">Why this option</p><ul class="list-disc list-inside text-sm text-slate-300 space-y-1 mt-1">${rec.reasons.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>${callouts(rec.warnings, "warn")}${callouts(rec.conflicts, "heads-up")}${reachList}${rec.id > 1 ? '<p class="text-xs text-slate-400 mt-3">Improvements after moving a subject down are not counted, because raw marks at the new level are unknown, so this is a cautious estimate.</p>' : ""}${breakBlock}${reachTable}<p class="text-sm font-semibold text-sky-300 mt-4">Other options we checked</p><ul class="mt-2 text-sm list-none">${otherRows}</ul></details>`;
+          const details = `<details class="mt-4"><summary class="cursor-pointer text-sky-400 hover:text-sky-300 text-sm font-medium py-3">Why this plan, and other options</summary><p class="text-sm font-semibold text-sky-300 mt-3">Why this option</p><ul class="list-disc list-inside text-sm text-slate-300 space-y-1 mt-1">${rec.reasons.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>${callouts(rec.warnings, "warn")}${callouts(rec.conflicts, "heads-up")}${reachList}${rec.id > 1 ? '<p class="text-xs text-slate-400 mt-3">Improvements after moving a subject down are not counted, because raw marks at the new level are unknown, so this is a cautious estimate.</p>' : ""}${breakBlock}${reachTable}<p class="text-sm font-semibold text-sky-300 mt-4">Other options we checked</p><ul class="mt-2 text-sm list-none">${otherRows}</ul></details>`;
           const recCard = `<div class="p-4 rounded-lg border-2 border-emerald-500 bg-emerald-800/20"><p class="text-xs font-semibold uppercase tracking-wide text-emerald-300">Suggested plan${rec.id ? `: Option ${esc(rec.id)}` : ""} · ${plural(L2.count, "realistic pathway")}</p><h3 class="text-lg font-semibold text-slate-100 mt-1">${esc(rec.title)}</h3><div class="flex flex-wrap gap-2 mt-3">${groupChips(L2.byGroup)}</div>${rec.checklist.length ? `<ol class="list-decimal list-inside text-base font-semibold text-slate-100 space-y-1 mt-3">${rec.checklist.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>` : ""}${freeHtml}${details}</div>`;
 
           resultsAdviceContainer.innerHTML = strip + recCard;
@@ -4682,7 +4701,16 @@
             )}<p class="text-sm text-slate-300 mt-3">${s.blocker ? `Marks alone will not be enough. Even top grades in your current subjects would leave: ${esc(s.blocker)}. This usually means taking a different subject or level.` : "Top grades across your current subjects would get you there. A longer-term goal worth keeping in view."}</p>`;
           };
           const rowHtml = (s) =>
-            `<details data-pw data-group="${esc(s.group)}" data-status="${statusOf(s.tier)}" class="group rounded-lg border border-slate-600 bg-slate-900/40 mb-2"><summary class="flex items-center gap-3 p-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden"><span class="w-3 h-3 rounded-full shrink-0 ${dot[statusOf(s.tier)]}"></span><span class="min-w-0 flex-1"><span class="block font-semibold text-slate-100">${esc(s.name)}</span><span class="block text-xs text-slate-400">${esc(s.group)} · ${esc(shortText(s))}</span></span><span class="text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span></summary><div class="px-3 pb-3 pt-1 border-t border-slate-700">${bodyOf(s)}</div></details>`;
+            `<details data-pw data-group="${esc(s.group)}" data-status="${statusOf(s.tier)}" class="group rounded-lg border border-slate-600 bg-slate-900/40 mb-2"><summary class="flex items-center gap-3 p-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden"><span class="w-3 h-3 rounded-full shrink-0 ${dot[statusOf(s.tier)]}"></span><span class="min-w-0 flex-1"><span class="block font-semibold text-slate-100">${esc(s.name)}</span><span class="block text-xs text-slate-400">${esc(shortText(s))}</span></span><span class="text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span></summary><div class="px-3 pb-3 pt-1 border-t border-slate-700">${bodyOf(s)}</div></details>`;
+          // One stair per group, each indented further than the one above
+          const stairs = Object.keys(PATHWAY_TOTAL_BY_GROUP)
+            .map((g, i) => {
+              const inGroup = steps.filter((s) => s.group === g);
+              if (!inGroup.length) return "";
+              const openN = inGroup.filter((s) => s.tier === 0).length;
+              return `<div data-gblock data-group="${esc(g)}" class="mb-3 border-l-4 border-slate-600 pl-3" style="margin-left: calc(${i} * min(4vw, 18px))"><div class="rounded-t-md border-t-4 border-cyan-500 bg-slate-700/50 px-3 py-1.5 mb-2 flex flex-wrap items-baseline justify-between gap-x-3"><span class="text-sm font-bold text-cyan-300">Step ${i + 1} · ${esc(g)}</span><span class="text-xs text-slate-400">${inGroup.length} pathway${inGroup.length === 1 ? "" : "s"}${openN ? ` · ${openN} open now` : ""}</span></div>${inGroup.map(rowHtml).join("")}</div>`;
+            })
+            .join("");
           const pill = (filter, value, label) =>
             `<button type="button" data-filter="${filter}" data-value="${esc(value)}" aria-pressed="false" class="${PILL_BASE} ${PILL_OFF}">${esc(label)}</button>`;
           const groupPills = [
@@ -4697,7 +4725,7 @@
             pill("status", "close", "Within reach"),
             pill("status", "further", "Needs more work"),
           ].join(" ");
-          resultsExplorerContainer.innerHTML = `<h3 class="text-lg font-semibold text-slate-100 mb-1">Explore every pathway</h3><p class="text-xs text-slate-400 mb-3">Tap a pathway to see exactly what it takes.</p><div class="flex flex-wrap gap-2 mb-2">${groupPills}</div><div class="flex flex-wrap gap-2 mb-4">${statusPills}</div>${steps.map(rowHtml).join("")}<p id="explorerEmpty" class="hidden text-sm text-slate-400 p-3">No pathways match these filters. Try "All pathways" or "Any status".</p>`;
+          resultsExplorerContainer.innerHTML = `<h3 class="text-lg font-semibold text-slate-100 mb-1">Explore every pathway</h3><p class="text-xs text-slate-400 mb-3">Steps run from JC/MI down to ITE 3-Year. Tap a pathway to see exactly what it takes.</p><div class="flex flex-wrap gap-2 mb-2">${groupPills}</div><div class="flex flex-wrap gap-2 mb-4">${statusPills}</div>${stairs}<p id="explorerEmpty" class="hidden text-sm text-slate-400 p-3">No pathways match these filters. Try "All pathways" or "Any status".</p>`;
           applyExplorerFilter();
         }
 
