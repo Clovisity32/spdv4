@@ -718,6 +718,312 @@ async function advise(page, subjects) {
       "No horizontal page scroll at 390px wide",
     );
 
+    console.log(
+      "\nPhase 9: Suggested plan choices, practical check, coherence",
+    );
+    const W6 = [
+      S("EL", "G3", "B3", 69),
+      S("MT", "G3", "C6", 50),
+      S("MATH", "G3", "F9", 31),
+      S("COMB_SCI", "G3", "D7", 47),
+      S("COMB_HUM", "G3", "E8", 43),
+      S("POA", "G3", "F9", 38),
+    ];
+    const STRONG = [
+      S("EL", "G3", "A2", 85),
+      S("MATH", "G3", "A2", 85),
+      S("MT", "G3", "B3", 70),
+      S("COMB_SCI", "G3", "B3", 70),
+      S("COMB_HUM", "G3", "B3", 70),
+      S("POA", "G3", "B4", 65),
+    ];
+    const WEAK3_OF_5 = [
+      S("EL", "G3", "D7", 52),
+      S("MATH", "G3", "E8", 40),
+      S("HIST", "G3", "E8", 41),
+      S("MT", "G3", "F9", 30),
+      S("COMB_SCI", "G3", "E8", 42),
+    ];
+    const THREE_FAIL_5 = [
+      S("EL", "G3", "D7", 50),
+      S("MATH", "G3", "D7", 52),
+      S("HIST", "G3", "F9", 30),
+      S("MT", "G3", "F9", 30),
+      S("COMB_SCI", "G3", "F9", 30),
+    ];
+    const WEAK_UNUSED = [
+      S("EL", "G3", "B3", 70),
+      S("MATH", "G3", "B3", 70),
+      S("HIST", "G3", "D7", 47),
+      S("COMB_SCI", "G3", "F9", 30),
+      S("POA", "G3", "F9", 30),
+      S("MT", "G3", "F9", 30),
+    ];
+    const profiles9 = [W6, STRONG, WEAK3_OF_5, THREE_FAIL_5, WEAK_UNUSED];
+    const adv9 = [];
+    for (const p of profiles9) adv9.push(await advise(page, p));
+    const [a6, aStrong, aWeak, a3f] = adv9;
+
+    ok(
+      adv9.every(
+        (x) =>
+          x.choices.length === 4 &&
+          x.choices.map((c) => c.key).join("") === "ABCD",
+      ),
+      "P9-1",
+      "Four choices A-D, always in that order",
+    );
+    ok(
+      adv9.every(
+        (x) =>
+          x.choices.filter((c) => c.isRecommended).length === 1 &&
+          x.choices.filter((c) => !c.applicable).every((c) => c.na),
+      ),
+      "P9-2",
+      "Exactly one suggested choice; inapplicable choices say why",
+    );
+    ok(
+      aStrong.standing.level === "coping" &&
+        aStrong.recommended.key === "A" &&
+        aStrong.choices[0].isRecommended,
+      "P9-3",
+      "A student coping everywhere is told to keep and improve, not to drop a subject",
+    );
+    ok(
+      adv9.every((x) =>
+        x.choices
+          .filter((c) => c.applicable)
+          .every(
+            (c) =>
+              c.count ===
+              x.before.realistic - c.lostIds.length + c.gainedIds.length,
+          ),
+      ),
+      "P9-4",
+      "Each choice's pathway count = today's realistic - given up + opened",
+    );
+    const flat = (x) => x.staircase.flatMap((t) => t.steps);
+    ok(
+      adv9.every((x) => {
+        const st = flat(x);
+        const n = (k) => st.filter((s) => s.status === k).length;
+        return (
+          x.summary.open === x.before.eligible &&
+          x.summary.open + x.summary.close === x.before.realistic &&
+          ["open", "close", "lower", "further"].every(
+            (k) => x.summary[k] === n(k),
+          )
+        );
+      }),
+      "P9-5",
+      "Tiles = staircase statuses, and Open + Within reach = choice A's pathway count",
+    );
+    ok(
+      adv9.every((x) =>
+        flat(x)
+          .filter((s) => s.tier === 1 && s.status === "close")
+          .every((s) => s.alt && s.alt.rows),
+      ),
+      "P9-6",
+      "A level-change pathway is only 'within reach' when a keep-your-levels route exists",
+    );
+    ok(
+      adv9.every((x) =>
+        x.choices.every(
+          (c) =>
+            c.steps.length <= 3 &&
+            (!c.check ||
+              ["P1", "P2", "P3", "P5"].every(
+                (r) => c.check.items.filter((i) => i.rule === r).length <= 1,
+              )),
+        ),
+      ),
+      "P9-7",
+      "At most 3 steps per choice and one line per practical-check rule",
+    );
+    // Practical check: majority lowered → look at the rest.
+    const wu = await page.evaluate(
+      ([s, sel]) => window.__spdTest.evalCustom(s, sel, "School A"),
+      [WEAK_UNUSED, { COMB_SCI: "lower", POA: "lower", MT: "lower" }],
+    );
+    const p1 = wu.check.items.find((i) => i.rule === "P1");
+    ok(
+      p1 &&
+        p1.rows.find((r) => r.subject === "History").suggestion ===
+          "Consider lowering too" &&
+        p1.rows
+          .filter((r) => r.subject !== "History")
+          .every((r) => r.suggestion === "Keep at current level"),
+      "P9-8",
+      "3 of 6 lowered: a weak subject no pathway uses is flagged 'Consider lowering too', strong ones stay",
+    );
+    const d3 = a3f.choices[3].check.items.find((i) => i.rule === "P1");
+    ok(
+      d3 &&
+        d3.rows.length === 2 &&
+        d3.rows.every(
+          (r) => r.helps !== "No" && r.suggestion === "Keep at current level",
+        ),
+      "P9-9",
+      "A subject a pathway needs is kept and the pathway is named",
+    );
+    ok(
+      aWeak.choices[3].check.items.some(
+        (i) => i.rule === "P2" && i.text.includes("Mathematics (+5 to D7)"),
+      ),
+      "P9-10",
+      "A lowered subject within 5 marks of the next grade is flagged (one merged line)",
+    );
+    ok(
+      aStrong.choices[0].check.items.length === 0 &&
+        aStrong.choices[0].check.passed === 5,
+      "P9-11",
+      "A strong student's plan passes every check with nothing flagged",
+    );
+    const ec0 = await page.evaluate(
+      ([s]) => window.__spdTest.evalCustom(s, {}, "School A"),
+      [W6],
+    );
+    ok(
+      ec0.count === a6.before.realistic && ec0.lost.length === 0,
+      "P9-12",
+      "Try-your-own-mix with no changes matches today's pathways",
+    );
+
+    const pushText = (x) =>
+      x.choices
+        .filter((c) => c.applicable)
+        .flatMap((c) => [
+          ...c.steps,
+          ...c.improve.map((i) => `${i.name} +${i.marks} to ${i.to}`),
+        ])
+        .join(" | ");
+    ok(
+      !pushText(a6).includes("English Language"),
+      "P9-13",
+      "No 'push' advice for a strong subject that changes nothing (English B3 → A2)",
+    );
+    ok(
+      pushText(a6).includes("Combined Science +3 to C6") &&
+        pushText(a6).includes("Combined Humanities +2 to D7"),
+      "P9-14",
+      "Weak subjects within a few marks of the next grade are still suggested",
+    );
+
+    // ---- UI: choices, selection, custom mix, badges ----
+    const recKey = a6.recommended.key;
+    const pressed = () =>
+      page.$$eval("#resultsAdviceContainer [data-choice]", (bs) =>
+        bs
+          .filter((b) => b.getAttribute("aria-pressed") === "true")
+          .map((b) => b.dataset.choice),
+      );
+    const panelText = () => page.textContent("#planPanel");
+    const applicable = a6.choices.filter((c) => c.applicable);
+    ok(
+      (await page.$$("#resultsAdviceContainer [data-choice]")).length ===
+        applicable.length &&
+        (await page.$$("#resultsAdviceContainer [data-choice-na]")).length ===
+          4 - applicable.length,
+      "P9-U1",
+      "Applicable choices are buttons; the others are shown greyed with a reason",
+    );
+    ok(
+      (await pressed()).join() === recKey &&
+        (await panelText()).includes(`Choice ${recKey}`) &&
+        (await panelText()).includes("Does this plan make sense?") &&
+        (await page.$("[data-before]")) !== null,
+      "P9-U2",
+      `The suggested choice (${recKey}) is pre-selected, with next steps, practical check and 'Before you decide'`,
+    );
+    let badgesOk = true;
+    for (const c of applicable) {
+      await page.click(`[data-choice="${c.key}"]`);
+      const got = await page.$$eval(ROWS, (rs) => ({
+        gain: rs
+          .filter((r) => r.dataset.plan === "gain")
+          .map((r) => r.dataset.id),
+        lose: rs
+          .filter((r) => r.dataset.plan === "lose")
+          .map((r) => r.dataset.id),
+      }));
+      const same = (x, y) => [...x].sort().join() === [...y].sort().join();
+      if (
+        (await pressed()).join() !== c.key ||
+        !(await panelText()).includes(`Choice ${c.key}`) ||
+        !same(got.gain, c.gainedIds) ||
+        !same(got.lose, c.lostIds)
+      )
+        badgesOk = false;
+    }
+    ok(
+      badgesOk,
+      "P9-U3",
+      "Selecting each choice swaps the panel, and explorer badges match exactly what it opens / closes",
+    );
+    // Try your own mix
+    await page.click("#customDetails summary");
+    await page.click('[data-seg="MATH"][data-mode="lower"]');
+    const cm = await page.evaluate(
+      ([s]) => window.__spdTest.evalCustom(s, { MATH: "lower" }, "School A"),
+      [W6],
+    );
+    const live = await page.innerText("#customLive");
+    ok(
+      live.startsWith(`${cm.count} pathway`) &&
+        (await panelText()).includes("Your own mix"),
+      "P9-U4",
+      `Lowering one subject updates the live count (${live}) and the panel`,
+    );
+    await page.click('[data-seg="POA"][data-mode="drop"]');
+    const dropDisabled = await page.$eval(
+      '[data-seg="EL"][data-mode="drop"]',
+      (b) => b.disabled,
+    );
+    await page.click('[data-seg="POA"][data-mode="keep"]');
+    const dropBack = await page.$eval(
+      '[data-seg="EL"][data-mode="drop"]',
+      (b) => b.disabled,
+    );
+    ok(
+      dropDisabled && !dropBack,
+      "P9-U5",
+      "Drop is disabled once only 5 subjects remain, and re-enabled when one is kept",
+    );
+    await page.click("[data-reset]");
+    ok(
+      (await pressed()).join() === recKey &&
+        (await page.innerText("#customLive")).startsWith("Pick Keep") &&
+        (await page.$("[data-reset]")) === null,
+      "P9-U6",
+      "'Reset to suggested' restores the suggested choice and clears the mix",
+    );
+    const notes = await page.$$eval("[data-plan-note]", (ns) =>
+      ns.map((n) => ({ k: n.dataset.planNote, t: n.textContent })),
+    );
+    ok(
+      notes.length > 0 &&
+        notes.every(
+          (n) =>
+            ["part", "different", "not"].includes(n.k) &&
+            (n.k !== "part" || n.t.includes(`choice ${recKey}`)) &&
+            (n.k !== "different" || n.t.includes("instead of")),
+        ),
+      "P9-U7",
+      `Level-change pathways say how they relate to the suggested plan (${notes.length} notes)`,
+    );
+    await page.click(
+      `[data-choice="${applicable[applicable.length - 1].key}"]`,
+    );
+    await page.locator("[data-before] summary").click();
+    ok(
+      !(await page.evaluate(
+        () => document.documentElement.scrollWidth > window.innerWidth,
+      )),
+      "P9-U8",
+      "No horizontal scroll at 390px with the last choice and 'Before you decide' open",
+    );
+
     ok(
       pageErrors.length === 0,
       "P7-1",
