@@ -364,6 +364,12 @@
               ></tbody>
             </table>
           </div>
+          <a
+            href="#resultsAdviceSection"
+            id="jumpToPlan"
+            class="mt-4 flex sm:inline-flex items-center justify-center min-h-[44px] px-5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-300"
+            >See where you can go: open Your Action Plan ↓</a
+          >
         </div>
       </section>
 
@@ -412,7 +418,11 @@
         id="resultsAdviceSection"
         class="mb-10 p-6 bg-slate-800 shadow-2xl rounded-xl border border-slate-700 hidden"
       >
-        <h2 class="text-2xl font-semibold mb-1 text-cyan-400">
+        <h2
+          id="actionPlanTitle"
+          tabindex="-1"
+          class="text-2xl font-semibold mb-1 text-cyan-400 outline-none"
+        >
           Your Action Plan
         </h2>
         <p class="text-sm text-slate-400 mb-5">
@@ -5147,6 +5157,45 @@
             return `Aggregate ${score}, needs ${cut} or less`;
           return "Needs different subjects or levels";
         };
+        const FSBB_RANK = { open: 0, close: 1, lower: 2, further: 3 };
+        // Summarise a column's pathways (staircase steps) as one box: the
+        // easiest one wins. "here" = your own row (marks on one line, detail on
+        // the next); otherwise one line, because the route fills the next one.
+        const fsbbStepSummary = (steps, here) => {
+          const best = steps
+            .slice()
+            .sort(
+              (x, y) =>
+                FSBB_RANK[x.status] - FSBB_RANK[y.status] ||
+                x.effort - y.effort,
+            )[0];
+          const out = {
+            stepId: best.id,
+            status: best.status === "close" ? "close" : "further",
+            line1: "",
+            line2: "",
+          };
+          const src =
+            best.alt && best.alt.rows
+              ? best.alt
+              : best.rows && best.totalMarks !== undefined
+                ? best
+                : null;
+          const aggregate =
+            best.needs && best.needs.find((n) => /aggregate/i.test(n.label));
+          if (src) {
+            const k = src.rows.length;
+            if (here) {
+              out.line1 = `+${plural(src.totalMarks, "mark")}`;
+              out.line2 =
+                k === 1 ? fsbbGradeMove(src.rows[0]) : `in ${k} subjects`;
+            } else
+              out.line1 = `+${plural(src.totalMarks, "mark")} in ${plural(k, "subject")}`;
+          } else if (aggregate)
+            out.line1 = `Aggregate ${aggregate.now}, needs ${aggregate.target}`;
+          else out.line1 = "Marks alone won't be enough";
+          return out;
+        };
         const fsbbCourses = (n, total) =>
           total > 1 ? `${n} of ${total} courses` : "Eligible";
         // "POA G3→G2", "Drop History": what a route changes, in plain words.
@@ -5208,16 +5257,6 @@
             }
             return cfg[key];
           };
-          const rank = { open: 0, close: 1, lower: 2, further: 3 };
-          const marksText = (src) => {
-            const rowsSrc = src.rows || [];
-            return [
-              `+${plural(src.totalMarks, "mark")}`,
-              rowsSrc.length === 1
-                ? fsbbGradeMove(rowsSrc[0])
-                : `in ${rowsSrc.length} subjects`,
-            ];
-          };
 
           FSBB_ROWS.forEach((_, r) =>
             FSBB_COLS.forEach((col, ci) => {
@@ -5250,31 +5289,7 @@
                   cell.line1 = fsbbCourses(open.length, col.ids.length);
                   return;
                 }
-                const best = steps
-                  .slice()
-                  .sort(
-                    (x, y) =>
-                      rank[x.status] - rank[y.status] || x.effort - y.effort,
-                  )[0];
-                cell.stepId = best.id;
-                const src =
-                  best.alt && best.alt.rows
-                    ? best.alt
-                    : best.rows && best.totalMarks !== undefined
-                      ? best
-                      : null;
-                cell.status = best.status === "close" ? "close" : "further";
-                if (src) {
-                  [cell.line1, cell.line2] = marksText(src);
-                } else if (
-                  best.needs &&
-                  best.needs.find((n) => /aggregate/i.test(n.label))
-                ) {
-                  const n = best.needs.find((x) => /aggregate/i.test(x.label));
-                  cell.line1 = `Aggregate ${n.now}, needs ${n.target}`;
-                } else {
-                  cell.line1 = "Needs different subjects or levels";
-                }
+                Object.assign(cell, fsbbStepSummary(steps, true));
                 return;
               }
               // Another row: the easiest mix that lands on it.
@@ -5345,6 +5360,9 @@
                   .sort((x, y) => fsbbDeficit(x) - fsbbDeficit(y))[0];
                 cell.status = "further";
                 cell.stepId = pw.id;
+                // Interim wording; the marks route is filled in afterwards
+                // (fsbbFillPending) because it needs the full advice engine.
+                cell.pending = true;
                 cell.line1 = fsbbGapLine(pw);
               }
             }),
@@ -5532,7 +5550,7 @@
             return `<div data-fsbb-none class="${CELL_BOX} ${FSBB_STYLE.none} flex items-center justify-center text-[11px] leading-tight">Not possible with your subjects</div>`;
           const label =
             `${FSBB_COLS[cell.col].label}, ${FSBB_ROWS[cell.row].full}: ${FSBB_WORD[cell.status]}. ${cell.line1} ${cell.line2}`.trim();
-          return `<button type="button" data-fsbb-cell data-row="${cell.row}" data-col="${cell.col}" data-status="${cell.status}"${cell.est ? " data-est" : ""} aria-expanded="false" aria-label="${esc(label)}" class="${CELL_BOX} ${FSBB_STYLE[cell.status]} ${cell.est ? "border-dashed" : ""} flex flex-col items-center justify-start gap-0.5 text-center hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-cyan-300"><span class="text-3xl font-black leading-none" aria-hidden="true">${FSBB_ICON[cell.status]}</span><span class="text-[12px] font-semibold leading-tight">${esc(cell.line1)}</span>${cell.line2 ? `<span class="text-[11px] leading-tight opacity-90">${esc(cell.line2)}</span>` : ""}${cell.est ? '<span class="text-[10px] uppercase tracking-wide opacity-80">est.</span>' : ""}</button>`;
+          return `<button type="button" data-fsbb-cell data-row="${cell.row}" data-col="${cell.col}" data-status="${cell.status}"${cell.est ? " data-est" : ""}${cell.pending ? " data-pending" : ""} aria-expanded="false" aria-label="${esc(label)}" class="${CELL_BOX} ${FSBB_STYLE[cell.status]} ${cell.est ? "border-dashed" : ""} flex flex-col items-center justify-start gap-0.5 text-center hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-cyan-300"><span class="text-3xl font-black leading-none" aria-hidden="true">${FSBB_ICON[cell.status]}</span><span class="text-[12px] font-semibold leading-tight">${esc(cell.line1)}</span>${cell.line2 ? `<span class="text-[11px] leading-tight opacity-90">${esc(cell.line2)}</span>` : ""}${cell.est ? '<span class="text-[10px] uppercase tracking-wide opacity-80">est.</span>' : ""}</button>`;
         };
 
         const fsbbTableHtml = (grid) => {
@@ -5696,19 +5714,24 @@
           const here = cell.row === g.r0;
           const change = fsbbChangeLine(real.cfg);
           const nTxt = fsbbCourses(real.n, col.ids.length);
+          // Short status line first; the route onto a lower row is its own line.
           let headline;
           if (real.status === "open")
             headline = here
               ? `You already qualify for ${nTxt === "Eligible" ? "this" : nTxt} now. Nothing to change.`
-              : `Easiest way in: ${change || "no change"}. This opens ${nTxt === "Eligible" ? "this pathway" : nTxt}.`;
+              : `Still eligible on this row: ${nTxt === "Eligible" ? "this pathway" : nTxt}.`;
           else if (real.status === "close")
             headline = here
               ? `Almost there: ${real.line1}${real.line2 ? `, ${real.line2}` : ""}.`
-              : `Almost there. Take ${change || "this mix"}, then ${real.line1}.`;
+              : `Almost there on this row: ${real.line1}.`;
           else
             headline = here
               ? `Needs more work: ${real.line1}${real.line2 ? `, ${real.line2}` : ""}.`
-              : `Needs more work even with ${change || "this mix"}: ${real.line1}.`;
+              : `Still needs more work on this row: ${real.line1}.`;
+          const routeHtml =
+            !here && change
+              ? `<p data-fsbb-route class="text-sm text-slate-100 mt-2"><span class="font-semibold">To be on this row:</span> ${esc(change)}</p>`
+              : "";
           const tone = {
             open: "text-emerald-300",
             close: "text-sky-300",
@@ -5723,7 +5746,7 @@
             )
             .join("");
           const eitherHtml = either.length
-            ? `<li data-advice="EITHER" class="rounded border border-slate-700 bg-slate-900/40 px-3 py-2"><span class="inline-block w-16 text-center text-[11px] font-bold rounded px-1.5 py-1 ${ACTION_STYLE.EITHER}">EITHER</span> <span class="font-semibold text-slate-100">${esc(either.map((a) => a.name).join(", "))}</span><span class="block text-sm text-slate-300 mt-1">Not needed for this. Moving ${either.length === 1 ? "it" : "them"} down closes nothing.</span></li>`
+            ? `<li data-advice="EITHER" class="rounded border border-slate-700 bg-slate-900/40 px-3 py-2"><span class="inline-block w-16 text-center text-[11px] font-bold rounded px-1.5 py-1 ${ACTION_STYLE.EITHER}">EITHER</span> <span class="font-semibold text-slate-100">${esc(either.map((a) => a.name).join(", "))}</span><span class="block text-sm text-slate-300 mt-1">Not needed for this. Moving ${either.length === 1 ? "it" : "them"} down closes no pathway.</span></li>`
             : "";
           const warnHtml = exp.warnings.length
             ? `<ul data-warnings class="mt-3 space-y-1">${exp.warnings.map((w) => `<li class="text-sm text-amber-300">⚠ ${esc(w)}</li>`).join("")}</ul>`
@@ -5732,7 +5755,7 @@
             ? '<p class="text-xs text-slate-400 mt-2">Estimate: grades at a higher level are guessed from your current grades.</p>'
             : "";
           const courses = fsbbCourseListHtml(adv, col.ids, here);
-          box.innerHTML = `<div class="flex items-start justify-between gap-3"><div><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">${esc(col.label)} · with ${esc(rowName)}</p><p data-fsbb-headline class="text-base sm:text-lg font-bold mt-1 ${tone}"><span aria-hidden="true">${FSBB_ICON[real.status]}</span> ${esc(headline)}</p></div><button type="button" data-fsbb-close class="shrink-0 text-sm px-3 min-h-[44px] sm:min-h-[36px] rounded-full border border-slate-500 text-slate-200 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400">Close</button></div>${estNote}<p class="text-sm font-semibold text-slate-100 mt-4">What to do with each subject</p><ul class="mt-2 space-y-1.5">${rowsHtml}${eitherHtml}</ul>${warnHtml}<p class="text-sm font-semibold text-slate-100 mt-5">Courses in this column (${col.ids.length})</p><p class="text-xs text-slate-400 mb-2">Tap a course to see exactly what it takes.</p><div id="fsbbCourses">${courses}</div>`;
+          box.innerHTML = `<div class="flex items-start justify-between gap-3"><div><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">${esc(col.label)} · with ${esc(rowName)}</p><p data-fsbb-headline class="text-base sm:text-lg font-bold mt-1 ${tone}"><span aria-hidden="true">${FSBB_ICON[real.status]}</span> ${esc(headline)}</p>${routeHtml}</div><button type="button" data-fsbb-close class="shrink-0 text-sm px-3 min-h-[44px] sm:min-h-[36px] rounded-full border border-slate-500 text-slate-200 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400">Close</button></div>${estNote}<p class="text-sm font-semibold text-slate-100 mt-4">What to do with each subject</p><ul class="mt-2 space-y-1.5">${rowsHtml}${eitherHtml}</ul>${warnHtml}<p class="text-sm font-semibold text-slate-100 mt-5">Courses in this column (${col.ids.length})</p><p class="text-xs text-slate-400 mb-2">Tap a course to see exactly what it takes.</p><div id="fsbbCourses">${courses}</div>`;
           box.classList.remove("hidden");
           fsbbSyncSelection();
         }
@@ -5762,17 +5785,84 @@
           renderFsbbDetails();
           const box = resultsAdviceContainer.querySelector("#fsbbDetails");
           if (box && box.scrollIntoView)
-            box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            box.scrollIntoView({ behavior: "smooth", block: "start" });
         });
         document.addEventListener("keydown", (e) => {
           if (e.key === "Escape" && fsbbView.row !== null) fsbbCloseDetails();
         });
+        // "See where you can go": jump from the subject list to the table,
+        // and move keyboard focus with it.
+        document.getElementById("jumpToPlan").addEventListener("click", (e) => {
+          e.preventDefault();
+          resultsAdviceSection.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+          document.getElementById("actionPlanTitle").focus({
+            preventScroll: true,
+          });
+        });
+
+        const fsbbFillState = { token: 0 };
+        // Boxes on a lower row that need the full advice engine to name their
+        // marks route are drawn first with interim wording, then filled in one
+        // box per tick so the page stays responsive.
+        function fsbbFillPending(grid) {
+          const token = ++fsbbFillState.token;
+          const todo = grid.rows
+            .flat()
+            .filter((c) => c.pending && c.of === undefined);
+          const cache = new Map();
+          const next = () => {
+            if (token !== fsbbFillState.token) return;
+            const cell = todo.shift();
+            if (!cell) return;
+            const cfg = cell.cfg;
+            if (!cache.has(cfg.key))
+              cache.set(cfg.key, buildResultsAdvice(cfg.subjects));
+            const steps = cache
+              .get(cfg.key)
+              .staircase.flatMap((tr) => tr.steps)
+              .filter((s) => cell.ids.includes(s.id));
+            const sum = fsbbStepSummary(steps, false);
+            cell.line1 = sum.line1;
+            cell.stepId = sum.stepId;
+            cell.pending = false;
+            grid.rows.flat().forEach((c) => {
+              if (c.of !== undefined && grid.rows[c.row][c.of] === cell) {
+                c.line1 = cell.line1;
+                c.pending = false;
+              }
+            });
+            // Redraw the table, keeping scroll position and focus.
+            const scroll = resultsAdviceContainer.querySelector("#fsbbScroll");
+            if (scroll) {
+              const left = scroll.scrollLeft;
+              const a = document.activeElement;
+              const keep =
+                a && a.dataset && a.dataset.fsbbCell !== undefined
+                  ? `[data-fsbb-cell][data-row="${a.dataset.row}"][data-col="${a.dataset.col}"]`
+                  : null;
+              scroll.outerHTML = fsbbTableHtml(grid);
+              const fresh = resultsAdviceContainer.querySelector("#fsbbScroll");
+              if (fresh) fresh.scrollLeft = left;
+              if (keep) {
+                const el = resultsAdviceContainer.querySelector(keep);
+                if (el) el.focus({ preventScroll: true });
+              }
+              fsbbSyncSelection();
+            }
+            setTimeout(next, 0);
+          };
+          setTimeout(next, 0);
+        }
 
         function renderResultsAdvice() {
           if (studentSubjects.length === 0) {
             resultsAdviceSection.classList.add("hidden");
             resultsAdviceContainer.innerHTML = "";
             fsbbState.grid = null;
+            fsbbFillState.token++;
             fsbbView.row = null;
             fsbbView.col = null;
             return;
@@ -5785,7 +5875,7 @@
             grid.r0 === null
               ? '<p data-fsbb-note class="text-sm text-amber-300 mb-3">Add at least 4 subjects to see which pathways each mix can reach.</p>'
               : "";
-          resultsAdviceContainer.innerHTML = `<div class="rounded-lg border border-cyan-700 bg-cyan-900/30 p-3 mb-4 text-sm sm:text-base text-slate-100"><strong>Aim for the highest level you can manage.</strong> Moving down a row closes the pathways on the right.</div>${note}${fsbbLegendHtml()}${fsbbTableHtml(grid)}<p class="text-xs text-slate-400 mt-2">${grid.r0 === null ? "" : "Tap any coloured box to see how. "}<span class="sm:hidden">Swipe the table sideways to see every pathway.</span></p><div id="fsbbDetails" class="hidden mt-4 rounded-xl border border-cyan-500/60 bg-slate-900/60 p-4" role="region" aria-live="polite" aria-label="How to reach this pathway"></div>`;
+          resultsAdviceContainer.innerHTML = `<div class="rounded-lg border border-cyan-700 bg-cyan-900/30 p-3 mb-4 text-sm sm:text-base text-slate-100"><strong>Aim for the highest level you can manage.</strong> Moving down a row closes the pathways on the right.</div>${note}${fsbbLegendHtml()}${fsbbTableHtml(grid)}${grid.rows.some((row) => row.some((c) => c.est)) ? '<p data-fsbb-est class="text-xs text-slate-300 mt-2">Dashed boxes marked EST. are estimates: we guess your grade if you took a subject at a higher level.</p>' : ""}<p class="text-xs text-slate-400 mt-2">${grid.r0 === null ? "" : "Tap any coloured box to see how. "}<span class="sm:hidden">Swipe the table sideways to see every pathway.</span></p><div id="fsbbDetails" class="hidden scroll-mt-4 mt-4 rounded-xl border border-cyan-500/60 bg-slate-900/60 p-4" role="region" aria-live="polite" aria-label="How to reach this pathway"></div>`;
           if (fsbbView.row !== null) {
             const c =
               grid.rows[fsbbView.row] && grid.rows[fsbbView.row][fsbbView.col];
@@ -5795,6 +5885,7 @@
             }
           }
           renderFsbbDetails();
+          fsbbFillPending(grid);
         }
 
         function checkEligibility() {

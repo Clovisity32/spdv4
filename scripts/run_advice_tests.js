@@ -1107,11 +1107,15 @@ async function advise(page, subjects) {
     // a lower row: the route is spelled out
     await page.click('[data-fsbb-cell][data-row="1"][data-col="0"]');
     const lowerHead = await page.textContent("[data-fsbb-headline]");
+    const lowerRoute = await page.textContent("[data-fsbb-route]");
     ok(
-      /G3→G[12]|Drop/.test(lowerHead) &&
+      /G3→G[12]|Drop/.test(lowerRoute) &&
+        lowerRoute.startsWith("To be on this row:") &&
+        lowerHead.length < 90 &&
+        !/G3→G/.test(lowerHead) &&
         (await page.$$("#fsbbDetails [data-advice]")).length >= 1,
       "P10-U9",
-      `A lower row spells out the route in plain words (${lowerHead.trim().slice(0, 70)})`,
+      `A lower row keeps the status line short and gives the route on its own line (${lowerRoute.trim().slice(0, 60)})`,
     );
     // quick-win lines, plain ITE names
     const winCount = await page.evaluate(
@@ -1151,6 +1155,51 @@ async function advise(page, subjects) {
       )),
       "P10-U12",
       "No horizontal page scroll at 390px with the details open",
+    );
+    // Far-off boxes: marks route filled in after the first draw
+    await page
+      .waitForFunction(() => !document.querySelector("[data-pending]"), null, {
+        timeout: 15000,
+      })
+      .catch(() => {});
+    const farTexts = await page.$$eval(
+      '[data-fsbb-cell][data-status="further"]',
+      (bs) => bs.map((b) => b.innerText.replace(/\s+/g, " ").trim()),
+    );
+    ok(
+      (await page.$$("[data-pending]")).length === 0 &&
+        farTexts.length > 0 &&
+        farTexts.every(
+          (t) =>
+            /\+\d+ marks?/.test(t) ||
+            /Marks alone won't be enough/.test(t) ||
+            /Aggregate \d+/.test(t),
+        ) &&
+        !farTexts.some((t) => /different subjects or levels/.test(t)),
+      "P10-U16",
+      `Every 'needs more work' box names the marks it needs, or says marks alone won't be enough (${farTexts.length} boxes, e.g. ${farTexts[farTexts.length - 1]})`,
+    );
+    // "See where you can go" jump button under the subject list
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.click("#jumpToPlan");
+    await page.waitForTimeout(900);
+    ok(
+      (await page.evaluate(() => {
+        const r = document
+          .querySelector("#resultsAdviceSection")
+          .getBoundingClientRect();
+        return r.top < window.innerHeight * 0.5 && r.bottom > 0;
+      })) &&
+        (await page.evaluate(
+          () => document.activeElement && document.activeElement.id,
+        )) === "actionPlanTitle",
+      "P10-U14",
+      "The 'See where you can go' button scrolls to Your Action Plan and moves focus there",
+    );
+    ok(
+      (await page.$("[data-fsbb-est]")) === null,
+      "P10-U15",
+      "No estimate note when the student is on the top row",
     );
     ok(
       (await page.$("#resultsExplorerContainer")) === null &&
