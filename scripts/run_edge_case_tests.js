@@ -102,26 +102,17 @@ async function getGroupOrder(page) {
   });
 }
 
-/** Extract quick-win suggestions (one-grade improvements) from the pathway explorer. */
+/** Extract quick-win suggestions (one-grade improvements) from the page. */
 async function getSuggestions(page) {
   await page.waitForTimeout(600);
-  return page.evaluate(() => {
-    const bySug = new Map();
-    document
-      .querySelectorAll("#resultsExplorerContainer [data-qw]")
-      .forEach((el) => {
-        const key = `${el.dataset.subject}|${el.dataset.from}|${el.dataset.to}`;
-        if (!bySug.has(key))
-          bySug.set(key, {
-            subject: el.dataset.subject,
-            fromGrade: el.dataset.from,
-            toGrade: el.dataset.to,
-            pathways: [],
-          });
-        bySug.get(key).pathways.push(el.closest("[data-pw]").dataset.name);
-      });
-    return [...bySug.values()];
-  });
+  return page.evaluate(() =>
+    window.__spdTest.quickWins().map((w) => ({
+      subject: w.subject,
+      fromGrade: w.from,
+      toGrade: w.to,
+      pathways: w.unlocked,
+    })),
+  );
 }
 
 function ok(cond, id, msg) {

@@ -598,129 +598,7 @@ async function advise(page, subjects) {
       `invariants hold (${result.slice(0, 3).join("; ") || "none violated"})`,
     );
 
-    console.log("\nPhase 8: Action Plan UI (explorer filters, rows, mobile)");
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(FILE_URL, { waitUntil: "domcontentloaded" });
-    await page.selectOption("#school", SCHOOL);
-    await page.waitForTimeout(300);
-    for (const [id, lvl, grd, raw] of [
-      ["EL", "G3", "B3", "69"],
-      ["MT", "G3", "C6", "50"],
-      ["MATH", "G3", "F9", "31"],
-      ["COMB_SCI", "G3", "D7", "47"],
-      ["COMB_HUM", "G3", "E8", "43"],
-      ["POA", "G3", "F9", "38"],
-    ]) {
-      await page.selectOption("#subject", id);
-      await page.waitForTimeout(200);
-      await page.selectOption("#level", lvl);
-      await page.waitForTimeout(200);
-      await page.selectOption("#grade", grd);
-      await page.fill("#rawMark", raw);
-      await page.click("#addUpdateSubjectBtn");
-      await page.waitForTimeout(350);
-    }
-    const ROWS = "#resultsExplorerContainer details[data-pw]";
-    const visible = () =>
-      page.$$eval(ROWS, (rs) =>
-        rs
-          .filter((r) => !r.classList.contains("hidden"))
-          .map((r) => ({ g: r.dataset.group, s: r.dataset.status })),
-      );
-    const pick = (filter, value) =>
-      page.click(`[data-filter="${filter}"][data-value="${value}"]`);
-    ok(
-      (await page.$$(ROWS)).length === 17,
-      "P8-1",
-      "Explorer lists all 17 pathways, open or not",
-    );
-    await pick("status", "further");
-    let vis = await visible();
-    ok(
-      vis.length === 11 && vis.every((r) => r.s === "further"),
-      "P8-2",
-      `Status filter "Needs more work" shows only those rows (${vis.length})`,
-    );
-    await pick("status", "all");
-    await pick("group", "JC/MI");
-    vis = await visible();
-    ok(
-      vis.length === 2 && vis.every((r) => r.g === "JC/MI"),
-      "P8-3",
-      `Group filter JC/MI shows only JC and MI (${vis.length})`,
-    );
-    ok(
-      (await page.$$eval(
-        "#resultsExplorerContainer [data-gblock]",
-        (bs) => bs.filter((b) => !b.classList.contains("hidden")).length,
-      )) === 1,
-      "P8-3b",
-      "Filtering to one group hides the other stair steps",
-    );
-    await pick("group", "all");
-    const groupSeq = await page.$$eval(ROWS, (rs) => [
-      ...new Set(rs.map((r) => r.dataset.group)),
-    ]);
-    ok(
-      groupSeq[0] === "JC/MI" &&
-        groupSeq[groupSeq.length - 1] === "ITE 3-Year Higher Nitec" &&
-        groupSeq.length === 5,
-      "P8-3c",
-      `Cards run in pathway order, JC/MI first and ITE 3-Year last (${groupSeq.join(" > ")})`,
-    );
-    await pick("group", "JC/MI");
-    await pick("status", "open");
-    ok(
-      (await visible()).length === 0 &&
-        (await page.isVisible("#explorerEmpty")),
-      "P8-4",
-      "Filters with no match show a friendly empty message",
-    );
-    await pick("group", "all");
-    await pick("status", "all");
-    await page
-      .locator(`${ROWS}[data-group="JC/MI"]`)
-      .first()
-      .locator("summary")
-      .click();
-    const jcBody = await page
-      .locator(`${ROWS}[data-group="JC/MI"]`)
-      .first()
-      .innerText();
-    ok(
-      /subject/i.test(jcBody) && /need/i.test(jcBody) && /marks/i.test(jcBody),
-      "P8-5",
-      "An out-of-reach pathway expands to a Subject / Now / Need / Marks table",
-    );
-    await pick("status", "quick");
-    vis = await visible();
-    ok(
-      vis.length > 0 &&
-        (await page.$$eval(`${ROWS}:not(.hidden)`, (rs) =>
-          rs.every(
-            (r) => r.dataset.quick === "1" && r.querySelector("[data-qw]"),
-          ),
-        )),
-      "P8-6",
-      `Quick wins filter shows only rows a single grade can open, each naming the grade change (${vis.length})`,
-    );
-    ok(
-      (await page.$("#improvementSuggestionsSection")) === null,
-      "P8-6b",
-      "No separate Improvement Suggestions block remains",
-    );
-    await pick("status", "all");
-    ok(
-      !(await page.evaluate(
-        () => document.documentElement.scrollWidth > window.innerWidth,
-      )),
-      "P8-7",
-      "No horizontal page scroll at 390px wide",
-    );
-
-    console.log(
-      "\nPhase 9: Suggested plan choices, practical check, coherence",
-    );
+    console.log("\nPhase 9: Advice engine choices, practical check, coherence");
     const W6 = [
       S("EL", "G3", "B3", 69),
       S("MT", "G3", "C6", 50),
@@ -910,147 +788,376 @@ async function advise(page, subjects) {
       "Weak subjects within a few marks of the next grade are still suggested",
     );
 
-    // ---- UI: choices, selection, custom mix, badges ----
-    const recKey = a6.recommended.key;
-    const pressed = () =>
-      page.$$eval("#resultsAdviceContainer [data-choice]", (bs) =>
-        bs
-          .filter((b) => b.getAttribute("aria-pressed") === "true")
-          .map((b) => b.dataset.choice),
+    console.log("\nPhase 10: FSBB table (rows, colours, details, drop rules)");
+    const fsbbOf = (subs) =>
+      page.evaluate(
+        ([s, school]) => window.__spdTest.fsbb(s, school),
+        [subs, SCHOOL],
       );
-    const panelText = () => page.textContent("#planPanel");
-    const applicable = a6.choices.filter((c) => c.applicable);
+    const explainOf = (subs, row, col) =>
+      page.evaluate(
+        ([s, r, c, school]) => window.__spdTest.fsbbExplain(s, r, c, school),
+        [subs, row, col, SCHOOL],
+      );
+    const rowOf = (subs) =>
+      page.evaluate((s) => window.__spdTest.fsbbRow(s), subs);
+    const g1 = (id) => S(id, "G1", "B");
     ok(
-      (await page.$$("#resultsAdviceContainer [data-choice]")).length ===
-        applicable.length &&
-        (await page.$$("#resultsAdviceContainer [data-choice-na]")).length ===
-          4 - applicable.length,
-      "P9-U1",
-      "Applicable choices are buttons; the others are shown greyed with a reason",
+      (await rowOf([...W6])) === 0 &&
+        (await rowOf([
+          S("EL", "G3", "B3"),
+          S("MATH", "G3", "B3"),
+          S("MT", "G3", "B3"),
+          S("HIST", "G3", "B3"),
+          S("BIO", "G2", "2"),
+          S("POA", "G2", "2"),
+        ])) === 1 &&
+        (await rowOf([
+          S("EL", "G2", "2"),
+          S("MATH", "G2", "2"),
+          S("MT", "G2", "2"),
+          S("HIST", "G2", "2"),
+          S("POA", "G2", "2"),
+        ])) === 2 &&
+        (await rowOf([g1("EL"), g1("MATH"), g1("MT"), g1("HIST")])) === 3 &&
+        (await rowOf([S("EL", "G3", "B3"), S("MATH", "G3", "B3")])) === null,
+      "P10-1",
+      "A student's row: 5+ G3 → 5 G3; 4 G3 + a 5th at G3/G2 → 4 G3 + 1 G2; 5 at G2 or above → 5 G2; 4 subjects → 4 G1; fewer than 4 → none",
     );
+
+    const gW6 = await fsbbOf(W6);
+    const flatSteps = (x) => x.staircase.flatMap((t) => t.steps);
+    const stW6 = flatSteps(a6);
+    const COLS_IDS = gW6.rows[0].map((c) => c.ids);
     ok(
-      (await pressed()).join() === recKey &&
-        (await panelText()).includes(`Choice ${recKey}`) &&
-        (await panelText()).includes("Does this plan make sense?") &&
-        (await page.$("[data-before]")) !== null,
-      "P9-U2",
-      `The suggested choice (${recKey}) is pre-selected, with next steps, practical check and 'Before you decide'`,
+      gW6.r0 === 0 &&
+        gW6.rows[0].every((c, ci) => {
+          const steps = stW6.filter((s) => COLS_IDS[ci].includes(s.id));
+          return (
+            (c.status === "open") === steps.some((s) => s.status === "open")
+          );
+        }),
+      "P10-2",
+      "Your row's ✓ boxes match the pathways open today (same engine as before)",
     );
-    let badgesOk = true;
-    for (const c of applicable) {
-      await page.click(`[data-choice="${c.key}"]`);
-      const got = await page.$$eval(ROWS, (rs) => ({
-        gain: rs
-          .filter((r) => r.dataset.plan === "gain")
-          .map((r) => r.dataset.id),
-        lose: rs
-          .filter((r) => r.dataset.plan === "lose")
-          .map((r) => r.dataset.id),
-      }));
-      const same = (x, y) => [...x].sort().join() === [...y].sort().join();
-      if (
-        (await pressed()).join() !== c.key ||
-        !(await panelText()).includes(`Choice ${c.key}`) ||
-        !same(got.gain, c.gainedIds) ||
-        !same(got.lose, c.lostIds)
-      )
-        badgesOk = false;
+
+    // soundness: every ✓ on a changed mix is truly eligible for that mix
+    let sound = true;
+    let soundDetail = "";
+    const profiles10 = [W6, STRONG, WEAK3_OF_5, THREE_FAIL_5, WEAK_UNUSED];
+    const grids10 = [];
+    for (const p of profiles10) grids10.push(await fsbbOf(p));
+    for (const g of grids10) {
+      for (const row of g.rows)
+        for (const c of row) {
+          if (c.status !== "open" || c.mirror || !c.subjects) continue;
+          const res = await page.evaluate(
+            (s) => window.__spdTest.calculate(s, 0),
+            c.subjects,
+          );
+          if (!res.some((p) => p.isEligible && c.ids.includes(p.id))) {
+            sound = false;
+            soundDetail = `${c.key} row ${c.row}`;
+          }
+        }
     }
     ok(
-      badgesOk,
-      "P9-U3",
-      "Selecting each choice swaps the panel, and explorer badges match exactly what it opens / closes",
+      sound,
+      "P10-3",
+      `No ✓ box is wrong: each one is eligible under the mix it describes (${soundDetail || "all checked"})`,
     );
-    const dChoice = a6.choices[3];
-    await page.click('[data-choice="D"]');
-    const stepItems = await page.$$eval("#planPanel ol > li", (ls) =>
-      ls.map((l) => l.firstChild.textContent),
+    const MATRIX10 = [
+      [1, 1, 1, 1, 1, 1],
+      [1, 1, 1, 1, 0, 0],
+      [1, 1, 1, 0, 0, 0],
+      [1, 1, 0, 0, 0, 0],
+    ];
+    ok(
+      grids10.every(
+        (g) =>
+          g.rows.every((row, r) =>
+            row.every(
+              (c, ci) => (c.status === "na") === (MATRIX10[r][ci] === 0),
+            ),
+          ) && g.rows[3][1].status === g.rows[3][0].status,
+      ),
+      "P10-4",
+      "Grey boxes are exactly the poster's grey boxes; 4 G1 under 2-Year mirrors 3-Year",
     );
     ok(
-      dChoice.stepList.length > 1 &&
-        (await page.$$eval(
-          "#planPanel [data-step-list] li",
-          (l) => l.length,
-        )) === dChoice.stepList.length &&
-        stepItems.every((t) => t.split(/\s+/).length <= 12),
-      "P9-U3b",
-      `Choice D lists each lowered subject on its own line (${dChoice.stepList.length}); every step lead-in is 12 words or fewer`,
+      grids10.every((g) =>
+        g.rows
+          .flat()
+          .filter((c) => c.status !== "na" && c.status !== "info")
+          .every(
+            (c) =>
+              !/Long-term|Open now|Lower |lower /.test(
+                `${c.line1} ${c.line2}`,
+              ) &&
+              (c.line2 === "" ||
+                c.row === g.r0 ||
+                /G[123]→G[123]|Drop|3-Year/.test(c.line2) ||
+                c.mirror),
+          ),
+      ),
+      "P10-5",
+      "Box text never says 'Long-term', 'Open now' or 'lower POA'; level changes read like 'POA G3→G2'",
     );
-    const shownText =
-      (await page.textContent("#resultsAdviceContainer")) +
-      (await page.$$eval(`${ROWS} summary`, (s) =>
-        s.map((x) => x.textContent).join(" "),
-      ));
+
+    // drop rules
+    const dropsOk = (g, n) =>
+      g.rows
+        .flat()
+        .every(
+          (c) => c.dropped.length <= 1 && (n > 5 || c.dropped.length === 0),
+        );
     ok(
-      !shownText.includes("MER (") &&
-        shownText.includes("ITE Higher Nitec: pass") &&
-        (await page.$$eval(ROWS, (rs) =>
-          rs.some((r) => r.dataset.name.startsWith("MER (")),
-        )),
-      "P9-U3c",
-      "Action Plan shows plain ITE route names, while data names stay unchanged",
+      dropsOk(grids10[2], WEAK3_OF_5.length) &&
+        dropsOk(grids10[3], THREE_FAIL_5.length) &&
+        dropsOk(grids10[0], W6.length) &&
+        dropsOk(grids10[4], WEAK_UNUSED.length),
+      "P10-6",
+      "At most one drop, and never when the student has only 5 subjects",
     );
-    // Try your own mix
-    await page.click("#customDetails summary");
-    await page.click('[data-seg="MATH"][data-mode="lower"]');
-    const cm = await page.evaluate(
-      ([s]) => window.__spdTest.evalCustom(s, { MATH: "lower" }, "School A"),
-      [W6],
-    );
-    const live = await page.innerText("#customLive");
+    const ex5 = [];
+    for (const r of [0, 1, 2, 3])
+      for (const c of [0, 1]) {
+        const e = await explainOf(WEAK3_OF_5, r, c);
+        ex5.push(...e.advice.map((a) => a.action));
+      }
+    const ex6 = await explainOf(WEAK_UNUSED, 0, 0);
     ok(
-      live.startsWith(`${cm.count} pathway`) &&
-        (await panelText()).includes("Your own mix"),
-      "P9-U4",
-      `Lowering one subject updates the live count (${live}) and the panel`,
+      !ex5.includes("DROP") &&
+        ex6.advice.filter((a) => a.action === "DROP").length <= 1 &&
+        (ex6.advice.filter((a) => a.action === "DROP").length === 0 ||
+          ex6.advice
+            .filter((a) => a.action === "DROP")
+            .every((a) => a.id !== "EL" && a.id !== "MATH")),
+      "P10-7",
+      "Advice never says DROP with 5 subjects; with 6 it drops at most one, and never English or Maths",
     );
-    await page.click('[data-seg="POA"][data-mode="drop"]');
-    const dropDisabled = await page.$eval(
-      '[data-seg="EL"][data-mode="drop"]',
-      (b) => b.disabled,
-    );
-    await page.click('[data-seg="POA"][data-mode="keep"]');
-    const dropBack = await page.$eval(
-      '[data-seg="EL"][data-mode="drop"]',
-      (b) => b.disabled,
-    );
+    // close-to-next-grade warning (every subject sits 5 marks below the next grade)
+    const NEAR = [
+      S("EL", "G3", "B3", 65),
+      S("MATH", "G3", "C6", 50),
+      S("MT", "G3", "D7", 45),
+      S("COMB_SCI", "G3", "D7", 45),
+      S("COMB_HUM", "G3", "E8", 40),
+      S("POA", "G3", "E8", 40),
+    ];
+    const gNear = await fsbbOf(NEAR);
+    let warnOk = true;
+    let warnChecked = 0;
+    for (const row of gNear.rows.slice(1))
+      for (const c of row) {
+        if (
+          (c.status !== "open" &&
+            c.status !== "close" &&
+            c.status !== "further") ||
+          c.mirror
+        )
+          continue;
+        const down = c.moves.filter((m) => !m.up).length + c.dropped.length;
+        if (!down) continue;
+        const e = await explainOf(NEAR, c.row, c.col);
+        warnChecked++;
+        if (e.warnings.filter((w) => /marks? from/.test(w)).length !== down)
+          warnOk = false;
+      }
     ok(
-      dropDisabled && !dropBack,
-      "P9-U5",
-      "Drop is disabled once only 5 subjects remain, and re-enabled when one is kept",
+      warnOk && warnChecked > 0,
+      "P10-8",
+      `A subject within 5 marks of the next grade gets a 'staying may be realistic' warning when a route moves or drops it (${warnChecked} routes)`,
     );
-    await page.click("[data-reset]");
+    const MIXED = [
+      S("EL", "G3", "C5", 55),
+      S("MATH", "G3", "C6", 52),
+      S("MT", "G3", "C6", 50),
+      S("COMB_SCI", "G3", "D7", 47),
+      S("COMB_HUM", "G2", "2", 72),
+      S("POA", "G2", "3", 66),
+    ];
+    const gMixed = await fsbbOf(MIXED);
     ok(
-      (await pressed()).join() === recKey &&
-        (await page.innerText("#customLive")).startsWith("Pick Keep") &&
-        (await page.$("[data-reset]")) === null,
-      "P9-U6",
-      "'Reset to suggested' restores the suggested choice and clears the mix",
-    );
-    const notes = await page.$$eval("[data-plan-note]", (ns) =>
-      ns.map((n) => ({ k: n.dataset.planNote, t: n.textContent })),
-    );
-    ok(
-      notes.length > 0 &&
-        notes.every(
-          (n) =>
-            ["part", "different", "not"].includes(n.k) &&
-            (n.k !== "part" || n.t.includes(`choice ${recKey}`)) &&
-            (n.k !== "different" || n.t.includes("instead of")),
+      gMixed.r0 === 1 &&
+        gMixed.rows[0].every(
+          (c) => c.status === "na" || c.status === "info" || c.est === true,
         ),
-      "P9-U7",
-      `Level-change pathways say how they relate to the suggested plan (${notes.length} notes)`,
+      "P10-9",
+      "A student on 4 G3 + 1 G2 sees the 5 G3 row marked as an estimate",
     );
-    await page.click(
-      `[data-choice="${applicable[applicable.length - 1].key}"]`,
+    ok(
+      gW6.ms < 2500,
+      "P10-10",
+      `The table builds quickly (${Math.round(gW6.ms)} ms including the advice engine)`,
     );
-    await page.locator("[data-before] summary").click();
+
+    // ---- UI ----
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(FILE_URL, { waitUntil: "domcontentloaded" });
+    await page.selectOption("#school", SCHOOL);
+    await page.waitForTimeout(300);
+    for (const [id, lvl, grd, raw] of [
+      ["EL", "G3", "B3", "69"],
+      ["MT", "G3", "C6", "50"],
+      ["MATH", "G3", "F9", "31"],
+      ["COMB_SCI", "G3", "D7", "47"],
+      ["COMB_HUM", "G3", "E8", "43"],
+      ["POA", "G3", "F9", "38"],
+    ]) {
+      await page.selectOption("#subject", id);
+      await page.waitForTimeout(200);
+      await page.selectOption("#level", lvl);
+      await page.waitForTimeout(200);
+      await page.selectOption("#grade", grd);
+      await page.fill("#rawMark", raw);
+      await page.click("#addUpdateSubjectBtn");
+      await page.waitForTimeout(350);
+    }
+    const heads = await page.$$eval("[data-fsbb-col]", (bs) =>
+      bs.map((b) => b.innerText.trim().replace(/\s+/g, " ")),
+    );
+    const tableText = await page.textContent("#resultsAdviceSection");
+    ok(
+      heads.length === 6 &&
+        heads[0].startsWith("3-Year") &&
+        heads[1].startsWith("2-Year") &&
+        heads[2].startsWith("Polytechnic Foundation") &&
+        heads[3] === "Polytechnic Year 1" &&
+        heads[4] === "Millennia Institute" &&
+        heads[5] === "Junior College" &&
+        !/NAFA|Arts Institution/i.test(tableText),
+      "P10-U1",
+      `Six pathway columns in poster order, no NAFA or Arts Institutions (${heads.join(" | ")})`,
+    );
+    ok(
+      (await page.$$("[data-fsbb-na]")).length === 9 &&
+        (await page.$$eval("[data-fsbb-na]", (ns) =>
+          ns.every((n) => n.textContent.trim() === ""),
+        )) &&
+        (await page.$$("#fsbbTable tbody tr")).length === 4,
+      "P10-U2",
+      "Four rows, and the poster's 9 grey boxes are plain grey with no text",
+    );
+    ok(
+      (
+        await page.$$eval("[data-you]", (ns) =>
+          ns.map((n) => n.closest("tr").rowIndex),
+        )
+      ).join() === "2" && // thead has 2 rows → first body row is index 2
+        (await page.$eval("[data-you]", (n) => n.textContent)).includes(
+          "You are here",
+        ),
+      "P10-U3",
+      "'You are here' sits on the student's own row (5 G3)",
+    );
+    ok(
+      (await page.$$eval(
+        '#fsbbTable tbody tr:first-child [data-fsbb-cell][data-status="open"]',
+        (b) => b.length,
+      )) === gW6.rows[0].filter((c) => c.status === "open").length &&
+        (await page.$$eval("[data-fsbb-cell]", (bs) =>
+          bs.every((b) =>
+            ["open", "close", "further"].includes(b.dataset.status),
+          ),
+        )),
+      "P10-U4",
+      "Eligible / almost there / needs more work boxes are colour-coded by status and match the engine",
+    );
+    ok(
+      !(await page.isVisible("#fsbbDetails")),
+      "P10-U5",
+      "Details stay hidden until a box is tapped",
+    );
+    await page.click('[data-fsbb-cell][data-row="0"][data-col="3"]');
+    const det = await page.textContent("#fsbbDetails");
+    ok(
+      (await page.isVisible("#fsbbDetails")) &&
+        (await page.getAttribute(
+          '[data-fsbb-cell][data-row="0"][data-col="3"]',
+          "aria-expanded",
+        )) === "true" &&
+        (await page.$$("#fsbbDetails [data-advice]")).length >= 1 &&
+        (await page.$$("#fsbbCourses [data-pw]")).length === 5 &&
+        (await page.$("#fsbbCourses [data-easiest]")) !== null &&
+        /Subject/i.test(det) &&
+        /Need/i.test(det) &&
+        /Marks/i.test(det) &&
+        /Easiest way in/.test(det),
+      "P10-U6",
+      "Tapping Polytechnic Year 1 shows what to do with each subject, then its 5 courses with the easiest first",
+    );
+    await page.keyboard.press("Escape");
+    ok(
+      !(await page.isVisible("#fsbbDetails")) &&
+        (await page.getAttribute(
+          '[data-fsbb-cell][data-row="0"][data-col="3"]',
+          "aria-expanded",
+        )) === "false",
+      "P10-U7",
+      "Escape closes the details",
+    );
+    await page.click('[data-fsbb-col="5"]');
+    ok(
+      (await page.textContent("#fsbbDetails")).includes("Junior College") &&
+        (await page.$$("#fsbbCourses [data-pw]")).length === 1,
+      "P10-U8",
+      "Tapping a column heading opens that pathway for your row",
+    );
+    // a lower row: the route is spelled out
+    await page.click('[data-fsbb-cell][data-row="1"][data-col="0"]');
+    const lowerHead = await page.textContent("[data-fsbb-headline]");
+    ok(
+      /G3→G[12]|Drop/.test(lowerHead) &&
+        (await page.$$("#fsbbDetails [data-advice]")).length >= 1,
+      "P10-U9",
+      `A lower row spells out the route in plain words (${lowerHead.trim().slice(0, 70)})`,
+    );
+    // quick-win lines, plain ITE names
+    const winCount = await page.evaluate(
+      () => window.__spdTest.quickWins().length,
+    );
+    let winsSeen = 0;
+    let iteText = "";
+    let iteNames = [];
+    for (let ci = 0; ci < 6; ci++) {
+      await page.click(`[data-fsbb-col="${ci}"]`);
+      winsSeen += (await page.$$("#fsbbCourses [data-qw]")).length;
+      if (ci === 0) {
+        iteText = await page.$$eval("#fsbbCourses summary", (s) =>
+          s.map((x) => x.textContent).join(" "),
+        );
+        iteNames = await page.$$eval("#fsbbCourses [data-pw]", (rs) =>
+          rs.map((x) => x.dataset.name),
+        );
+      }
+    }
+    ok(
+      winCount === 0 || winsSeen > 0,
+      "P10-U10",
+      `Quick-win lines still appear on your row's courses (${winCount} wins, ${winsSeen} lines)`,
+    );
+    ok(
+      !iteText.includes("MER (") &&
+        iteText.includes("ITE Higher Nitec: pass") &&
+        iteNames.some((n) => n.startsWith("MER (")),
+      "P10-U11",
+      "ITE courses show plain names while data names stay unchanged",
+    );
+    await page.click('[data-fsbb-cell][data-row="1"][data-col="0"]');
     ok(
       !(await page.evaluate(
         () => document.documentElement.scrollWidth > window.innerWidth,
       )),
-      "P9-U8",
-      "No horizontal scroll at 390px with the last choice and 'Before you decide' open",
+      "P10-U12",
+      "No horizontal page scroll at 390px with the details open",
+    );
+    ok(
+      (await page.$("#resultsExplorerContainer")) === null &&
+        (await page.$("#improvementSuggestionsSection")) === null &&
+        (await page.$("[data-choice]")) === null,
+      "P10-U13",
+      "The old choice cards, custom mix and separate explorer are gone",
     );
 
     ok(

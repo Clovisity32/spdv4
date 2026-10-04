@@ -416,12 +416,10 @@
           Your Action Plan
         </h2>
         <p class="text-sm text-slate-400 mb-5">
-          See where you stand and what it would take to open more doors. Tap any
-          pathway for the exact subjects and grades.
+          The same table your school used to brief you, filled in with your own
+          results. Find your row, then tap a box to see the easiest way in.
         </p>
         <div id="resultsAdviceContainer"></div>
-
-        <div id="resultsExplorerContainer" class="mt-6"></div>
       </section>
 
       <footer class="text-center mt-12 text-sm text-slate-500">
@@ -1242,9 +1240,6 @@
         const rawMarkInput = document.getElementById("rawMark");
         const resultsAdviceSection = document.getElementById(
           "resultsAdviceSection",
-        );
-        const resultsExplorerContainer = document.getElementById(
-          "resultsExplorerContainer",
         );
         const resultsAdviceContainer = document.getElementById(
           "resultsAdviceContainer",
@@ -4861,16 +4856,10 @@
           };
         };
 
-        // ---- Suggested plan view state (kept across re-renders) ----
-        const planView = {
-          a: null,
-          sel: null, // "A".."D" or "custom"
-          rec: null,
-          custom: {},
-          customResult: null,
-          open: false, // "Before you decide" expanded
-          customOpen: false,
-        };
+        // ================= FSBB Summary table =================
+        // The MOE briefing table (rows = level mixes, columns = pathways),
+        // filled in for this student. This is a display layer: the calculation
+        // functions and conversion maps are only called, never changed.
         const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
         // Display-only plain-language names for the six ITE entry routes. The
         // data names ("MER (...)") stay as they are: eligibility cards and tests use them.
@@ -4887,399 +4876,727 @@
         ];
         const plain = (s) =>
           PLAIN_NAMES.reduce((out, [a, b]) => out.split(a).join(b), String(s));
-        const planChoice = () =>
-          planView.a
-            ? planView.a.choices.find((c) => c.key === planView.sel)
-            : null;
 
-        const checkHtml = (check) => {
-          if (!check) return "";
-          const tone = {
-            warn: ["⚠", "text-amber-300"],
-            info: ["ℹ", "text-sky-300"],
-            note: ["ℹ", "text-sky-300"],
-          };
-          const lines = check.items
-            .map((it) => {
-              const [icon, cls] = tone[it.status] || tone.note;
-              const rows = it.rows
-                ? `<ul class="mt-1 space-y-1.5">${it.rows.map((r) => `<li class="rounded border border-slate-700 bg-slate-900/40 px-3 py-2"><p class="text-slate-100">${esc(r.subject)} <span class="text-slate-400">${esc(r.now)} → ${esc(r.ifLowered)}</span></p><p class="text-xs text-slate-300">Helps a pathway: ${esc(plain(r.helps))}</p><p class="${r.consider ? "text-amber-300 font-semibold" : "text-slate-300"}">${esc(r.suggestion)}</p></li>`).join("")}</ul><p class="text-xs text-slate-400 mt-1">${esc(it.note)}</p>`
-                : "";
-              return `<div data-check="${esc(it.rule)}" class="mt-2 text-sm ${cls}"><p>${icon} ${esc(plain(it.text))}</p>${rows}</div>`;
-            })
-            .join("");
-          const ok = check.passed
-            ? `<p class="mt-2 text-sm text-emerald-300">✓ ${check.items.length ? `${plural(check.passed, "other check")} passed` : `Passes all ${check.total} checks`}</p>`
-            : "";
-          return `<div data-checks class="mt-4 border-t border-slate-700 pt-3"><p class="text-sm font-semibold text-slate-100">Does this plan make sense?</p>${lines}${ok}</div>`;
-        };
-
-        const orderHtml = (changed) => {
-          const byTier = {};
-          studentSubjects.forEach((s) => {
-            const t = getLdlTier(s.subjectId);
-            const name = subjName(s);
-            const tag = changed.dropped.includes(s.subjectId)
-              ? " (dropped)"
-              : changed.lowered.includes(s.subjectId)
-                ? " (lowered)"
-                : "";
-            (byTier[t] = byTier[t] || []).push(`${name}${tag}`);
-          });
-          const ord = ["1st", "2nd", "3rd", "Last"];
-          return `<ol class="text-sm text-slate-300 space-y-1 mt-1">${RECAL_ORDER.map(
-            (r, i) =>
-              `<li><span class="text-slate-400">${ord[i]}:</span> ${esc(r.label)}${byTier[r.tier] ? ` · <span class="text-slate-100">${esc(byTier[r.tier].join(", "))}</span>` : ""}</li>`,
-          ).join("")}</ol>`;
-        };
-
-        const beforeDecideHtml = (c) => {
-          const a = planView.a;
-          const stepText = c.steps.join(" ");
-          const alsoFree = a.freeMoves.filter(
-            (f) => !stepText.includes(f.name),
-          );
-          const heads = (c.conflicts || [])
-            .filter((x) => ["C1", "C2", "C5", "C6"].includes(x.id))
-            .map(
-              (x) =>
-                `<li><span class="font-semibold text-amber-300">${esc(plain(x.title))}.</span> ${esc(plain(x.text))}</li>`,
-            )
-            .join("");
-          return `<details data-before class="mt-3"${planView.open ? " open" : ""}><summary class="cursor-pointer text-sky-400 hover:text-sky-300 text-sm font-medium py-3">Before you decide</summary><p class="text-sm text-slate-200">Aim for the highest level you can realistically manage. Lowering a level can close pathways that need the higher level.</p><p class="text-sm font-semibold text-sky-300 mt-3">If you recalibrate, consider in this order</p>${orderHtml({ dropped: c.droppedIds || [], lowered: c.loweredIds || [] })}${c.reasons.length ? `<p class="text-sm font-semibold text-sky-300 mt-3">Why this choice</p><ul class="list-disc list-inside text-sm text-slate-300 space-y-1 mt-1">${c.reasons.map((t) => `<li>${esc(plain(t))}</li>`).join("")}</ul>` : ""}${heads ? `<p class="text-sm font-semibold text-sky-300 mt-3">Heads-up</p><ul class="list-disc list-inside text-sm text-slate-300 space-y-1 mt-1">${heads}</ul>` : ""}${alsoFree.length ? `<p class="text-sm text-emerald-300 mt-3">Also free: ${alsoFree.map((f) => esc(f.text)).join("; ")}. No pathway uses ${alsoFree.length === 1 ? "it" : "them"}.</p>` : ""}</details>`;
-        };
-
-        const resetLink = () =>
-          planView.sel !== planView.rec || planView.customResult
-            ? `<button type="button" data-reset class="text-sm text-sky-400 hover:text-sky-300 underline min-h-[44px] sm:min-h-0">Reset to suggested</button>`
-            : "";
-
-        const customPanelHtml = () => {
-          const r = planView.customResult;
-          const steps = studentSubjects
-            .filter((s) => planView.custom[s.subjectId])
-            .map((s) => {
-              const m = planView.custom[s.subjectId];
-              const d = m === "lower" ? moveDown(s) : null;
-              return m === "drop"
-                ? `Drop ${subjName(s)} (${s.level} ${s.grade}).`
-                : d
-                  ? `Take ${subjName(s)} at ${d.level} (${shortChange(d)}).`
-                  : "";
-            })
-            .filter(Boolean);
-          return `<h3 class="text-lg font-semibold text-slate-100">Your own mix</h3><ol class="list-decimal list-inside text-base font-semibold text-slate-100 space-y-1 mt-2">${steps.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>${r.gained.length ? `<p class="text-sm text-emerald-300 mt-2">Opens ${r.gained.length} more: ${esc(plain(r.gained.join(", ")))}.</p>` : ""}${checkHtml(r.check)}<div class="mt-2">${resetLink()}</div>`;
-        };
-
-        const choicePanelHtml = (c) =>
-          `<p class="text-xs font-semibold uppercase tracking-wide text-emerald-300">What to do next · Choice ${esc(c.key)}${c.isRecommended ? " ★" : ""}</p><h3 class="text-lg font-semibold text-slate-100 mt-1">${esc(c.label)}</h3><ol class="list-decimal list-inside text-base font-semibold text-slate-100 space-y-1 mt-3">${c.steps.map((t) => `<li>${esc(t)}${t.endsWith(":") && c.stepList.length ? `<ul data-step-list class="list-disc list-inside text-sm font-normal text-slate-200 ml-5 mt-1 space-y-0.5">${c.stepList.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</li>`).join("")}</ol>${c.gained.length ? `<p class="text-sm text-emerald-300 mt-2">Opens ${c.gained.length} more: ${esc(plain(c.gained.join(", ")))}.</p>` : ""}${checkHtml(c.check)}<div class="mt-2">${resetLink()}</div>${beforeDecideHtml(c)}`;
-
-        // Badges on explorer rows follow the selected choice.
-        function applyPlanBadges() {
-          const c =
-            planView.sel === "custom" ? planView.customResult : planChoice();
-          const act =
-            planView.sel === "custom"
-              ? "your mix"
-              : c && c.action
-                ? c.action
-                : "this choice";
-          resultsExplorerContainer
-            .querySelectorAll("[data-pw]")
-            .forEach((row) => {
-              const b = row.querySelector("[data-plan-badge]");
-              const id = row.dataset.id;
-              let kind = "";
-              if (c && c.gainedIds && c.gainedIds.includes(id)) kind = "gain";
-              else if (c && c.lostIds && c.lostIds.includes(id)) kind = "lose";
-              row.dataset.plan = kind;
-              if (!b) return;
-              b.textContent =
-                kind === "gain"
-                  ? "Opens with this choice"
-                  : kind === "lose"
-                    ? `Closes if you ${act}`
-                    : "";
-              b.className = `${kind ? "" : "hidden "}inline-block text-xs font-semibold rounded px-2 py-0.5 mt-1 ${kind === "gain" ? "bg-emerald-800/40 text-emerald-300" : "bg-amber-800/40 text-amber-300"}`;
-            });
-        }
-
-        // Re-sync cards, custom controls, panel and badges to planView.
-        function syncPlanView() {
-          const a = planView.a;
-          if (!a) return;
-          const hasCustom = Object.keys(planView.custom).length > 0;
-          planView.customResult = hasCustom
-            ? evaluateCustom(studentSubjects, planView.custom)
-            : null;
-          if (hasCustom) planView.sel = "custom";
-          else if (planView.sel === "custom") planView.sel = planView.rec;
-          resultsAdviceContainer
-            .querySelectorAll("[data-choice]")
-            .forEach((btn) =>
-              btn.setAttribute(
-                "aria-pressed",
-                btn.dataset.choice === planView.sel ? "true" : "false",
-              ),
-            );
-          const kept = studentSubjects.filter(
-            (s) => planView.custom[s.subjectId] !== "drop",
-          ).length;
-          resultsAdviceContainer
-            .querySelectorAll("[data-seg]")
-            .forEach((btn) => {
-              const s = studentSubjects.find(
-                (x) => x.subjectId === btn.dataset.seg,
-              );
-              const mode = planView.custom[btn.dataset.seg] || "keep";
-              const on = btn.dataset.mode === mode;
-              const off =
-                !s ||
-                (btn.dataset.mode === "lower" && !moveDown(s)) ||
-                (btn.dataset.mode === "drop" &&
-                  mode !== "drop" &&
-                  kept <= MIN_SUBJECTS_AFTER_DROP);
-              btn.disabled = off;
-              btn.setAttribute("aria-pressed", on ? "true" : "false");
-              btn.className = `${PILL_BASE} ${on ? PILL_ON : PILL_OFF}${off ? " opacity-40 cursor-not-allowed" : ""}`;
-            });
-          const live = resultsAdviceContainer.querySelector("#customLive");
-          if (live) {
-            const r = planView.customResult;
-            live.textContent = r
-              ? `${plural(r.count, "pathway")} · ${r.lost.length ? `Gives up: ${plain(r.lost.join(", "))}` : "Gives up: nothing"}`
-              : "Pick Keep, Lower or Drop for each subject to see the exact cost.";
-          }
-          const panel = resultsAdviceContainer.querySelector("#planPanel");
-          if (panel)
-            panel.innerHTML =
-              planView.sel === "custom" && planView.customResult
-                ? customPanelHtml()
-                : planChoice()
-                  ? choicePanelHtml(planChoice())
-                  : "";
-          applyPlanBadges();
-        }
-        resultsAdviceContainer.addEventListener("click", (e) => {
-          const card = e.target.closest("[data-choice]");
-          const seg = e.target.closest("[data-seg]");
-          const reset = e.target.closest("[data-reset]");
-          if (card && !card.disabled) {
-            planView.sel = card.dataset.choice;
-            planView.custom = {};
-          } else if (seg && !seg.disabled) {
-            if (seg.dataset.mode === "keep")
-              delete planView.custom[seg.dataset.seg];
-            else planView.custom[seg.dataset.seg] = seg.dataset.mode;
-          } else if (reset) {
-            planView.sel = planView.rec;
-            planView.custom = {};
-          } else return;
-          syncPlanView();
-        });
-        // toggle does not bubble, so listen in the capture phase.
-        resultsAdviceContainer.addEventListener(
-          "toggle",
-          (e) => {
-            if (e.target.matches("[data-before]"))
-              planView.open = e.target.open;
-            else if (e.target.matches("#customDetails"))
-              planView.customOpen = e.target.open;
+        // Columns in poster order (NAFA and Arts Institutions are left out).
+        const FSBB_COLS = [
+          {
+            key: "ite3",
+            label: "3-Year Higher Nitec",
+            head: ["3-Year", "Higher Nitec"],
+            group: "ITE 3-Year Higher Nitec",
           },
-          true,
+          {
+            key: "ite2",
+            label: "2-Year Higher Nitec",
+            head: ["2-Year", "Higher Nitec"],
+            group: "ITE Year 2 Higher Nitec",
+          },
+          {
+            key: "pfp",
+            label: "Polytechnic Foundation Programme (PFP)",
+            head: ["Polytechnic", "Foundation", "Programme"],
+            group: "PFP",
+          },
+          {
+            key: "poly",
+            label: "Polytechnic Year 1",
+            head: ["Polytechnic", "Year 1"],
+            group: "Polytechnic Year 1",
+          },
+          {
+            key: "mi",
+            label: "Millennia Institute",
+            head: ["Millennia", "Institute"],
+            ids: ["mi"],
+          },
+          {
+            key: "jc",
+            label: "Junior College",
+            head: ["Junior", "College"],
+            ids: ["jc"],
+          },
+        ];
+        FSBB_COLS.forEach((c) => {
+          c.ids =
+            c.ids ||
+            PATHWAYS.filter((p) => p.group === c.group).map((p) => p.id);
+        });
+        const FSBB_COL_OF_ID = {};
+        FSBB_COLS.forEach((c, i) =>
+          c.ids.forEach((id) => (FSBB_COL_OF_ID[id] = i)),
         );
+        const FSBB_ROWS = [
+          { label: "5 G3", full: "5 G3 subjects" },
+          { label: "4 G3 + 1 G2", full: "4 G3 + 1 G2 subjects" },
+          { label: "5 G2", full: "5 G2 subjects" },
+          { label: "4 G1", full: "4 G1 subjects" },
+        ];
+        // Which pathways each mix can reach (the poster's grey boxes are 0).
+        const FSBB_MATRIX = [
+          [1, 1, 1, 1, 1, 1],
+          [1, 1, 1, 1, 0, 0],
+          [1, 1, 1, 0, 0, 0],
+          [1, 1, 0, 0, 0, 0],
+        ];
 
-        // ---- Pathway explorer filter state (kept across re-renders) ----
-        const explorerFilter = { group: "all", status: "all" };
-        const PILL_BASE =
-          "text-sm px-4 min-h-[44px] sm:min-h-[36px] rounded-full border focus:outline-none focus:ring-2 focus:ring-cyan-500";
-        const PILL_OFF = "border-slate-600 text-slate-300 hover:bg-slate-700";
-        const PILL_ON = "border-cyan-500 bg-cyan-600 text-white";
+        // The poster row a set of subjects sits on (the highest row it meets).
+        const fsbbRowOf = (subjects) => {
+          const g3 = subjects.filter((s) => s.level === "G3").length;
+          const g2 = subjects.filter((s) => s.level === "G2").length;
+          if (g3 >= 5) return 0;
+          if (g3 >= 4 && g3 + g2 >= 5) return 1;
+          if (g3 + g2 >= 5) return 2;
+          if (subjects.length >= 4) return 3;
+          return null;
+        };
 
-        function applyExplorerFilter() {
-          resultsExplorerContainer
-            .querySelectorAll("[data-filter]")
-            .forEach((btn) => {
-              const on =
-                explorerFilter[btn.dataset.filter] === btn.dataset.value;
-              btn.className = `${PILL_BASE} ${on ? PILL_ON : PILL_OFF}`;
-              btn.setAttribute("aria-pressed", on ? "true" : "false");
+        // One level down / one level up. Going up is an estimate: the weakest
+        // grade at the higher level that maps to the current grade.
+        const fsbbWeakestAbove = (order, map, grade, fallback) => {
+          let pick = null;
+          order.forEach((g) => {
+            if (map[g] === grade) pick = g;
+          });
+          return pick || fallback;
+        };
+        const fsbbDown = (s) => {
+          const d = moveDown(s);
+          if (!d) return null;
+          const { moved, ...rest } = d;
+          return rest;
+        };
+        const fsbbUp = (s) => {
+          const allowed = getAllowedLevels(s.subjectId);
+          if (s.level === "G2" && allowed.includes("G3"))
+            return {
+              ...s,
+              level: "G3",
+              grade: fsbbWeakestAbove(
+                G3_GRADES_OPTIONS,
+                G3_TO_G2_CONVERSION_MAP,
+                s.grade,
+                "F9",
+              ),
+              rawMark: null,
+            };
+          if (s.level === "G1" && allowed.includes("G2"))
+            return {
+              ...s,
+              level: "G2",
+              grade: fsbbWeakestAbove(
+                G2_GRADES_OPTIONS,
+                G2_TO_G1_EQUIV_MAP,
+                s.grade,
+                "6",
+              ),
+              rawMark: null,
+            };
+          return null;
+        };
+
+        // Candidate subject mixes: lower subjects one level at a time in the
+        // usual order (electives first, English and Maths last), with every
+        // "protect this subject" and "drop this subject" variant. Rows above the
+        // student's row come from raising subjects (estimated grades).
+        const fsbbConfigs = (base, r0) => {
+          const map = new Map();
+          if (r0 === null) return [];
+          const lvl = (l) => GRADE_LEVELS.indexOf(l);
+          const orig = new Map(base.map((s) => [s.subjectId, s]));
+          const record = (subs, dropped) => {
+            const row = fsbbRowOf(subs);
+            if (row === null) return;
+            // Only a weaker subject is ever worth dropping.
+            if (dropped.some((id) => weakness(orig.get(id)) < 0.5)) return;
+            const key = subs
+              .map((s) => `${s.subjectId}:${s.level}:${s.grade}`)
+              .sort()
+              .join("|");
+            if (map.has(key)) return;
+            let changes = dropped.length;
+            let tierSum = dropped.reduce((t, id) => t + getLdlTier(id), 0);
+            const moves = [];
+            subs.forEach((s) => {
+              const o = orig.get(s.subjectId);
+              const d = lvl(s.level) - lvl(o.level);
+              if (!d) return;
+              changes += Math.abs(d);
+              tierSum += getLdlTier(s.subjectId) * Math.abs(d);
+              moves.push({
+                subjectId: s.subjectId,
+                name: subjName(s),
+                fromLevel: o.level,
+                fromGrade: o.grade,
+                toLevel: s.level,
+                toGrade: s.grade,
+                up: d < 0,
+              });
             });
-          let shown = 0;
-          resultsExplorerContainer
-            .querySelectorAll("[data-pw]")
-            .forEach((row) => {
-              const show =
-                (explorerFilter.group === "all" ||
-                  row.dataset.group === explorerFilter.group) &&
-                (explorerFilter.status === "all" ||
-                  (explorerFilter.status === "quick"
-                    ? row.dataset.quick === "1"
-                    : row.dataset.status === explorerFilter.status));
-              row.classList.toggle("hidden", !show);
-              if (show) shown++;
+            map.set(key, {
+              key,
+              subjects: subs,
+              dropped: [...dropped],
+              changes,
+              tierSum,
+              row,
+              moves,
+              est: moves.some((m) => m.up),
             });
-          resultsExplorerContainer
-            .querySelectorAll("[data-gblock]")
-            .forEach((blk) =>
-              blk.classList.toggle(
-                "hidden",
-                !blk.querySelector("[data-pw]:not(.hidden)"),
+          };
+          const walk = (start, order, step, dropped) => {
+            let cur = start;
+            for (let pass = 0; pass < 2; pass++)
+              order.forEach((id) => {
+                const i = cur.findIndex((s) => s.subjectId === id);
+                if (i < 0) return;
+                const nxt = step(cur[i]);
+                if (!nxt) return;
+                cur = cur.map((s, j) => (j === i ? nxt : s));
+                record(cur, dropped);
+              });
+          };
+          record(
+            base.map((s) => ({ ...s })),
+            [],
+          );
+          const byLow = [...base]
+            .sort(
+              (a, b) =>
+                getLdlTier(a.subjectId) - getLdlTier(b.subjectId) ||
+                weakness(b) - weakness(a),
+            )
+            .map((s) => s.subjectId);
+          const drops = [
+            null,
+            ...(base.length > MIN_SUBJECTS_AFTER_DROP
+              ? base.map((s) => s.subjectId)
+              : []),
+          ];
+          drops.forEach((d) => {
+            const list = base
+              .filter((s) => s.subjectId !== d)
+              .map((s) => ({ ...s }));
+            const dropped = d ? [d] : [];
+            if (d) record(list, dropped);
+            [null, ...list.map((s) => s.subjectId)].forEach((p) =>
+              walk(
+                list,
+                byLow.filter((id) => id !== d && id !== p),
+                fsbbDown,
+                dropped,
               ),
             );
-          const empty =
-            resultsExplorerContainer.querySelector("#explorerEmpty");
-          if (empty) empty.classList.toggle("hidden", shown > 0);
-        }
-        resultsExplorerContainer.addEventListener("click", (e) => {
-          const btn = e.target.closest("[data-filter]");
-          if (!btn) return;
-          explorerFilter[btn.dataset.filter] = btn.dataset.value;
-          applyExplorerFilter();
-        });
-
-        function renderResultsAdvice() {
-          if (studentSubjects.length === 0) {
-            resultsAdviceSection.classList.add("hidden");
-            resultsAdviceContainer.innerHTML = "";
-            resultsExplorerContainer.innerHTML = "";
-            planView.a = null;
-            planView.rec = null;
-            planView.custom = {};
-            return;
-          }
-          resultsAdviceSection.classList.remove("hidden");
-          const a = buildResultsAdvice(studentSubjects);
-          const rec = a.recommended;
-          // ---- Flatten the staircase into one list of pathways ----
-          const orderIdx = Object.fromEntries(
-            PATHWAYS.map((pw, i) => [pw.id, i]),
-          );
-          const steps = a.staircase
-            .flatMap((tr) => tr.steps.map((s) => ({ ...s, tier: tr.tier })))
-            .sort((x, y) => orderIdx[x.id] - orderIdx[y.id]);
-          const statusOf = (s) => s.status;
-          const count = (st) => a.summary[st];
-
-          // ---- 1. Where you stand ----
-          const st = a.standing;
-          const standDot = {
-            notCoping: "bg-red-400",
-            borderline: "bg-amber-400",
-            coping: "bg-emerald-400",
-          }[st.level];
-          const standText =
-            st.level === "coping"
-              ? "You are coping in all your subjects."
-              : `${st.level === "notCoping" ? "Not coping" : "Borderline"} in ${plural(st.subjects.length, "subject")}: ${st.subjects.join(", ")}`;
-          const tile = (n, label, tone) =>
-            `<div class="rounded-lg border ${tone} p-3 text-center"><p class="text-2xl font-bold text-slate-100">${esc(n)}</p><p class="text-xs text-slate-300">${esc(label)}</p></div>`;
-          const tiles = `<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">${tile(count("open"), "Open now", "border-emerald-500 bg-emerald-800/20")}${tile(count("close"), "Within reach", "border-sky-500 bg-sky-800/20")}${tile(count("lower"), "Needs a lower level", "border-amber-500 bg-amber-800/20")}${tile(count("further"), "Needs more work", "border-slate-600 bg-slate-900/40")}</div><p class="text-xs text-slate-400 mt-1">With your current subjects and levels.${a.hasAnyRawMark ? "" : " Tip: add raw marks to see exact mark targets."}</p>`;
-
-          // ---- 2. Your choices, least to most narrowing ----
-          const cardHtml = (c) => {
-            const head = `<span class="flex items-baseline justify-between gap-2"><span class="font-semibold text-slate-100">${esc(c.key)} · ${esc(c.label)}</span>${c.isRecommended ? '<span class="text-xs font-semibold text-emerald-300 shrink-0">★ Suggested</span>' : ""}</span>`;
-            if (!c.applicable)
-              return `<div data-choice-na="${esc(c.key)}" class="rounded-lg border border-slate-700 bg-slate-900/30 p-3 opacity-60">${head}<span class="block text-xs text-slate-400 mt-1">Not applicable: ${esc(c.na)}</span></div>`;
-            const what = c.changes.length
-              ? c.changes.join("; ")
-              : c.improve.length
-                ? `Improve: ${c.improve
-                    .slice(0, 2)
-                    .map((i) => `${i.name} +${i.marks} to ${i.to}`)
-                    .join(", ")}`
-                : "Keep every subject and level";
-            return `<button type="button" data-choice="${esc(c.key)}" aria-pressed="false" class="block w-full text-left rounded-lg border border-slate-600 bg-slate-900/40 hover:bg-slate-700/50 p-3 min-h-[44px] focus:outline-none focus:ring-2 focus:ring-cyan-500 aria-pressed:border-emerald-500 aria-pressed:bg-emerald-800/20">${head}<span class="block text-xs text-slate-300 mt-0.5">${esc(what)}</span><span class="flex flex-wrap gap-x-3 gap-y-0.5 text-xs mt-1"><span class="font-semibold text-slate-100">${esc(plural(c.count, "pathway"))}</span><span class="${c.lost.length ? "text-amber-300" : "text-emerald-300"}">${c.lost.length ? `Gives up: ${esc(plain(joinNames(c.lost, 2)))}` : "Gives up: nothing"}</span></span></button>`;
-          };
-          const segRow = (s) =>
-            `<div class="flex flex-wrap items-center justify-between gap-2 py-1"><span class="text-sm text-slate-100">${esc(subjName(s))} <span class="text-slate-400">${esc(s.level)} ${esc(s.grade)}</span></span><span class="flex gap-1">${[
-              "keep",
-              "lower",
-              "drop",
-            ]
-              .map(
-                (m) =>
-                  `<button type="button" data-seg="${esc(s.subjectId)}" data-mode="${m}" aria-pressed="false" class="${PILL_BASE} ${PILL_OFF}">${m.charAt(0).toUpperCase() + m.slice(1)}</button>`,
-              )
-              .join("")}</span></div>`;
-          const customBlock = `<details id="customDetails" class="mt-3"${planView.customOpen ? " open" : ""}><summary class="cursor-pointer text-sky-400 hover:text-sky-300 text-sm font-medium py-3">Try your own mix</summary><div>${studentSubjects.map(segRow).join("")}</div><p id="customLive" class="text-sm text-slate-200 mt-2" aria-live="polite"></p></details>`;
-
-          resultsAdviceContainer.innerHTML = `<div class="p-4 rounded-lg border-2 border-emerald-500 bg-emerald-800/20"><p class="text-xs font-semibold uppercase tracking-wide text-emerald-300">Your suggested plan</p><p class="flex items-center gap-2 text-base font-semibold text-slate-100 mt-2"><span class="w-3 h-3 rounded-full shrink-0 ${standDot}" aria-hidden="true"></span>${esc(standText)}</p>${tiles}<p class="text-sm font-semibold text-slate-100 mt-4">Your choices <span class="font-normal text-slate-400">· least to most narrowing</span></p><div class="grid gap-2 mt-2">${a.choices.map(cardHtml).join("")}</div>${customBlock}<div id="planPanel" class="mt-4 pt-4 border-t border-slate-600"></div></div>`;
-
-          // Keep the student's selection across re-renders unless the
-          // suggestion itself changed or the choice no longer applies.
-          planView.a = a;
-          if (planView.rec !== rec.key) {
-            planView.rec = rec.key;
-            planView.sel = rec.key;
-            planView.custom = {};
-          }
-          Object.keys(planView.custom).forEach((id) => {
-            if (!studentSubjects.some((s) => s.subjectId === id))
-              delete planView.custom[id];
           });
-          if (planView.sel !== "custom") {
-            const cur = a.choices.find((c) => c.key === planView.sel);
-            if (!cur || !cur.applicable) planView.sel = rec.key;
+          if (r0 > 0) {
+            const byUp = [...base]
+              .sort((a, b) => weakness(a) - weakness(b))
+              .map((s) => s.subjectId);
+            walk(
+              base.map((s) => ({ ...s })),
+              byUp,
+              fsbbUp,
+              [],
+            );
           }
+          return [...map.values()];
+        };
 
-          // ---- Pathway explorer: every pathway, open or not ----
-          const dot = {
-            open: "bg-emerald-400",
-            close: "bg-sky-400",
-            lower: "bg-amber-400",
-            further: "bg-slate-400",
+        const fsbbCleanMer = (d) =>
+          String(d.text)
+            .replace(/<span class="tooltiptext">.*?<\/span>/g, "")
+            .replace(/<sup>.*?<\/sup>/g, "")
+            .replace(/<[^>]*>/g, "")
+            .replace(/Infinity/g, "n/a")
+            .replace(/\s+/g, " ")
+            .trim();
+        const fsbbClip = (t, n) =>
+          t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t;
+        const fsbbCut = (pw) => {
+          const req = pw.requirements || {};
+          return req.grossL1R4 !== undefined
+            ? req.grossL1R4
+            : req.grossELMAB3 !== undefined
+              ? req.grossELMAB3
+              : req.netELR2B2;
+        };
+        const fsbbScore = (pw) =>
+          (pw.requirements || {}).netELR2B2 !== undefined
+            ? pw.netScore
+            : pw.grossScore;
+        const fsbbDeficit = (pw) => {
+          if (!pw) return 99;
+          if (pw.isEligible) return 0;
+          const cut = fsbbCut(pw);
+          const score = fsbbScore(pw);
+          const unmet = ((pw.merCheck && pw.merCheck.merDetails) || []).filter(
+            (d) => !d.met && !d.isPlainBullet,
+          ).length;
+          return Math.max(
+            1,
+            (cut !== undefined && Number.isFinite(score)
+              ? Math.max(0, score - cut)
+              : 30) +
+              6 * unmet,
+          );
+        };
+        // One short line on what a pathway still asks for.
+        const fsbbGapLine = (pw) => {
+          const cut = fsbbCut(pw);
+          const score = fsbbScore(pw);
+          if (cut !== undefined && Number.isFinite(score) && score > cut)
+            return `Aggregate ${score}, needs ${cut} or less`;
+          return "Needs different subjects or levels";
+        };
+        const fsbbCourses = (n, total) =>
+          total > 1 ? `${n} of ${total} courses` : "Eligible";
+        // "POA G3→G2", "Drop History": what a route changes, in plain words.
+        const fsbbChangeLine = (cfg) => {
+          if (!cfg) return "";
+          const groups = {};
+          cfg.moves.forEach((m) => {
+            const k = `${m.fromLevel}→${m.toLevel}`;
+            (groups[k] = groups[k] || []).push(m.name);
+          });
+          const parts = Object.entries(groups).map(
+            ([k, names]) =>
+              `${names.length > 2 ? plural(names.length, "subject") : names.join(", ")} ${k}`,
+          );
+          if (cfg.dropped.length)
+            parts.push(
+              `Drop ${cfg.dropped.map((id) => getSubjectById(id)?.name || id).join(", ")}`,
+            );
+          return parts.join(" · ");
+        };
+        // "Science D7→C6" from a route-table row.
+        const fsbbGradeMove = (r) =>
+          `${r.subject} ${String(r.now).split(" ")[1] || r.now}→${String(r.need).split(" ")[0]}`;
+
+        // Builds the whole table: rows[row][col] = cell.
+        const fsbbBuild = (subjects, advice) => {
+          const base = subjects.map((s) => ({ ...s }));
+          const r0 = fsbbRowOf(base);
+          const rows = FSBB_ROWS.map(() => FSBB_COLS.map(() => null));
+          const stepsAll =
+            advice && !advice.empty
+              ? advice.staircase.flatMap((t) => t.steps)
+              : [];
+          const configs = fsbbConfigs(base, r0);
+          const rowCfgs = [0, 1, 2, 3].map((r) =>
+            configs.filter((c) => c.row === r),
+          );
+          const evalCfg = (cfg) => {
+            if (!cfg.status) {
+              cfg.status = calculateAllPathwaysStatus(cfg.subjects);
+              cfg.elig = new Set(
+                cfg.status.filter((p) => p.isEligible).map((p) => p.id),
+              );
+            }
+            return cfg;
           };
-          const recChoice = a.choices.find((c) => c.isRecommended);
-          // How a level-change route relates to the suggested plan.
-          const planNoteFor = (s) => {
-            const via = s.via || [];
-            const low = recChoice ? recChoice.loweredIds || [] : [];
-            const nm = (ids) =>
-              ids.map((id) => getSubjectById(id)?.name || id).join(", ");
-            if (!via.length || !recChoice) return "";
-            const [kind, text] = !low.length
-              ? [
-                  "not",
-                  `Not part of your suggested plan (choice ${recChoice.key}: ${recChoice.label.toLowerCase()}).`,
-                ]
-              : via.every((v) => low.includes(v))
-                ? [
-                    "part",
-                    `Part of your suggested plan (choice ${recChoice.key}).`,
-                  ]
-                : [
-                    "different",
-                    `Different from your suggested plan: lowers ${nm(via)} instead of ${nm(low)}.`,
-                  ];
-            return `<p data-plan-note="${kind}" class="text-xs ${kind === "part" ? "text-emerald-300" : "text-slate-400"} mt-2">${esc(text)}</p>`;
+          const rowTotal = (cfg, r) => {
+            const key = `t${r}`;
+            if (cfg[key] === undefined) {
+              evalCfg(cfg);
+              let t = 0;
+              FSBB_COLS.forEach((c, ci) => {
+                if (FSBB_MATRIX[r][ci])
+                  c.ids.forEach((id) => {
+                    if (cfg.elig.has(id)) t++;
+                  });
+              });
+              cfg[key] = t;
+            }
+            return cfg[key];
           };
-          const qw = computeQuickWins();
+          const rank = { open: 0, close: 1, lower: 2, further: 3 };
+          const marksText = (src) => {
+            const rowsSrc = src.rows || [];
+            return [
+              `+${plural(src.totalMarks, "mark")}`,
+              rowsSrc.length === 1
+                ? fsbbGradeMove(rowsSrc[0])
+                : `in ${rowsSrc.length} subjects`,
+            ];
+          };
+
+          FSBB_ROWS.forEach((_, r) =>
+            FSBB_COLS.forEach((col, ci) => {
+              const cell = {
+                row: r,
+                col: ci,
+                key: col.key,
+                ids: col.ids,
+                total: col.ids.length,
+                status: "na",
+                n: 0,
+                line1: "",
+                line2: "",
+                est: false,
+                cfg: null,
+              };
+              rows[r][ci] = cell;
+              if (!FSBB_MATRIX[r][ci]) return;
+              if (r0 === null) {
+                cell.status = "info";
+                return;
+              }
+              if (r === r0) {
+                // Today's subjects: statuses come from the pathway staircase.
+                const steps = stepsAll.filter((s) => col.ids.includes(s.id));
+                const open = steps.filter((s) => s.status === "open");
+                if (open.length) {
+                  cell.status = "open";
+                  cell.n = open.length;
+                  cell.line1 = fsbbCourses(open.length, col.ids.length);
+                  return;
+                }
+                const best = steps
+                  .slice()
+                  .sort(
+                    (x, y) =>
+                      rank[x.status] - rank[y.status] || x.effort - y.effort,
+                  )[0];
+                cell.stepId = best.id;
+                const src =
+                  best.alt && best.alt.rows
+                    ? best.alt
+                    : best.rows && best.totalMarks !== undefined
+                      ? best
+                      : null;
+                cell.status = best.status === "close" ? "close" : "further";
+                if (src) {
+                  [cell.line1, cell.line2] = marksText(src);
+                } else if (
+                  best.needs &&
+                  best.needs.find((n) => /aggregate/i.test(n.label))
+                ) {
+                  const n = best.needs.find((x) => /aggregate/i.test(x.label));
+                  cell.line1 = `Aggregate ${n.now}, needs ${n.target}`;
+                } else {
+                  cell.line1 = "Needs different subjects or levels";
+                }
+                return;
+              }
+              // Another row: the easiest mix that lands on it.
+              const cands = rowCfgs[r];
+              if (!cands.length) {
+                cell.status = "none";
+                return;
+              }
+              const nOf = (cfg) =>
+                col.ids.filter((id) => cfg.elig.has(id)).length;
+              const openCands = cands.filter((c) => {
+                evalCfg(c);
+                return nOf(c) > 0;
+              });
+              if (openCands.length) {
+                openCands.sort(
+                  (a, b) =>
+                    a.changes - b.changes ||
+                    rowTotal(b, r) - rowTotal(a, r) ||
+                    b.dropped.length - a.dropped.length ||
+                    nOf(b) - nOf(a) ||
+                    a.tierSum - b.tierSum ||
+                    (a.key < b.key ? -1 : 1),
+                );
+                const cfg = openCands[0];
+                cell.status = "open";
+                cell.cfg = cfg;
+                cell.est = cfg.est;
+                cell.n = nOf(cfg);
+                cell.line1 = fsbbCourses(cell.n, col.ids.length);
+                cell.line2 = fsbbChangeLine(cfg);
+                return;
+              }
+              // Not eligible on any mix of this row: take the closest one.
+              const defOf = (cfg) =>
+                Math.min(
+                  ...col.ids.map((id) =>
+                    fsbbDeficit(cfg.status.find((p) => p.id === id)),
+                  ),
+                );
+              const cfg = cands
+                .slice()
+                .sort(
+                  (a, b) =>
+                    defOf(a) - defOf(b) ||
+                    a.changes - b.changes ||
+                    a.tierSum - b.tierSum ||
+                    (a.key < b.key ? -1 : 1),
+                )[0];
+              cell.cfg = cfg;
+              cell.est = cfg.est;
+              cell.line2 = fsbbChangeLine(cfg);
+              const ev = evaluateRealistic(cfg.subjects);
+              const closeIds = col.ids.filter((id) => ev.realistic.has(id));
+              if (closeIds.length) {
+                const sumOf = (id) =>
+                  (ev.needs[id] || []).reduce((t, n) => t + n.marks, 0);
+                const id = closeIds.sort((x, y) => sumOf(x) - sumOf(y))[0];
+                const needs = ev.needs[id] || [];
+                cell.status = "close";
+                cell.stepId = id;
+                cell.line1 = `+${plural(sumOf(id), "mark")}`;
+                if (needs.length > 1)
+                  cell.line1 += ` in ${needs.length} subjects`;
+              } else {
+                const pw = cfg.status
+                  .filter((p) => col.ids.includes(p.id))
+                  .sort((x, y) => fsbbDeficit(x) - fsbbDeficit(y))[0];
+                cell.status = "further";
+                cell.stepId = pw.id;
+                cell.line1 = fsbbGapLine(pw);
+              }
+            }),
+          );
+          // Students on 4 G1 start Year 1 of the 3-Year course, so the poster
+          // gives the 2-Year column the same tick: it mirrors the 3-Year cell.
+          const m3 = rows[3][0];
+          if (m3.status !== "na" && m3.status !== "info")
+            rows[3][1] = {
+              ...m3,
+              col: 1,
+              key: "ite2",
+              of: 0,
+              line2: m3.line2 ? `${m3.line2}` : "Starts in 3-Year Year 1",
+            };
+          return { r0, base, rows, advice };
+        };
+
+        // What the student should do with each subject for one cell, plus the
+        // warnings that apply to that route (and only those).
+        const fsbbExplain = (grid, cell0) => {
+          const base = grid.base;
+          const cell =
+            cell0.of !== undefined ? grid.rows[cell0.row][cell0.of] : cell0;
+          const cfg = cell.cfg;
+          const cur = cfg ? cfg.subjects : base;
+          const col = FSBB_COLS[cell.col];
+          const eligOf = (subs) =>
+            new Set(
+              calculateAllPathwaysStatus(subs)
+                .filter((p) => p.isEligible)
+                .map((p) => p.id),
+            );
+          const eligNow = eligOf(cur);
+          const rowNow = fsbbRowOf(cur);
+          const advice = [];
+          base.forEach((s) => {
+            const name = subjName(s);
+            const now = `${s.level} ${s.grade}`;
+            const entry = { id: s.subjectId, name, now };
+            if (cfg && cfg.dropped.includes(s.subjectId)) {
+              advice.push({
+                ...entry,
+                action: "DROP",
+                note: `Not needed for this mix. Frees time for your other subjects (${cur.length} left).`,
+              });
+              return;
+            }
+            const mv =
+              cfg && cfg.moves.find((m) => m.subjectId === s.subjectId);
+            if (mv) {
+              advice.push({
+                ...entry,
+                action: mv.up ? "RAISE" : "MOVE",
+                to: `${mv.toLevel} ${mv.toGrade}`,
+                note: mv.up
+                  ? "Estimate: we assume your grade stays in the same band."
+                  : `Take it at ${mv.toLevel} to be on this row.`,
+              });
+              return;
+            }
+            const cs = cur.find((x) => x.subjectId === s.subjectId);
+            const down = moveDown(cs);
+            if (!down) {
+              advice.push({
+                ...entry,
+                action: "KEEP",
+                note: `Only offered at ${s.level} here.`,
+              });
+              return;
+            }
+            const after = cur.map((x) =>
+              x.subjectId === s.subjectId ? down : x,
+            );
+            const afterSet = eligOf(after);
+            const lostCols = [
+              ...new Set(
+                [...eligNow]
+                  .filter((id) => !afterSet.has(id))
+                  .map((id) => FSBB_COL_OF_ID[id]),
+              ),
+            ].map((i) => FSBB_COLS[i].label);
+            if (lostCols.length || fsbbRowOf(after) !== rowNow) {
+              advice.push({
+                ...entry,
+                action: "KEEP",
+                note: lostCols.length
+                  ? `Moving it down would close ${joinNames(lostCols, 3)}.`
+                  : "Moving it down would drop you a row.",
+              });
+              return;
+            }
+            advice.push({
+              ...entry,
+              action: "EITHER",
+              note: "Not needed for this. Moving it down closes nothing.",
+              cs,
+            });
+          });
+          // Drop only when it changes nothing, and the student has spare subjects.
+          const hasDrop = advice.some((a) => a.action === "DROP");
+          if (!hasDrop && cur.length > MIN_SUBJECTS_AFTER_DROP) {
+            const safe = advice
+              .filter((a) => a.action === "EITHER" && weakness(a.cs) >= 0.5)
+              .filter((a) => {
+                const rest = cur.filter((x) => x.subjectId !== a.id);
+                const set = eligOf(rest);
+                return (
+                  [...eligNow].every((id) => set.has(id)) &&
+                  fsbbRowOf(rest) === rowNow
+                );
+              })
+              .sort(
+                (x, y) =>
+                  getLdlTier(x.id) - getLdlTier(y.id) ||
+                  weakness(y.cs) - weakness(x.cs),
+              )[0];
+            if (safe) {
+              safe.action = "DROP";
+              safe.note = `Not needed for any pathway here. Frees time for your other subjects (${cur.length - 1} left).`;
+            }
+          }
+          advice.forEach((a) => delete a.cs);
+          const warnings = [];
+          const lowered = cfg
+            ? [
+                ...cfg.moves.filter((m) => !m.up).map((m) => m.subjectId),
+                ...cfg.dropped,
+              ]
+            : [];
+          lowered.forEach((id) => {
+            const o = base.find((x) => x.subjectId === id);
+            const r = o ? reachInfo(o) : null;
+            if (r && r.status === "reachable")
+              warnings.push(
+                `${subjName(o)} is only ${plural(r.needed, "mark")} from ${r.next}. Staying at ${o.level} may be realistic.`,
+              );
+          });
+          const dropEntry = advice.find((a) => a.action === "DROP");
+          if (dropEntry) {
+            const left =
+              cfg && cfg.dropped.includes(dropEntry.id)
+                ? cur.length
+                : cur.length - 1;
+            if (left <= MIN_SUBJECTS_AFTER_DROP)
+              warnings.push(
+                `Riskier: only ${left} subjects would be left, so every grade counts.`,
+              );
+          }
+          return { advice, warnings, cell };
+        };
+
+        // ---- Rendering ----
+        const fsbbState = { grid: null };
+        const fsbbView = { row: null, col: null };
+        const FSBB_STYLE = {
+          open: "bg-emerald-600 border-emerald-300 text-white",
+          close: "bg-sky-700/40 border-sky-400 text-sky-50",
+          further: "bg-slate-900/70 border-slate-500 text-slate-200",
+          none: "bg-slate-700/50 border-slate-700 text-slate-400",
+          na: "bg-slate-700/70 border-slate-700",
+          info: "bg-slate-900/40 border-slate-700 text-slate-500",
+        };
+        const FSBB_ICON = { open: "✓", close: "↑", further: "○" };
+        const FSBB_WORD = {
+          open: "Eligible",
+          close: "Almost there",
+          further: "Needs more work",
+        };
+        const ACTION_STYLE = {
+          KEEP: "bg-emerald-700 text-white",
+          MOVE: "bg-amber-600 text-white",
+          RAISE: "bg-sky-700 text-white",
+          DROP: "bg-rose-700 text-white",
+          EITHER: "bg-slate-600 text-white",
+        };
+        const CELL_BOX = "w-full min-h-[92px] rounded-lg border-2 px-1.5 py-2";
+
+        const fsbbCellHtml = (cell) => {
+          if (cell.status === "na")
+            return `<div data-fsbb-na class="${CELL_BOX} ${FSBB_STYLE.na}" aria-label="Not available with this mix"></div>`;
+          if (cell.status === "info")
+            return `<div class="${CELL_BOX} ${FSBB_STYLE.info} flex items-center justify-center text-2xl">✓</div>`;
+          if (cell.status === "none")
+            return `<div data-fsbb-none class="${CELL_BOX} ${FSBB_STYLE.none} flex items-center justify-center text-[11px] leading-tight">Not possible with your subjects</div>`;
+          const label =
+            `${FSBB_COLS[cell.col].label}, ${FSBB_ROWS[cell.row].full}: ${FSBB_WORD[cell.status]}. ${cell.line1} ${cell.line2}`.trim();
+          return `<button type="button" data-fsbb-cell data-row="${cell.row}" data-col="${cell.col}" data-status="${cell.status}"${cell.est ? " data-est" : ""} aria-expanded="false" aria-label="${esc(label)}" class="${CELL_BOX} ${FSBB_STYLE[cell.status]} ${cell.est ? "border-dashed" : ""} flex flex-col items-center justify-start gap-0.5 text-center hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-cyan-300"><span class="text-3xl font-black leading-none" aria-hidden="true">${FSBB_ICON[cell.status]}</span><span class="text-[12px] font-semibold leading-tight">${esc(cell.line1)}</span>${cell.line2 ? `<span class="text-[11px] leading-tight opacity-90">${esc(cell.line2)}</span>` : ""}${cell.est ? '<span class="text-[10px] uppercase tracking-wide opacity-80">est.</span>' : ""}</button>`;
+        };
+
+        const fsbbTableHtml = (grid) => {
+          const head = FSBB_COLS.map(
+            (c, i) =>
+              `<th scope="col" class="p-0 align-stretch"><button type="button" data-fsbb-col="${i}" class="w-full h-full min-h-[68px] bg-[#3b5bdb] hover:bg-[#4c6ef5] text-white font-semibold rounded px-1 py-2 text-[12px] sm:text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-cyan-300">${c.head.map(esc).join("<br>")}</button></th>`,
+          ).join("");
+          const body = FSBB_ROWS.map((row, r) => {
+            const you = grid.r0 === r;
+            const lines = grid.rows[r]
+              .filter((c) => FSBB_ICON[c.status] && c.line2)
+              .map((c) => c.line2);
+            const common =
+              r !== grid.r0 && lines.length > 1 && new Set(lines).size === 1
+                ? lines[0]
+                : "";
+            const label = row.label
+              .split(" ")
+              .map((w) =>
+                /^G\d$/.test(w) ? `<span class="font-black">${w}</span>` : w,
+              )
+              .join(" ");
+            return `<tr><th scope="row" class="sticky left-0 z-10 bg-slate-800 text-left p-2 min-w-[104px] ${you ? "border-l-4 border-cyan-400" : "border-l-4 border-transparent"}"><span class="block text-base sm:text-lg text-slate-100 leading-tight">${label}</span><span class="block text-xs text-slate-400">subjects</span>${you ? '<span data-you class="inline-block mt-1 text-[11px] font-bold rounded bg-cyan-400 text-slate-900 px-1.5 py-0.5">★ You are here</span>' : ""}${common ? `<span data-row-route class="block mt-1 text-[11px] leading-tight text-slate-300">${esc(common)}</span>` : ""}</th>${grid.rows[r].map((cell) => `<td class="p-0">${fsbbCellHtml(common ? { ...cell, line2: "" } : cell)}</td>`).join("")}</tr>`;
+          }).join("");
+          return `<div class="overflow-x-auto rounded-xl border border-slate-700" id="fsbbScroll"><table id="fsbbTable" class="min-w-[700px] w-full table-fixed border-separate border-spacing-1 text-center"><colgroup><col style="width:132px">${FSBB_COLS.map(() => "<col>").join("")}</colgroup><thead><tr><th class="sticky left-0 z-10 bg-slate-800"></th><th colspan="6" class="bg-[#1b2f5e] text-white tracking-[0.2em] text-xs font-bold py-2 rounded">POST-SEC PATHWAYS</th></tr><tr><th scope="col" class="sticky left-0 z-10 bg-slate-800 text-left align-bottom p-2 text-sm font-bold text-slate-100">Students taking at least</th>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+        };
+
+        const fsbbLegendHtml = () => {
+          const chip = (cls, icon) =>
+            `<span class="inline-flex items-center justify-center w-7 h-7 rounded border-2 font-black ${cls}" aria-hidden="true">${icon}</span>`;
+          return `<ul class="flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-100 mb-3"><li class="flex items-center gap-2">${chip(FSBB_STYLE.open, "✓")} Eligible</li><li class="flex items-center gap-2">${chip(FSBB_STYLE.close, "↑")} Almost there (5 marks or less per subject)</li><li class="flex items-center gap-2">${chip(FSBB_STYLE.further, "○")} Needs more work</li><li class="flex items-center gap-2">${chip(FSBB_STYLE.na, "")} Not available with this mix</li></ul>`;
+        };
+
+        const courseDot = {
+          open: "bg-emerald-400",
+          close: "bg-sky-400",
+          lower: "bg-amber-400",
+          further: "bg-slate-400",
+        };
+        // The expandable course rows for one table column.
+        const fsbbCourseListHtml = (adv, ids, withWins) => {
+          const qw = withWins ? computeQuickWins() : [];
           const winsFor = (s) =>
             s.tier === 0 ? [] : qw.filter((w) => w.unlocked.includes(s.name));
           const marksFor = (w) => {
-            const r = a.reach.find(
+            const r = adv.reach.find(
               (x) => x.name === w.subject && typeof x.needed === "number",
             );
             return r ? ` (+${r.needed} mark${r.needed === 1 ? "" : "s"})` : "";
           };
-          const quickCount = steps.filter((s) => winsFor(s).length).length;
           const shortText = (s) =>
             s.tier === 0
-              ? "Open now"
+              ? "Eligible now"
               : s.tier === 1 && s.status === "close"
                 ? s.alt && s.alt.rows
                   ? `+${s.alt.totalMarks} marks across ${plural(s.alt.subjects, "subject")}`
-                  : "Within reach"
+                  : "Almost there"
                 : s.tier === 1
                   ? "Needs a lower level"
-                  : s.farOff
-                    ? "Long-term goal"
-                    : s.rows && s.totalMarks !== undefined
-                      ? `+${s.totalMarks} marks across ${plural(s.subjects, "subject")}`
-                      : s.blocker
-                        ? "Needs a different subject or level"
-                        : "Needs top grades across your subjects";
+                  : s.rows && s.totalMarks !== undefined
+                    ? `+${s.totalMarks} marks across ${plural(s.subjects, "subject")}`
+                    : s.blocker
+                      ? "Needs a different subject or level"
+                      : "Needs top grades across your subjects";
           const table = (head, rows) =>
             `<div class="overflow-x-auto mt-2"><table class="min-w-full text-sm"><thead><tr>${head.map((h) => `<th class="text-left text-xs uppercase text-slate-400 px-2 py-1">${esc(h)}</th>`).join("")}</tr></thead><tbody class="divide-y divide-slate-700">${rows.map((r) => `<tr>${r.map((c, i) => `<td class="px-2 py-1.5 ${i === 0 ? "text-slate-100" : "text-slate-300"}">${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
           const routeTable = (rows) =>
@@ -5287,68 +5604,197 @@
               ["Subject", "Now", "Need", "Marks"],
               rows.map((r) => [r.subject, r.now, r.need, r.marks]),
             );
-          const bodyOf = (s) => {
-            const wins = winsFor(s)
-              .map(
-                (w) =>
-                  `<p data-qw data-subject="${esc(w.subject)}" data-from="${esc(w.from)}" data-to="${esc(w.to)}" class="text-sm text-emerald-300 mb-2">Quick win: ${esc(w.subject)} ${esc(w.from)} → ${esc(w.to)}${esc(marksFor(w))} opens this.</p>`,
-              )
-              .join("");
-            return wins + bodyCore(s);
-          };
           const bodyCore = (s) => {
             if (s.tier === 0)
               return `<p class="text-sm text-slate-200">${esc(s.detail)}</p>`;
             if (s.tier === 1) {
-              const note = planNoteFor(s);
               const hasAlt = s.alt && s.alt.rows;
               const altBlock = hasAlt
                 ? `${routeTable(s.alt.rows)}<p class="text-xs text-slate-400 mt-1">${esc(s.alt.summary)}</p>`
                 : "";
-              // Within reach: lead with keeping levels, lowering is the fallback.
               return s.status === "close" && hasAlt
-                ? `<p class="text-sm font-semibold text-sky-300">Keep your levels and improve (${esc(s.alt.difficulty)})</p>${altBlock}<p class="mt-3 text-sm text-slate-300">Or lower a level: ${esc(s.detail)}</p>${note}`
-                : `<p class="text-sm text-slate-200">${esc(s.detail)}</p>${note}${hasAlt ? `<p class="mt-3 text-sm font-semibold text-sky-300">Or keep your levels and improve (${esc(s.alt.difficulty)})</p>${altBlock}` : ""}`;
+                ? `<p class="text-sm font-semibold text-sky-300">Keep your levels and improve (${esc(s.alt.difficulty)})</p>${altBlock}<p class="mt-3 text-sm text-slate-300">Or move down a level: ${esc(s.detail)}</p>`
+                : `<p class="text-sm text-slate-200">${esc(s.detail)}</p>${hasAlt ? `<p class="mt-3 text-sm font-semibold text-sky-300">Or keep your levels and improve (${esc(s.alt.difficulty)})</p>${altBlock}` : ""}`;
             }
             if (s.rows)
               return `<p class="text-sm text-slate-200">Improve these to open it:</p>${routeTable(s.rows)}<p class="text-xs text-slate-400 mt-1">${esc(s.summary)}</p>`;
             return `<p class="text-sm text-slate-200">This pathway asks for:</p>${table(
               ["Requirement", "Now", "Need"],
               (s.needs || []).map((n) => [n.label, n.now, n.target]),
-            )}<p class="text-sm text-slate-300 mt-3">${s.blocker ? `Marks alone will not be enough. Even top grades in your current subjects would leave: ${esc(s.blocker)}. This usually means taking a different subject or level.` : "Top grades across your current subjects would get you there. A longer-term goal worth keeping in view."}</p>`;
+            )}<p class="text-sm text-slate-300 mt-3">${s.blocker ? `Marks alone will not be enough. Even top grades in your current subjects would leave: ${esc(s.blocker)}. This usually means taking a different subject or level.` : "Top grades across your current subjects would get you there."}</p>`;
           };
-          const rowHtml = (s) =>
-            `<details data-pw data-id="${esc(s.id)}" data-group="${esc(s.group)}" data-name="${esc(s.name)}" data-quick="${winsFor(s).length ? 1 : 0}" data-status="${statusOf(s)}" class="group rounded-lg border border-slate-600 bg-slate-900/40 mb-2"><summary class="flex items-center gap-3 p-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden"><span class="w-3 h-3 rounded-full shrink-0 ${dot[statusOf(s)]}"></span><span class="min-w-0 flex-1"><span class="block font-semibold text-slate-100">${esc(plain(s.name))}</span><span class="block text-xs text-slate-400">${esc(shortText(s))}${winsFor(s).length ? ` · <span class="text-emerald-300">Quick win: ${esc(winsFor(s)[0].subject)} ${esc(winsFor(s)[0].short)}${winsFor(s).length > 1 ? ` (+${winsFor(s).length - 1})` : ""}</span>` : ""}</span><span data-plan-badge class="hidden"></span></span><span class="text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span></summary><div class="px-3 pb-3 pt-1 border-t border-slate-700">${bodyOf(s)}</div></details>`;
-          // One stair per group, each indented further than the one above
-          const stairs = Object.keys(PATHWAY_TOTAL_BY_GROUP)
-            .map((g, i) => {
-              const inGroup = steps.filter((s) => s.group === g);
-              if (!inGroup.length) return "";
-              const openN = inGroup.filter((s) => s.tier === 0).length;
-              return `<div data-gblock data-group="${esc(g)}" class="mb-3 border-l-4 border-slate-600 pl-3" style="margin-left: calc(${i} * min(4vw, 18px))"><div class="rounded-t-md border-t-4 border-cyan-500 bg-slate-700/50 px-3 py-1.5 mb-2 flex flex-wrap items-baseline justify-between gap-x-3"><span class="text-sm font-bold text-cyan-300">Step ${i + 1} · ${esc(g)}</span><span class="text-xs text-slate-400">${inGroup.length} pathway${inGroup.length === 1 ? "" : "s"}${openN ? ` · ${openN} open now` : ""}</span></div>${inGroup.map(rowHtml).join("")}</div>`;
-            })
+          const bodyOf = (s) =>
+            winsFor(s)
+              .map(
+                (w) =>
+                  `<p data-qw data-subject="${esc(w.subject)}" data-from="${esc(w.from)}" data-to="${esc(w.to)}" class="text-sm text-emerald-300 mb-2">Quick win: ${esc(w.subject)} ${esc(w.from)} → ${esc(w.to)}${esc(marksFor(w))} opens this.</p>`,
+              )
+              .join("") + bodyCore(s);
+          const rank = { open: 0, close: 1, lower: 2, further: 3 };
+          const steps = adv.staircase
+            .flatMap((tr) => tr.steps)
+            .filter((s) => ids.includes(s.id))
+            .sort(
+              (x, y) => rank[x.status] - rank[y.status] || x.effort - y.effort,
+            );
+          return steps
+            .map(
+              (s, i) =>
+                `<details data-pw data-id="${esc(s.id)}" data-group="${esc(s.group)}" data-name="${esc(s.name)}" data-quick="${winsFor(s).length ? 1 : 0}" data-status="${s.status}"${i === 0 ? " data-easiest open" : ""} class="group rounded-lg border ${i === 0 ? "border-emerald-500" : "border-slate-600"} bg-slate-900/40 mb-2"><summary class="flex items-center gap-3 p-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden"><span class="w-3 h-3 rounded-full shrink-0 ${courseDot[s.status]}"></span><span class="min-w-0 flex-1"><span class="block font-semibold text-slate-100">${esc(plain(s.name))}${i === 0 && steps.length > 1 ? ' <span class="ml-1 text-xs font-semibold text-emerald-300">Easiest way in</span>' : ""}</span><span class="block text-xs text-slate-400">${esc(shortText(s))}${winsFor(s).length ? ` · <span class="text-emerald-300">Quick win: ${esc(winsFor(s)[0].subject)} ${esc(winsFor(s)[0].short)}${winsFor(s).length > 1 ? ` (+${winsFor(s).length - 1})` : ""}</span>` : ""}</span></span><span class="text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span></summary><div class="px-3 pb-3 pt-1 border-t border-slate-700">${bodyOf(s)}</div></details>`,
+            )
             .join("");
-          const pill = (filter, value, label) =>
-            `<button type="button" data-filter="${filter}" data-value="${esc(value)}" aria-pressed="false" class="${PILL_BASE} ${PILL_OFF}">${esc(label)}</button>`;
-          const groupPills = [
-            pill("group", "all", "All pathways"),
-            ...Object.keys(PATHWAY_TOTAL_BY_GROUP).map((g) =>
-              pill("group", g, g),
-            ),
-          ].join(" ");
-          const statusPills = [
-            pill("status", "all", "Any status"),
-            pill("status", "open", "Open now"),
-            pill("status", "close", "Within reach"),
-            pill("status", "lower", "Needs a lower level"),
-            pill("status", "further", "Needs more work"),
-            ...(quickCount
-              ? [pill("status", "quick", `Quick wins (${quickCount})`)]
-              : []),
-          ].join(" ");
-          resultsExplorerContainer.innerHTML = `<h3 class="text-lg font-semibold text-slate-100 mb-1">Explore every pathway</h3><p class="text-xs text-slate-400 mb-3">Steps run from JC/MI down to ITE 3-Year. Tap a pathway to see exactly what it takes.</p><div class="flex flex-wrap gap-2 mb-2">${groupPills}</div><div class="flex flex-wrap gap-2 mb-4">${statusPills}</div>${stairs}<p id="explorerEmpty" class="hidden text-sm text-slate-400 p-3">No pathways match these filters. Try "All pathways" or "Any status".</p>`;
-          applyExplorerFilter();
-          syncPlanView();
+        };
+
+        function fsbbSyncSelection() {
+          resultsAdviceContainer
+            .querySelectorAll("[data-fsbb-cell]")
+            .forEach((b) => {
+              const on =
+                Number(b.dataset.row) === fsbbView.row &&
+                Number(b.dataset.col) === fsbbView.col;
+              b.setAttribute("aria-expanded", on ? "true" : "false");
+              b.classList.toggle("ring-4", on);
+              b.classList.toggle("ring-white", on);
+            });
+          resultsAdviceContainer
+            .querySelectorAll("[data-fsbb-col]")
+            .forEach((b) =>
+              b.classList.toggle(
+                "ring-2",
+                Number(b.dataset.fsbbCol) === fsbbView.col,
+              ),
+            );
+        }
+
+        function fsbbCloseDetails() {
+          fsbbView.row = null;
+          fsbbView.col = null;
+          renderFsbbDetails();
+        }
+
+        function renderFsbbDetails() {
+          const box = resultsAdviceContainer.querySelector("#fsbbDetails");
+          if (!box) return;
+          const g = fsbbState.grid;
+          const cell =
+            g && fsbbView.row !== null
+              ? g.rows[fsbbView.row][fsbbView.col]
+              : null;
+          if (!cell || !FSBB_ICON[cell.status]) {
+            box.classList.add("hidden");
+            box.innerHTML = "";
+            fsbbSyncSelection();
+            return;
+          }
+          const real = cell.of !== undefined ? g.rows[cell.row][cell.of] : cell;
+          const col = FSBB_COLS[real.col];
+          const rowName = FSBB_ROWS[cell.row].full;
+          const exp = fsbbExplain(g, cell);
+          const adv = real.cfg
+            ? buildResultsAdvice(real.cfg.subjects)
+            : g.advice;
+          const here = cell.row === g.r0;
+          const change = fsbbChangeLine(real.cfg);
+          const nTxt = fsbbCourses(real.n, col.ids.length);
+          let headline;
+          if (real.status === "open")
+            headline = here
+              ? `You already qualify for ${nTxt === "Eligible" ? "this" : nTxt} now. Nothing to change.`
+              : `Easiest way in: ${change || "no change"}. This opens ${nTxt === "Eligible" ? "this pathway" : nTxt}.`;
+          else if (real.status === "close")
+            headline = here
+              ? `Almost there: ${real.line1}${real.line2 ? `, ${real.line2}` : ""}.`
+              : `Almost there. Take ${change || "this mix"}, then ${real.line1}.`;
+          else
+            headline = here
+              ? `Needs more work: ${real.line1}${real.line2 ? `, ${real.line2}` : ""}.`
+              : `Needs more work even with ${change || "this mix"}: ${real.line1}.`;
+          const tone = {
+            open: "text-emerald-300",
+            close: "text-sky-300",
+            further: "text-slate-200",
+          }[real.status];
+          const either = exp.advice.filter((a) => a.action === "EITHER");
+          const rowsHtml = exp.advice
+            .filter((a) => a.action !== "EITHER")
+            .map(
+              (a) =>
+                `<li data-advice="${esc(a.action)}" class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded border border-slate-700 bg-slate-900/40 px-3 py-2"><span class="inline-block w-16 text-center text-[11px] font-bold rounded px-1.5 py-1 ${ACTION_STYLE[a.action]}">${esc(a.action === "KEEP" || a.action === "EITHER" ? a.action : a.action === "MOVE" ? "MOVE" : a.action)}</span><span class="font-semibold text-slate-100">${esc(a.name)}</span><span class="text-sm text-slate-400">${esc(a.now)}${a.to ? ` → ${esc(a.to)}` : ""}</span><span class="basis-full text-sm text-slate-300">${esc(a.note)}</span></li>`,
+            )
+            .join("");
+          const eitherHtml = either.length
+            ? `<li data-advice="EITHER" class="rounded border border-slate-700 bg-slate-900/40 px-3 py-2"><span class="inline-block w-16 text-center text-[11px] font-bold rounded px-1.5 py-1 ${ACTION_STYLE.EITHER}">EITHER</span> <span class="font-semibold text-slate-100">${esc(either.map((a) => a.name).join(", "))}</span><span class="block text-sm text-slate-300 mt-1">Not needed for this. Moving ${either.length === 1 ? "it" : "them"} down closes nothing.</span></li>`
+            : "";
+          const warnHtml = exp.warnings.length
+            ? `<ul data-warnings class="mt-3 space-y-1">${exp.warnings.map((w) => `<li class="text-sm text-amber-300">⚠ ${esc(w)}</li>`).join("")}</ul>`
+            : "";
+          const estNote = real.est
+            ? '<p class="text-xs text-slate-400 mt-2">Estimate: grades at a higher level are guessed from your current grades.</p>'
+            : "";
+          const courses = fsbbCourseListHtml(adv, col.ids, here);
+          box.innerHTML = `<div class="flex items-start justify-between gap-3"><div><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">${esc(col.label)} · with ${esc(rowName)}</p><p data-fsbb-headline class="text-base sm:text-lg font-bold mt-1 ${tone}"><span aria-hidden="true">${FSBB_ICON[real.status]}</span> ${esc(headline)}</p></div><button type="button" data-fsbb-close class="shrink-0 text-sm px-3 min-h-[44px] sm:min-h-[36px] rounded-full border border-slate-500 text-slate-200 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400">Close</button></div>${estNote}<p class="text-sm font-semibold text-slate-100 mt-4">What to do with each subject</p><ul class="mt-2 space-y-1.5">${rowsHtml}${eitherHtml}</ul>${warnHtml}<p class="text-sm font-semibold text-slate-100 mt-5">Courses in this column (${col.ids.length})</p><p class="text-xs text-slate-400 mb-2">Tap a course to see exactly what it takes.</p><div id="fsbbCourses">${courses}</div>`;
+          box.classList.remove("hidden");
+          fsbbSyncSelection();
+        }
+
+        resultsAdviceContainer.addEventListener("click", (e) => {
+          const cellBtn = e.target.closest("[data-fsbb-cell]");
+          const colBtn = e.target.closest("[data-fsbb-col]");
+          if (e.target.closest("[data-fsbb-close]")) {
+            fsbbCloseDetails();
+            return;
+          }
+          const g = fsbbState.grid;
+          if (!g) return;
+          if (cellBtn) {
+            fsbbView.row = Number(cellBtn.dataset.row);
+            fsbbView.col = Number(cellBtn.dataset.col);
+          } else if (colBtn) {
+            const ci = Number(colBtn.dataset.fsbbCol);
+            const order = g.r0 === null ? [] : [g.r0, 0, 1, 2, 3];
+            const r = order.find(
+              (x) => g.rows[x][ci] && FSBB_ICON[g.rows[x][ci].status],
+            );
+            if (r === undefined) return;
+            fsbbView.row = r;
+            fsbbView.col = ci;
+          } else return;
+          renderFsbbDetails();
+          const box = resultsAdviceContainer.querySelector("#fsbbDetails");
+          if (box && box.scrollIntoView)
+            box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        });
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape" && fsbbView.row !== null) fsbbCloseDetails();
+        });
+
+        function renderResultsAdvice() {
+          if (studentSubjects.length === 0) {
+            resultsAdviceSection.classList.add("hidden");
+            resultsAdviceContainer.innerHTML = "";
+            fsbbState.grid = null;
+            fsbbView.row = null;
+            fsbbView.col = null;
+            return;
+          }
+          resultsAdviceSection.classList.remove("hidden");
+          const base = studentSubjects.map((s) => ({ ...s }));
+          const grid = fsbbBuild(base, buildResultsAdvice(base));
+          fsbbState.grid = grid;
+          const note =
+            grid.r0 === null
+              ? '<p data-fsbb-note class="text-sm text-amber-300 mb-3">Add at least 4 subjects to see which pathways each mix can reach.</p>'
+              : "";
+          resultsAdviceContainer.innerHTML = `<div class="rounded-lg border border-cyan-700 bg-cyan-900/30 p-3 mb-4 text-sm sm:text-base text-slate-100"><strong>Aim for the highest level you can manage.</strong> Moving down a row closes the pathways on the right.</div>${note}${fsbbLegendHtml()}${fsbbTableHtml(grid)}<p class="text-xs text-slate-400 mt-2">${grid.r0 === null ? "" : "Tap any coloured box to see how. "}<span class="sm:hidden">Swipe the table sideways to see every pathway.</span></p><div id="fsbbDetails" class="hidden mt-4 rounded-xl border border-cyan-500/60 bg-slate-900/60 p-4" role="region" aria-live="polite" aria-label="How to reach this pathway"></div>`;
+          if (fsbbView.row !== null) {
+            const c =
+              grid.rows[fsbbView.row] && grid.rows[fsbbView.row][fsbbView.col];
+            if (!c || !FSBB_ICON[c.status]) {
+              fsbbView.row = null;
+              fsbbView.col = null;
+            }
+          }
+          renderFsbbDetails();
         }
 
         function checkEligibility() {
@@ -5951,6 +6397,44 @@
           evalCustom: (subjects, sel, school) => {
             if (school !== undefined) selectedSchool = school;
             return evaluateCustom(subjects, sel);
+          },
+          // Single-grade improvements that open a closed pathway (live page state).
+          quickWins: () => computeQuickWins(),
+          fsbbRow: (subjects) => fsbbRowOf(subjects),
+          // Plain-data copy of the table: rows[row][col] = cell.
+          fsbb: (subjects, school) => {
+            if (school !== undefined) selectedSchool = school;
+            const t0 = performance.now();
+            const g = fsbbBuild(subjects, buildResultsAdvice(subjects));
+            const ms = performance.now() - t0;
+            return {
+              r0: g.r0,
+              ms,
+              rows: g.rows.map((row) =>
+                row.map((c) => ({
+                  row: c.row,
+                  col: c.col,
+                  key: c.key,
+                  ids: c.ids,
+                  status: c.status,
+                  n: c.n,
+                  total: c.total,
+                  line1: c.line1,
+                  line2: c.line2,
+                  est: c.est,
+                  mirror: c.of !== undefined,
+                  subjects: c.cfg ? c.cfg.subjects : null,
+                  moves: c.cfg ? c.cfg.moves : [],
+                  dropped: c.cfg ? c.cfg.dropped : [],
+                })),
+              ),
+            };
+          },
+          fsbbExplain: (subjects, row, col, school) => {
+            if (school !== undefined) selectedSchool = school;
+            const g = fsbbBuild(subjects, buildResultsAdvice(subjects));
+            const e = fsbbExplain(g, g.rows[row][col]);
+            return { advice: e.advice, warnings: e.warnings };
           },
         };
       })();

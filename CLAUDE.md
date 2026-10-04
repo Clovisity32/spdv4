@@ -43,7 +43,7 @@ Single-file app — all HTML, CSS, and JavaScript lives in `index.html`.
   - Calculation functions: `calculateL1R4`, `calculateELR2B2_G3_Mixed`,
     `calculateELMAB3_G2`, `calculateITEHnitecSpecific`, `calculateITEHnitecCompleted`
   - DOM renderers: `renderEligibilityResults`, `renderStudentSubjectsTable`,
-    `renderImprovementSuggestions`
+    `renderResultsAdvice` (the FSBB table)
   - Event wiring in `DOMContentLoaded`
 
 **Never split into multiple files unless explicitly asked.**
@@ -60,7 +60,7 @@ One role: **student** — Singapore Sec 4/5 student exploring post-secondary opt
 4. Enter CCA bonus points (0–5)
 5. Click **Add Subject** → row appears in subject table
 6. Eligibility cards update automatically across all pathway groups
-7. Improvement suggestions show which single grade change unlocks new pathways
+7. "Your Action Plan" shows the FSBB Summary table with the student's row marked; tap a box for the easiest way in
 
 ## Do Not Touch
 
@@ -89,7 +89,7 @@ spdv4/
     ├── run_edge_case_tests.js   ← 152 assertions across 14 phases
     ├── run_invariant_tests.js   ← 102 assertions across 3 phases
     ├── run_ca_tests.js          ← 18 conditional-admission checks
-    └── run_advice_tests.js      ← Action Plan engine + UI (79 checks)
+    └── run_advice_tests.js      ← Action Plan engine + FSBB table UI (82 checks)
 ```
 
 ## Pathway Groups (2027 cohort)
@@ -129,3 +129,4 @@ Eligible groups sort before not-eligible groups; original insertion order preser
 | 2026-10 | Suggested plan restructure | "Your suggested plan" is now four fixed blocks: where you stand (standing + 4 status tiles), four selectable choices A Keep / B Reduce / C Lower 1 / D Lower 2+ (least to most narrowing; each shows pathway count and what it gives up), next steps + "Does this plan make sense?" practical check (P1 majority-lowered: lists remaining higher-level subjects with "Consider lowering too" / "Keep at current level"; P2 close-to-next-grade; P3 pathways given up; P4 order notes; P5 few subjects — information only, never overrides), and a collapsed "Before you decide" (recalibration order with the student's subjects, reasons). "Try your own mix" lets the student set Keep/Lower/Drop per subject (`window.__spdTest.evalCustom`). Engine additions are additive: `choices`, `standing`, `summary`, `recommended.key/check`, per-step `status`/`via`. Explorer statuses now come from one source (`open`/`close`=realistic/`lower`/`further`), so tiles = choice A count; rows get "Opens/Closes with this choice" badges and level-change rows state whether they are part of the suggested plan. A student coping everywhere is never told to drop a subject. Calc functions untouched. `run_advice_tests.js` now 77 checks. UX quick fix: "Push" advice and choice A "Improve" only name subjects whose next grade opens a pathway or that are weak (`worthPushing`), so a strong subject like English B3 is no longer told to chase A2 |
 
 | 2026-10 | Action Plan wording | ITE route labels (`MER (Pass EL & Math)` etc.) shown in plain language in the Action Plan only, via display-only `plain()` / `PLAIN_NAMES`; PATHWAYS data names, eligibility cards and edge tests unchanged. Choice D lists each lowered subject on its own line. `run_advice_tests.js` now 79 checks |
+| 2026-10 | FSBB table Action Plan | "Your Action Plan" is now the MOE FSBB Summary table (poster column order: 3-Year Higher Nitec, 2-Year Higher Nitec, PFP, Polytechnic Year 1, MI, JC; rows 5 G3 / 4 G3 + 1 G2 / 5 G2 / 4 G1; NAFA and Arts left out). Rows are the options, so the A–D choice cards, ★ suggestion, "Try your own mix", status tiles, practical check, "Before you decide" and the separate explorer were removed. Boxes: ✓ eligible, ↑ almost there (≤5 marks), ○ needs more work, grey = not offered (`FSBB_MATRIX`). "You are here" row uses today's staircase; other rows are the easiest mix landing on that row (`fsbbConfigs` / `fsbbBuild`: lower subjects in recalibration order with protect/drop variants; rows above the student's row are estimates, dashed + "est."). Drop only for weaker subjects, only with more than 5 subjects. Tap a box (or column heading) for `fsbbExplain` (KEEP / MOVE / RAISE / DROP / EITHER per subject, two warnings: within 5 marks of next grade, only 5 subjects left) plus that column's course rows (easiest first, quick-win lines on your row). Engine and calc functions untouched; test hooks `__spdTest.fsbb`, `fsbbExplain`, `fsbbRow`, `quickWins`. `run_edge_case_tests.js` reads quick wins via `__spdTest.quickWins`. `run_advice_tests.js` now 82 checks |
