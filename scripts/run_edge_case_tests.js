@@ -1816,15 +1816,42 @@ function ok(cond, id, msg) {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // Phase 14: Eligibility-First Group Sort
-    // groupedPathways insertion order: JC/MI(0) Poly(1) PFP(2) ITE-Yr2(3) ITE-3Yr(4)
-    // Groups with ≥1 eligible pathway sort before groups with none; stable within each tier.
+    // Phase 14: Fixed group order, collapsed not-eligible cards
+    // Groups always run JC/MI → Polytechnic → PFP → ITE Year 2 → ITE 3-Year,
+    // whatever is eligible. Eligible cards start open; others start collapsed
+    // to their header (name + status) and open on click.
     // ════════════════════════════════════════════════════════════════════════
-    console.log("\n── Phase 14: Eligibility-First Group Sort ──");
+    console.log("\n── Phase 14: Fixed group order, collapsed cards ──");
+    const FIXED_ORDER = [
+      "JC/MI",
+      "Polytechnic Year 1",
+      "PFP",
+      "ITE Year 2 Higher Nitec",
+      "ITE 3-Year Higher Nitec",
+    ];
+    const cardStates = (page) =>
+      page.evaluate(() =>
+        Array.from(
+          document.querySelectorAll(
+            "#eligibilityResultsContainer details[data-pathway-id]",
+          ),
+        ).map((d) => {
+          const status =
+            (
+              Array.from(d.querySelectorAll("summary p")).find((p) =>
+                p.textContent.includes("Status:"),
+              ) || {}
+            ).textContent || "";
+          return {
+            id: d.dataset.pathwayId,
+            open: d.open,
+            eligible: /Status:[ ]*Eligible/.test(status),
+            notYet: /Not yet eligible/.test(status),
+          };
+        }),
+      );
 
-    // SORT-01: Eligible group appears before Not-Eligible group in DOM
-    // Profile: EL E8 → ITE Year 2 Applied Sci eligible (G2:4 ≤ MER:4) and ITE 3-Year eligible; PFP not eligible (EL G2:4 > 3)
-    // Expected: ITE 3-Year Higher Nitec (orig=4, eligible) rendered before JC/MI (orig=0, not eligible)
+    // SORT-01: JC/MI stays first although only ITE is eligible
     await reset(page);
     await addMany(page, [
       ["EL", "G3", "E8"],
@@ -1835,32 +1862,17 @@ function ok(cond, id, msg) {
     ]);
     {
       const order = await getGroupOrder(page);
-      const iY3 = order.indexOf("ITE 3-Year Higher Nitec");
-      const iJC = order.indexOf("JC/MI");
+      const jc = await getResult(page, "Junior College");
+      const ite = await getResult(page, "MER (Complete SEC)");
       ok(
-        iY3 !== -1 && iJC !== -1 && iY3 < iJC,
+        order.join("|") === FIXED_ORDER.join("|") &&
+          !jc.isEligible &&
+          ite.isEligible,
         "SORT-01",
-        `Eligible group "ITE 3-Year Higher Nitec" (pos ${iY3}) before Not-Eligible "JC/MI" (pos ${iJC})`,
+        `Order stays JC/MI → ITE 3-Year even though only ITE is eligible (${order.join(" > ")})`,
       );
     }
-
-    // SORT-02: Among Not-Eligible groups, original insertion order preserved
-    // Same profile: JC/MI (not eligible, original 0) and Poly (not eligible, original 1)
-    // Expected: JC/MI appears before Polytechnic Year 1 in DOM
-    {
-      const order = await getGroupOrder(page);
-      const iJC = order.indexOf("JC/MI");
-      const iPoly = order.indexOf("Polytechnic Year 1");
-      ok(
-        iJC !== -1 && iPoly !== -1 && iJC < iPoly,
-        "SORT-02",
-        `Not-Eligible "JC/MI" (pos ${iJC}) before "Polytechnic Year 1" (pos ${iPoly}) — original order preserved`,
-      );
-    }
-
-    // SORT-03: Among Eligible groups, original insertion order preserved
-    // Profile: EL D7 → PFP-Hum eligible (orig 2) and ITE 3-Year Higher Nitec eligible (orig 4)
-    // Expected: PFP appears before ITE 3-Year Higher Nitec in DOM
+    // SORT-02: another mix of eligible groups, same fixed order
     await reset(page);
     await addMany(page, [
       ["EL", "G3", "D7"],
@@ -1871,31 +1883,13 @@ function ok(cond, id, msg) {
     ]);
     {
       const order = await getGroupOrder(page);
-      const iPFP = order.indexOf("PFP");
-      const iY3 = order.indexOf("ITE 3-Year Higher Nitec");
       ok(
-        iPFP !== -1 && iY3 !== -1 && iPFP < iY3,
-        "SORT-03",
-        `Eligible "PFP" (pos ${iPFP}) before Eligible "ITE 3-Year Higher Nitec" (pos ${iY3}) — original order preserved`,
+        order.join("|") === FIXED_ORDER.join("|"),
+        "SORT-02",
+        "Order is unchanged when PFP and ITE are the eligible groups",
       );
     }
-
-    // SORT-04: ITE Year 2 (orig=3) before ITE 3-Year (orig=4) when both eligible — original order preserved within eligible tier
-    // Profile same as SORT-01: EL E8 → ITE Year 2 Applied Sci eligible; ITE 3-Year eligible; PFP not eligible
-    {
-      const order = await getGroupOrder(page);
-      const iY2 = order.indexOf("ITE Year 2 Higher Nitec");
-      const iY3 = order.indexOf("ITE 3-Year Higher Nitec");
-      ok(
-        iY2 !== -1 && iY3 !== -1 && iY2 < iY3,
-        "SORT-04",
-        `Eligible "ITE Year 2 Higher Nitec" (pos ${iY2}) before Eligible "ITE 3-Year Higher Nitec" (pos ${iY3}) — original order preserved`,
-      );
-    }
-
-    // SORT-05: ITE Year 2 Not Eligible (score=20 > 19) sorts after eligible ITE 3-Year Higher Nitec
-    // Profile: all 5 subjects G3 E8 (→G2:4 each) → score=20 > 19 → ITE Year 2 Not Eligible
-    // ITE 3-Year: Complete SEC MER met (5 subjects) → Eligible
+    // SORT-03: nothing but ITE 3-Year eligible
     await reset(page);
     await addMany(page, [
       ["EL", "G3", "E8"],
@@ -1906,14 +1900,67 @@ function ok(cond, id, msg) {
     ]);
     {
       const order = await getGroupOrder(page);
-      const iY2 = order.indexOf("ITE Year 2 Higher Nitec");
-      const iY3 = order.indexOf("ITE 3-Year Higher Nitec");
       ok(
-        iY2 !== -1 && iY3 !== -1 && iY3 < iY2,
-        "SORT-05",
-        `Eligible "ITE 3-Year Higher Nitec" (pos ${iY3}) before Not-Eligible "ITE Year 2 Higher Nitec" (pos ${iY2})`,
+        order.join("|") === FIXED_ORDER.join("|"),
+        "SORT-03",
+        "Order is unchanged when ITE 3-Year is the only eligible group",
       );
     }
+
+    // CARD-01: eligible cards open, not-eligible cards collapsed
+    const states = await cardStates(page);
+    ok(
+      states.length === 17 &&
+        states.some((s) => s.eligible) &&
+        states.some((s) => s.notYet) &&
+        states.every((s) => (s.eligible ? s.open : !s.open)),
+      "CARD-01",
+      `Eligible cards start open and not-yet-eligible cards start collapsed (${states.filter((s) => s.open).length} open of ${states.length})`,
+    );
+    // CARD-02: a collapsed card still shows its name and status
+    const closed = states.find((s) => !s.open);
+    const sel = `#eligibilityResultsContainer details[data-pathway-id="${closed.id}"]`;
+    {
+      const headerVisible =
+        (await page.isVisible(`${sel} > summary h3`)) &&
+        (await page.isVisible(`${sel} > summary p`));
+      const bodyHidden = !(await page.isVisible(`${sel} details summary`));
+      ok(
+        headerVisible && bodyHidden,
+        "CARD-02",
+        "A collapsed card shows its name and status; the score and details stay hidden",
+      );
+    }
+    // CARD-03: clicking the header opens it
+    await page.click(`${sel} > summary`);
+    ok(
+      (await page.$eval(sel, (d) => d.open)) &&
+        (await page.isVisible(`${sel} details summary`)),
+      "CARD-03",
+      "Clicking the header opens the card",
+    );
+    // CARD-04: what the student opened or closed survives adding a subject
+    const openEligible = states.find((s) => s.open);
+    const sel2 = `#eligibilityResultsContainer details[data-pathway-id="${openEligible.id}"]`;
+    await page.click(`${sel2} > summary`);
+    await add(page, "PHY", "G3", "B4");
+    ok(
+      (await page.$eval(sel, (d) => d.open)) &&
+        !(await page.$eval(sel2, (d) => d.open)),
+      "CARD-04",
+      "A card opened by hand stays open, and one closed by hand stays closed, after another subject is added",
+    );
+    // CARD-05: group headings stay visible above collapsed cards
+    ok(
+      (
+        await page.$$eval(
+          "#eligibilityResultsContainer .col-span-full.mb-6 > h3",
+          (hs) => hs.map((h) => h.textContent.trim()),
+        )
+      ).join("|") === FIXED_ORDER.join("|"),
+      "CARD-05",
+      "Every group heading is shown, even for groups whose cards are all collapsed",
+    );
   } catch (err) {
     // A thrown error mid-run must fail the suite, not print "All checks passed!".
     console.log(`

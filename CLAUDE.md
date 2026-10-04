@@ -86,7 +86,7 @@ spdv4/
 │       └── screenshot.md
 └── scripts/
     ├── screenshot.js
-    ├── run_edge_case_tests.js   ← 152 assertions across 14 phases
+    ├── run_edge_case_tests.js   ← 155 assertions across 14 phases
     ├── run_invariant_tests.js   ← 102 assertions across 3 phases
     ├── run_ca_tests.js          ← 18 conditional-admission checks
     └── run_advice_tests.js      ← Action Plan engine + FSBB table UI (85 checks)
@@ -105,7 +105,7 @@ Insertion order in `groupedPathways` determines sort tie-breaking:
 
 **Removed from 2027:** "ITE Year 2 Higher Nitec" (Year 2 PSE entry gone — internal acceleration only) and "ITE 2-Year Nitec" ("Nitec" qualification abolished).
 
-Eligible groups sort before not-eligible groups; original insertion order preserved within each tier.
+Groups always render in this fixed order, JC/MI down to ITE 3-Year Higher Nitec, whatever is eligible. Eligible cards start open; not-yet-eligible cards start collapsed to their header (name + status) and open on click, and a card the student opens or closes by hand stays that way across re-renders (`eligibilityCardPref`).
 
 ## Known Gotchas
 
@@ -131,3 +131,4 @@ Eligible groups sort before not-eligible groups; original insertion order preser
 | 2026-10 | Action Plan wording | ITE route labels (`MER (Pass EL & Math)` etc.) shown in plain language in the Action Plan only, via display-only `plain()` / `PLAIN_NAMES`; PATHWAYS data names, eligibility cards and edge tests unchanged. Choice D lists each lowered subject on its own line. `run_advice_tests.js` now 79 checks |
 | 2026-10 | FSBB table Action Plan | "Your Action Plan" is now the MOE FSBB Summary table (poster column order: 3-Year Higher Nitec, 2-Year Higher Nitec, PFP, Polytechnic Year 1, MI, JC; rows 5 G3 / 4 G3 + 1 G2 / 5 G2 / 4 G1; NAFA and Arts left out). Rows are the options, so the A–D choice cards, ★ suggestion, "Try your own mix", status tiles, practical check, "Before you decide" and the separate explorer were removed. Boxes: ✓ eligible, ↑ almost there (≤5 marks), ○ needs more work, grey = not offered (`FSBB_MATRIX`). "You are here" row uses today's staircase; other rows are the easiest mix landing on that row (`fsbbConfigs` / `fsbbBuild`: lower subjects in recalibration order with protect/drop variants; rows above the student's row are estimates, dashed + "est."). Drop only for weaker subjects, only with more than 5 subjects. Tap a box (or column heading) for `fsbbExplain` (KEEP / MOVE / RAISE / DROP / EITHER per subject, two warnings: within 5 marks of next grade, only 5 subjects left) plus that column's course rows (easiest first, quick-win lines on your row). Engine and calc functions untouched; test hooks `__spdTest.fsbb`, `fsbbExplain`, `fsbbRow`, `quickWins`. `run_edge_case_tests.js` reads quick wins via `__spdTest.quickWins`. `run_advice_tests.js` now 82 checks |
 | 2026-10 | FSBB table UX pass | First student UX audit (`tests/ux/`, `node tests/ux/student-journey.js`, friction 2.1 → 1.9). "See where you can go" button (`#jumpToPlan`) under the subject list scrolls to `#actionPlanTitle`. Lower-row details: short status line plus a separate "To be on this row:" route line (`[data-fsbb-route]`); details scroll to the top of the screen on tap; EST. note under the table. Far-off (○) boxes on lower rows show the marks route ("+16 marks in 2 subjects") instead of vague text: drawn first with interim wording (`data-pending`), then filled in one box per tick by `fsbbFillPending` because it needs the full advice engine; pathways marks cannot reach say "Marks alone won't be enough". `run_advice_tests.js` now 85 checks |
+| 2026-10 | Eligibility cards | Removed the eligible-first group sort (groups keep PATHWAYS order). Each pathway card is a `<details data-pathway-id>`: open when eligible or conditionally admitted, collapsed to its header otherwise; open/closed choices persist in `eligibilityCardPref`. Phase 14 of `run_edge_case_tests.js` rewritten (SORT-01–03 fixed order, CARD-01–05 collapse behaviour); now 155 assertions |

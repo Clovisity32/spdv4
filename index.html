@@ -6183,6 +6183,15 @@
           });
         }
 
+        // Which cards the student opened or closed by hand (survives re-renders).
+        const eligibilityCardPref = {};
+        eligibilityResultsContainer.addEventListener("click", (e) => {
+          const sum = e.target.closest("summary");
+          const card = sum && sum.parentElement;
+          if (card && card.dataset && card.dataset.pathwayId)
+            eligibilityCardPref[card.dataset.pathwayId] = !card.open;
+        });
+
         function renderEligibilityResults(eligibilityResults) {
           eligibilityResultsContainer.innerHTML = "";
           if (studentSubjects.length === 0) {
@@ -6206,15 +6215,8 @@
               groupedPathways["Other Pathways"].push(p);
             }
           });
-          const sortedGroups = Object.keys(groupedPathways).sort((a, b) => {
-            const aEligible = groupedPathways[a].some((p) => p.isEligible)
-              ? 0
-              : 1;
-            const bEligible = groupedPathways[b].some((p) => p.isEligible)
-              ? 0
-              : 1;
-            return aEligible - bEligible;
-          });
+          // Groups keep the fixed order JC/MI down to ITE 3-Year Higher Nitec.
+          const sortedGroups = Object.keys(groupedPathways);
           for (const group of sortedGroups) {
             if (groupedPathways[group].length > 0) {
               const groupSection = document.createElement("div");
@@ -6238,7 +6240,7 @@
               cardsContainer.className =
                 "grid md:grid-cols-2 lg:col-span-3 gap-6";
               groupedPathways[group].forEach((pathway) => {
-                const card = document.createElement("div");
+                const card = document.createElement("details");
                 const isEligible = pathway.isEligible;
                 const isCA = pathway.isCA;
                 let notEligibleLabel = "Not yet eligible";
@@ -6271,7 +6273,13 @@
                     notEligibleLabel = "Not yet eligible — MER not met";
                   }
                 }
-                card.className = `p-5 rounded-lg shadow-lg border ${isCA ? "bg-amber-800/30 border-amber-500" : isEligible ? "bg-emerald-800/30 border-emerald-600" : "bg-slate-700/50 border-slate-500"} transition-all hover:shadow-xl hover:scale-[1.02]`;
+                card.dataset.pathwayId = pathway.id;
+                {
+                  const pref = eligibilityCardPref[pathway.id];
+                  card.open =
+                    pref !== undefined ? pref : !!(isEligible || isCA);
+                }
+                card.className = `group p-5 rounded-lg shadow-lg border ${isCA ? "bg-amber-800/30 border-amber-500" : isEligible ? "bg-emerald-800/30 border-emerald-600" : "bg-slate-700/50 border-slate-500"} transition-all hover:shadow-xl hover:scale-[1.02]`;
                 let scoreText = "";
                 if (pathway.group === "ITE 3-Year Higher Nitec") {
                   if (!isEligible) {
@@ -6352,7 +6360,7 @@
                         .join("")}</ul>`
                     : `<h5 class="text-sm font-semibold text-sky-300 mt-3 mb-1">Subjects considered for calculation:</h5><p class="text-slate-300 text-sm pl-2">No subjects met criteria or not applicable.</p>`;
 
-                card.innerHTML = `<h3 class="text-xl font-semibold mb-2 flex items-center">${isCA ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-amber-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg>' : isEligible ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-emerald-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-slate-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z"></path></svg>'} ${pathwayNameDisplay}</h3><p class="text-sm mb-1 font-medium ${isCA ? "text-amber-300" : isEligible ? "text-emerald-300" : "text-slate-400"}">Status: ${isCA ? 'Eligible <span class="tooltip">(Conditional Admission)<sup><small>i</small></sup><span class="tooltiptext">Score qualifies for Conditional Admission. You may still be considered even though MER is not fully met. Consider re-sitting to fulfil MER requirements.</span></span>' : isEligible ? 'Eligible <span class="tooltip">(subject to MER)<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span>' : notEligibleLabel}</p>${scoreText}<details class="text-xs mt-2"><summary class="cursor-pointer text-sky-400 hover:text-sky-300">Details & Reasons</summary><div class="mt-2"><h5 class="text-sm font-semibold text-sky-300 mb-1">Requirements:</h5><ul class="list-disc list-inside mt-1 pl-2 text-slate-300 space-y-1">${requirementsList}${descriptionItemHtml}</ul></div>${subjectsUsedHtml}</details>`;
+                card.innerHTML = `<summary class="flex items-start justify-between gap-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded"><span class="min-w-0 flex-1"><h3 class="text-xl font-semibold mb-2 flex items-center [&>svg]:shrink-0">${isCA ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-amber-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg>' : isEligible ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-emerald-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-slate-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z"></path></svg>'} ${pathwayNameDisplay}</h3><p class="text-sm mb-1 font-medium ${isCA ? "text-amber-300" : isEligible ? "text-emerald-300" : "text-slate-400"}">Status: ${isCA ? 'Eligible <span class="tooltip">(Conditional Admission)<sup><small>i</small></sup><span class="tooltiptext">Score qualifies for Conditional Admission. You may still be considered even though MER is not fully met. Consider re-sitting to fulfil MER requirements.</span></span>' : isEligible ? 'Eligible <span class="tooltip">(subject to MER)<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span>' : notEligibleLabel}</p></span><span class="shrink-0 text-2xl leading-none text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span></summary>${scoreText}<details class="text-xs mt-2"><summary class="cursor-pointer text-sky-400 hover:text-sky-300">Details & Reasons</summary><div class="mt-2"><h5 class="text-sm font-semibold text-sky-300 mb-1">Requirements:</h5><ul class="list-disc list-inside mt-1 pl-2 text-slate-300 space-y-1">${requirementsList}${descriptionItemHtml}</ul></div>${subjectsUsedHtml}</details>`;
                 cardsContainer.appendChild(card);
               });
               if (allNotEligibleInGroup && groupSection.children.length <= 1) {
