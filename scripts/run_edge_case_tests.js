@@ -1821,7 +1821,7 @@ function ok(cond, id, msg) {
     // whatever is eligible. Eligible cards start open; others start collapsed
     // to their header (name + status) and open on click.
     // ════════════════════════════════════════════════════════════════════════
-    console.log("\n── Phase 14: Fixed group order, collapsed cards ──");
+    console.log("\n── Phase 14: Fixed track order, collapsible tracks ──");
     const FIXED_ORDER = [
       "JC/MI",
       "Polytechnic Year 1",
@@ -1829,24 +1829,22 @@ function ok(cond, id, msg) {
       "ITE Year 2 Higher Nitec",
       "ITE 3-Year Higher Nitec",
     ];
-    const cardStates = (page) =>
+    const trackStates = (page) =>
       page.evaluate(() =>
         Array.from(
           document.querySelectorAll(
-            "#eligibilityResultsContainer details[data-pathway-id]",
+            "#eligibilityResultsContainer > details[data-track]",
           ),
         ).map((d) => {
-          const status =
-            (
-              Array.from(d.querySelectorAll("summary p")).find((p) =>
-                p.textContent.includes("Status:"),
-              ) || {}
-            ).textContent || "";
+          const cards = Array.from(d.querySelectorAll('[class*="p-5"]'));
           return {
-            id: d.dataset.pathwayId,
+            track: d.dataset.track,
             open: d.open,
-            eligible: /Status:[ ]*Eligible/.test(status),
-            notYet: /Not yet eligible/.test(status),
+            cards: cards.length,
+            eligibleCards: cards.filter((c) =>
+              c.textContent.includes("Status: Eligible"),
+            ).length,
+            status: d.querySelector("[data-track-status]").textContent.trim(),
           };
         }),
       );
@@ -1907,60 +1905,93 @@ function ok(cond, id, msg) {
       );
     }
 
-    // CARD-01: eligible cards open, not-eligible cards collapsed
-    const states = await cardStates(page);
+    // CARD-01: a track with something eligible starts open; the rest start collapsed
+    const states = await trackStates(page);
     ok(
-      states.length === 17 &&
-        states.some((s) => s.eligible) &&
-        states.some((s) => s.notYet) &&
-        states.every((s) => (s.eligible ? s.open : !s.open)),
+      states.length === 5 &&
+        states.some((s) => s.open) &&
+        states.some((s) => !s.open) &&
+        states.every((s) =>
+          s.eligibleCards > 0
+            ? s.open &&
+              s.status === s.eligibleCards + " of " + s.cards + " eligible"
+            : !s.open && s.status === "Not yet eligible",
+        ),
       "CARD-01",
-      `Eligible cards start open and not-yet-eligible cards start collapsed (${states.filter((s) => s.open).length} open of ${states.length})`,
+      "A track with an eligible pathway starts open and says how many; a track with none starts collapsed and says 'Not yet eligible' (" +
+        states
+          .map((s) => s.track + ":" + (s.open ? "open" : "closed"))
+          .join(", ") +
+        ")",
     );
-    // CARD-02: a collapsed card still shows its name and status
+    // CARD-02: a collapsed track still shows its name and status, but not its cards
     const closed = states.find((s) => !s.open);
-    const sel = `#eligibilityResultsContainer details[data-pathway-id="${closed.id}"]`;
-    {
-      const headerVisible =
-        (await page.isVisible(`${sel} > summary h3`)) &&
-        (await page.isVisible(`${sel} > summary p`));
-      const bodyHidden = !(await page.isVisible(`${sel} details summary`));
-      ok(
-        headerVisible && bodyHidden,
-        "CARD-02",
-        "A collapsed card shows its name and status; the score and details stay hidden",
-      );
-    }
-    // CARD-03: clicking the header opens it
-    await page.click(`${sel} > summary`);
+    const tsel =
+      '#eligibilityResultsContainer > details[data-track="' +
+      closed.track +
+      '"]';
     ok(
-      (await page.$eval(sel, (d) => d.open)) &&
-        (await page.isVisible(`${sel} details summary`)),
-      "CARD-03",
-      "Clicking the header opens the card",
+      (await page.isVisible(tsel + " > summary h3")) &&
+        (await page.isVisible(tsel + " > summary [data-track-status]")) &&
+        !(await page.isVisible(tsel + ' [class*="p-5"] h3')),
+      "CARD-02",
+      "A collapsed track shows its name and status; its description and cards are hidden",
     );
-    // CARD-04: what the student opened or closed survives adding a subject
-    const openEligible = states.find((s) => s.open);
-    const sel2 = `#eligibilityResultsContainer details[data-pathway-id="${openEligible.id}"]`;
-    await page.click(`${sel2} > summary`);
+    // CARD-03: clicking the header opens the track
+    await page.click(tsel + " > summary");
+    ok(
+      (await page.$eval(tsel, (d) => d.open)) &&
+        (await page.isVisible(tsel + ' [class*="p-5"] h3')),
+      "CARD-03",
+      "Clicking the track header opens it and shows its cards",
+    );
+    // CARD-04: the student's choice survives adding a subject
+    const openTrack = states.find((s) => s.open);
+    const tsel2 =
+      '#eligibilityResultsContainer > details[data-track="' +
+      openTrack.track +
+      '"]';
+    await page.click(tsel2 + " > summary");
     await add(page, "PHY", "G3", "B4");
     ok(
-      (await page.$eval(sel, (d) => d.open)) &&
-        !(await page.$eval(sel2, (d) => d.open)),
+      (await page.$eval(tsel, (d) => d.open)) &&
+        !(await page.$eval(tsel2, (d) => d.open)),
       "CARD-04",
-      "A card opened by hand stays open, and one closed by hand stays closed, after another subject is added",
+      "A track opened by hand stays open, and one closed by hand stays closed, after another subject is added",
     );
-    // CARD-05: group headings stay visible above collapsed cards
+    // CARD-05: every track heading is shown, in order
     ok(
       (
         await page.$$eval(
-          "#eligibilityResultsContainer .col-span-full.mb-6 > h3",
+          "#eligibilityResultsContainer > details[data-track] > summary h3",
           (hs) => hs.map((h) => h.textContent.trim()),
         )
       ).join("|") === FIXED_ORDER.join("|"),
       "CARD-05",
-      "Every group heading is shown, even for groups whose cards are all collapsed",
+      "All five track headings are shown in order, collapsed or not",
     );
+    // CARD-06: inside an open track every card is shown (cards are not collapsed one by one)
+    await page.evaluate(() =>
+      document
+        .querySelectorAll("#eligibilityResultsContainer > details[data-track]")
+        .forEach((d) => (d.open = true)),
+    );
+    {
+      const ite =
+        '#eligibilityResultsContainer > details[data-track="ITE 3-Year Higher Nitec"]';
+      const shown = await page.$$eval(
+        ite + ' [class*="p-5"] > h3',
+        (hs) => hs.filter((h) => h.getBoundingClientRect().height > 0).length,
+      );
+      const cardTags = await page.$$eval(ite + ' [class*="p-5"]', (cs) =>
+        cs.map((c) => c.tagName),
+      );
+      ok(
+        shown === 6 && cardTags.every((tag) => tag === "DIV"),
+        "CARD-06",
+        "Inside an open track every pathway card shows its name, status and scores",
+      );
+    }
   } catch (err) {
     // A thrown error mid-run must fail the suite, not print "All checks passed!".
     console.log(`

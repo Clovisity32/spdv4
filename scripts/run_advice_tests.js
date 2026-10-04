@@ -879,10 +879,10 @@ async function advise(page, subjects) {
             row.every(
               (c, ci) => (c.status === "na") === (MATRIX10[r][ci] === 0),
             ),
-          ) && g.rows[3][1].status === g.rows[3][0].status,
+          ) && g.rows[3][1].mirror === true,
       ),
       "P10-4",
-      "Grey boxes are exactly the poster's grey boxes; 4 G1 under 2-Year mirrors 3-Year",
+      "Grey boxes are exactly the poster's grey boxes; 2-Year at 4 G1 is the 3-Year route (mirror)",
     );
     ok(
       grids10.every((g) =>
@@ -937,13 +937,16 @@ async function advise(page, subjects) {
       "Advice never says DROP with 5 subjects; with 6 it drops at most one, and never English or Maths",
     );
     // close-to-next-grade warning (every subject sits 5 marks below the next grade)
+    // Same grades and marks as the weak profile (so a real route exists), with
+    // every mark except Maths placed exactly 5 below the next grade. Maths
+    // (9 short) is the one subject that must NOT trigger the warning.
     const NEAR = [
       S("EL", "G3", "B3", 65),
-      S("MATH", "G3", "C6", 50),
-      S("MT", "G3", "D7", 45),
+      S("MT", "G3", "C6", 50),
+      S("MATH", "G3", "F9", 31),
       S("COMB_SCI", "G3", "D7", 45),
       S("COMB_HUM", "G3", "E8", 40),
-      S("POA", "G3", "E8", 40),
+      S("POA", "G3", "F9", 35),
     ];
     const gNear = await fsbbOf(NEAR);
     let warnOk = true;
@@ -951,17 +954,21 @@ async function advise(page, subjects) {
     for (const row of gNear.rows.slice(1))
       for (const c of row) {
         if (
-          (c.status !== "open" &&
-            c.status !== "close" &&
-            c.status !== "further") ||
-          c.mirror
+          c.status !== "open" &&
+          c.status !== "later" &&
+          c.status !== "close" &&
+          c.status !== "further"
         )
           continue;
-        const down = c.moves.filter((m) => !m.up).length + c.dropped.length;
-        if (!down) continue;
+        const downIds = [
+          ...c.moves.filter((m) => !m.up).map((m) => m.subjectId),
+          ...c.dropped,
+        ];
+        if (!downIds.length) continue;
+        const near = downIds.filter((id) => id !== "MATH").length;
         const e = await explainOf(NEAR, c.row, c.col);
         warnChecked++;
-        if (e.warnings.filter((w) => /marks? from/.test(w)).length !== down)
+        if (e.warnings.filter((w) => /marks? from/.test(w)).length !== near)
           warnOk = false;
       }
     ok(
@@ -990,6 +997,106 @@ async function advise(page, subjects) {
       gW6.ms < 2500,
       "P10-10",
       `The table builds quickly (${Math.round(gW6.ms)} ms including the advice engine)`,
+    );
+
+    // ---- Moving down is only suggested when it opens something ----
+    const A1x6 = ["EL", "MATH", "MT", "COMB_SCI", "COMB_HUM", "POA"].map((id) =>
+      S(id, "G3", "A1", 90),
+    );
+    const gA1 = await fsbbOf(A1x6);
+    ok(
+      gA1.r0 === 0 &&
+        gA1.rows.every((row, r) =>
+          row.every(
+            (c) =>
+              r === 0 ||
+              c.status === "na" ||
+              (c.status === "have" &&
+                c.moves.length === 0 &&
+                c.dropped.length === 0),
+          ),
+        ),
+      "P10-11",
+      "A student with six G3 A1s already has every pathway: every lower box says 'already open' and suggests no move and no drop",
+    );
+    const exA1 = [];
+    for (const [r, c] of [
+      [0, 0],
+      [0, 3],
+      [0, 5],
+    ])
+      exA1.push(...(await explainOf(A1x6, r, c)).advice.map((a) => a.action));
+    ok(
+      exA1.length > 0 && exA1.every((a) => a === "KEEP" || a === "EITHER"),
+      "P10-12",
+      "For that student the subject advice is only keep / either: no MOVE, no RAISE, no DROP",
+    );
+    // For every profile: a box with a level change or drop must beat the rows above it
+    const RANK10 = {
+      open: 0,
+      have: 0,
+      later: 1,
+      close: 1,
+      further: 2,
+      nobetter: 2,
+    };
+    let pointless = "";
+    for (const g of [...grids10, gA1, gNear, gMixed]) {
+      for (let r = g.r0 + 1; r < 4; r++)
+        g.rows[r].forEach((c, ci) => {
+          if (RANK10[c.status] === undefined) return;
+          if (c.moves.length === 0 && c.dropped.length === 0) return;
+          let above = 9;
+          for (let k = g.r0; k < r; k++)
+            if (RANK10[g.rows[k][ci].status] !== undefined)
+              above = Math.min(above, RANK10[g.rows[k][ci].status]);
+          if (!(RANK10[c.status] < above)) pointless = c.key + " row " + r;
+        });
+    }
+    ok(
+      pointless === "",
+      "P10-13",
+      "A lower box only carries a level change or drop when it opens or improves a pathway (" +
+        (pointless || "all checked") +
+        ")",
+    );
+    ok(
+      gW6.rows[3][1].status === "later" &&
+        gW6.rows[3][1].line1 === "Possible after Year 1" &&
+        gW6.rows[1][1].status === "nobetter" &&
+        gW6.rows[1][0].status === "have",
+      "P10-14",
+      "Weak student: 3-Year is 'already open' lower down, 2-Year at 4 G1 reads 'Possible after Year 1' (not a course count), and boxes that gain nothing say so",
+    );
+
+    // ---- Free-time hint: separate from the routes, never for strong students ----
+    const exW6 = await explainOf(W6, 0, 0);
+    const exW6poly = await explainOf(W6, 0, 3);
+    const exA1b = await explainOf(A1x6, 0, 3);
+    const ex5b = await explainOf(WEAK3_OF_5, 0, 0);
+    ok(
+      exW6.free &&
+        exW6.free.names.length >= 1 &&
+        exW6.free.names.every(
+          (n) => !n.startsWith("English") && !n.startsWith("Mathematics"),
+        ) &&
+        exW6.free.left === 5 &&
+        exW6.warnings.some((w) => w.includes("only 5 subjects")),
+      "P10-15",
+      "Weak student with 6 subjects: subjects no pathway needs are offered as a free-time option, with the 5-subject warning (" +
+        (exW6.free ? exW6.free.names.join(", ") : "none") +
+        ")",
+    );
+    ok(
+      !exW6poly.free ||
+        !exW6poly.free.names.some((n) => n.startsWith("Combined Humanities")),
+      "P10-15b",
+      "The free-time hint never lists a subject that the column's own improvement routes ask you to raise (Humanities for Polytechnic)",
+    );
+    ok(
+      exA1b.free === null && ex5b.free === null,
+      "P10-16",
+      "No free-time option for a strong student, or for a student who already has only 5 subjects",
     );
 
     // ---- UI ----
@@ -1058,7 +1165,9 @@ async function advise(page, subjects) {
       )) === gW6.rows[0].filter((c) => c.status === "open").length &&
         (await page.$$eval("[data-fsbb-cell]", (bs) =>
           bs.every((b) =>
-            ["open", "close", "further"].includes(b.dataset.status),
+            ["open", "close", "further", "have", "nobetter", "later"].includes(
+              b.dataset.status,
+            ),
           ),
         )),
       "P10-U4",
@@ -1105,13 +1214,12 @@ async function advise(page, subjects) {
       "Tapping a column heading opens that pathway for your row",
     );
     // a lower row: the route is spelled out
-    await page.click('[data-fsbb-cell][data-row="1"][data-col="0"]');
+    await page.click('[data-fsbb-cell][data-row="3"][data-col="1"]');
     const lowerHead = await page.textContent("[data-fsbb-headline]");
     const lowerRoute = await page.textContent("[data-fsbb-route]");
     ok(
       /G3→G[12]|Drop/.test(lowerRoute) &&
         lowerRoute.startsWith("To be on this row:") &&
-        lowerHead.length < 90 &&
         !/G3→G/.test(lowerHead) &&
         (await page.$$("#fsbbDetails [data-advice]")).length >= 1,
       "P10-U9",
@@ -1179,6 +1287,59 @@ async function advise(page, subjects) {
       "P10-U16",
       `Every 'needs more work' box names the marks it needs, or says marks alone won't be enough (${farTexts.length} boxes, e.g. ${farTexts[farTexts.length - 1]})`,
     );
+    // ---- Why: a box that gains nothing explains itself, and courses say why ----
+    await page.click('[data-fsbb-cell][data-row="1"][data-col="3"]');
+    {
+      const head = await page.textContent("[data-fsbb-headline]");
+      const sub = await page.textContent("[data-fsbb-sub]");
+      ok(
+        head.includes("LDL does not increase eligibility") &&
+          sub.includes("On your own row") &&
+          (await page.$("[data-fsbb-route]")) === null &&
+          (await page.$$("#fsbbDetails [data-advice='MOVE']")).length === 0 &&
+          (await page.$$("#fsbbDetails [data-advice='DROP']")).length === 0,
+        "P10-U17",
+        "A 'moving down won't help' box says so, points back at your own row, and gives no move or drop",
+      );
+    }
+    await page.click('[data-fsbb-cell][data-row="1"][data-col="0"]');
+    {
+      const head = await page.textContent("[data-fsbb-headline]");
+      const why = await page.$$eval("#fsbbCourses [data-why] li", (ls) =>
+        ls.map((l) => l.textContent.trim()),
+      );
+      ok(
+        head.includes("already qualify") &&
+          why.length > 0 &&
+          why.some((l) => l.startsWith("✓")),
+        "P10-U18",
+        "An 'already open' box shows why you qualify: each requirement with a ✓ (" +
+          why.length +
+          " lines)",
+      );
+    }
+    await page.click('[data-fsbb-cell][data-row="0"][data-col="3"]');
+    {
+      const why = await page.$$eval("#fsbbCourses [data-why] li", (ls) =>
+        ls.map((l) => l.textContent.trim()),
+      );
+      ok(
+        why.some((l) => l.startsWith("✗")) &&
+          (await page.textContent("#fsbbCourses")).includes("Why not yet"),
+        "P10-U19",
+        "A course you do not qualify for yet shows what is missing with a ✗",
+      );
+    }
+    await page.click('[data-fsbb-cell][data-row="3"][data-col="1"]');
+    {
+      const head = await page.textContent("[data-fsbb-headline]");
+      ok(
+        head.includes("join Year 1 of the 3-Year Higher Nitec") &&
+          (await page.$$("#fsbbCourses [data-pw]")).length === 6,
+        "P10-U20",
+        "2-Year at 4 G1 explains you join Year 1 of the 3-Year course (and may be offered the 2-year route), and lists the 3-Year courses you would join",
+      );
+    }
     // "See where you can go" jump button under the subject list
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.click("#jumpToPlan");
