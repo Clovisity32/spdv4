@@ -71,8 +71,7 @@ async function getResult(page, nameSubstr) {
         };
         return {
           found: true,
-          isEligible:
-            status.includes("Eligible") && !status.includes("Not Eligible"),
+          isEligible: status.includes("You qualify"),
           isCA: status.includes("Conditional Admission"),
           status: status.trim(),
           gross: num(grossP),

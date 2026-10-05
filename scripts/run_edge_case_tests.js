@@ -88,8 +88,7 @@ async function getResult(page, nameSubstr) {
         };
         return {
           found: true,
-          isEligible:
-            status.includes("Eligible") && !status.includes("Not Eligible"),
+          isEligible: status.includes("You qualify"),
           isCA: status.includes("Conditional Admission"),
           status: status.trim(),
           gross: num(grossP),
@@ -1855,7 +1854,7 @@ function ok(cond, id, msg) {
             open: d.open,
             cards: cards.length,
             eligibleCards: cards.filter((c) =>
-              c.textContent.includes("Status: Eligible"),
+              c.textContent.includes("Status: You qualify"),
             ).length,
             status: d.querySelector("[data-track-status]").textContent.trim(),
           };
@@ -1927,11 +1926,12 @@ function ok(cond, id, msg) {
         states.every((s) =>
           s.eligibleCards > 0
             ? s.open &&
-              s.status === s.eligibleCards + " of " + s.cards + " eligible"
-            : !s.open && s.status === "Not yet eligible",
+              s.status ===
+                "You qualify for " + s.eligibleCards + " of " + s.cards
+            : !s.open && s.status === "Not yet",
         ),
       "CARD-01",
-      "A track with an eligible pathway starts open and says how many; a track with none starts collapsed and says 'Not yet eligible' (" +
+      "A track with an eligible pathway starts open and says how many; a track with none starts collapsed and says 'Not yet' (" +
         states
           .map((s) => s.track + ":" + (s.open ? "open" : "closed"))
           .join(", ") +
@@ -2282,15 +2282,21 @@ function ok(cond, id, msg) {
       await pickTick(["MATH"]);
       await page.click("#subjectMenuAdd");
       await page.waitForTimeout(500);
-      const tagBefore = (await page.textContent('[data-subject-row="MATH"]')).includes("Set grade");
+      const tagBefore = (
+        await page.textContent('[data-subject-row="MATH"]')
+      ).includes("Set grade");
       await setRow("MATH", "G2", "1");
       await page.fill('[data-subject-row="MATH"] [data-row-raw]', "72");
       await page.press('[data-subject-row="MATH"] [data-row-raw]', "Tab");
       await page.waitForTimeout(200);
       ok(
         tagBefore &&
-          (await page.inputValue('[data-subject-row="MATH"] [data-row-grade]')) === "2" &&
-          !(await page.textContent('[data-subject-row="MATH"]')).includes("Set grade"),
+          (await page.inputValue(
+            '[data-subject-row="MATH"] [data-row-grade]',
+          )) === "2" &&
+          !(await page.textContent('[data-subject-row="MATH"]')).includes(
+            "Set grade",
+          ),
         "PICK-12b",
         "At G2 a mark of 72 sets grade 2, and the row's 'Set grade' tag clears",
       );

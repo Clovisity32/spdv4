@@ -1252,6 +1252,26 @@ async function advise(page, subjects) {
       "P10-U2",
       "The table shows one row (the student's own combination), and its poster-grey boxes are plain grey with no text",
     );
+    {
+      const sizes = await page.evaluate(() => {
+        const h = (sel) =>
+          [...document.querySelectorAll(sel)].map((n) =>
+            Math.round(n.getBoundingClientRect().height),
+          );
+        return {
+          boxes: h(
+            "#fsbbTable tbody [data-fsbb-cell], #fsbbTable tbody [data-fsbb-na], #fsbbTable tbody [data-fsbb-none]",
+          ),
+          heads: h("#fsbbTable [data-fsbb-col]"),
+        };
+      });
+      const same = (a) => a.length > 0 && Math.max(...a) - Math.min(...a) <= 1;
+      ok(
+        same(sizes.boxes) && same(sizes.heads),
+        "P10-U2b",
+        `All boxes in the table row are the same height (${[...new Set(sizes.boxes)].join("/")}px) and all column headings match (${[...new Set(sizes.heads)].join("/")}px), so no box looks highlighted by size`,
+      );
+    }
     ok(
       (
         await page.$$eval("[data-you]", (ns) =>
@@ -1614,7 +1634,7 @@ async function advise(page, subjects) {
         (tds) => tds.map((t) => t.textContent.trim()),
       );
       ok(
-        head.includes("already qualify") &&
+        head.includes("You qualify") &&
           needs.length > 0 &&
           needs.every((n) => n === "OK"),
         "P10-U18",
@@ -1683,7 +1703,16 @@ async function advise(page, subjects) {
         "The same rule opens on tap or keyboard focus (phones have no hover)",
       );
       ok(
-        extras.length >= 1,
+        extras.length >= 1 &&
+          (await page.$$eval(
+            "#fsbbCourses [data-easiest] [data-slot-extra]",
+            (rs) =>
+              rs.every(
+                (r) =>
+                  ["backup", "unused"].includes(r.dataset.kind) &&
+                  !/^Extra/.test(r.children[0].textContent.trim()),
+              ),
+          )),
         "P10-T4",
         "A subject the course does not use is listed last as an extra (" +
           extras.length +
