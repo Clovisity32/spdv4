@@ -1759,22 +1759,11 @@ async function advise(page, subjects) {
           " options)",
       );
     }
-    // "See where you can go" jump button under the subject list
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await page.click("#jumpToPlan");
-    await page.waitForTimeout(900);
+    // The "See where you can go" jump button is gone
     ok(
-      (await page.evaluate(() => {
-        const r = document
-          .querySelector("#resultsAdviceSection")
-          .getBoundingClientRect();
-        return r.top < window.innerHeight * 0.5 && r.bottom > 0;
-      })) &&
-        (await page.evaluate(
-          () => document.activeElement && document.activeElement.id,
-        )) === "actionPlanTitle",
+      (await page.$("#jumpToPlan")) === null,
       "P10-U14",
-      "The 'See where you can go' button scrolls to Your Action Plan and moves focus there",
+      "There is no 'See where you can go' jump button under the subject list",
     );
     ok(
       (await page.$("[data-fsbb-est]")) === null,

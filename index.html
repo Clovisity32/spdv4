@@ -360,12 +360,6 @@
               ></tbody>
             </table>
           </div>
-          <a
-            href="#resultsAdviceSection"
-            id="jumpToPlan"
-            class="mt-4 flex sm:inline-flex items-center justify-center min-h-[44px] px-5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-300"
-            >See where you can go: open Your Action Plan ↓</a
-          >
         </div>
       </section>
 
@@ -6760,20 +6754,6 @@
           } catch (_) {}
           setView(saved);
         }
-        // "See where you can go": jump from the subject list to the table,
-        // and move keyboard focus with it.
-        document.getElementById("jumpToPlan").addEventListener("click", (e) => {
-          e.preventDefault();
-          setView("Plan");
-          resultsAdviceSection.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-          });
-          document.getElementById("actionPlanTitle").focus({
-            preventScroll: true,
-          });
-        });
-
         const fsbbFillState = { token: 0 };
         // Boxes on a lower row that need the full advice engine to name their
         // marks route are drawn first with interim wording, then filled in one
