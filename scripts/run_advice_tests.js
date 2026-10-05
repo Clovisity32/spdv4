@@ -1147,13 +1147,12 @@ async function advise(page, subjects) {
       `Six pathway columns in poster order, no NAFA or Arts Institutions (${heads.join(" | ")})`,
     );
     ok(
-      (await page.$$("[data-fsbb-na]")).length === 9 &&
-        (await page.$$eval("[data-fsbb-na]", (ns) =>
+      (await page.$$eval("[data-fsbb-na]", (ns) =>
           ns.every((n) => n.textContent.trim() === ""),
         )) &&
-        (await page.$$("#fsbbTable tbody tr")).length === 4,
+        (await page.$$("#fsbbTable tbody tr")).length === 1,
       "P10-U2",
-      "Four rows, and the poster's 9 grey boxes are plain grey with no text",
+      "The table shows one row (the student's own combination), and its poster-grey boxes are plain grey with no text",
     );
     ok(
       (
@@ -1224,16 +1223,12 @@ async function advise(page, subjects) {
       "P10-U8",
       "Tapping a column heading opens that pathway for your row",
     );
-    // a lower row: the status line is short, the table shows the moved grades
-    await page.click('[data-fsbb-cell][data-row="3"][data-col="1"]');
-    const lowerHead = await page.textContent("[data-fsbb-headline]");
-    const lowerTable = await page.textContent("#fsbbCourses");
+    // the table shows only the student's own row, with no 'LDL does not increase' boxes
     ok(
-      !/G3→G/.test(lowerHead) &&
-        (await page.$("[data-fsbb-route]")) === null &&
-        lowerTable.includes("(was "),
+      (await page.$$("[data-fsbb-cell][data-row='1'], [data-fsbb-cell][data-row='2'], [data-fsbb-cell][data-row='3']")).length === 0 &&
+        !(await page.textContent("#resultsAdviceSection")).includes("LDL does not increase"),
       "P10-U9",
-      "A lower row keeps the status line short and the table shows each moved subject with its original grade, e.g. '(was G3 …)'",
+      "Lower rows and the 'LDL does not increase eligibility' boxes are gone from the table",
     );
     // quick-win lines, plain ITE names
     const winCount = await page.evaluate(
@@ -1266,7 +1261,7 @@ async function advise(page, subjects) {
       "P10-U11",
       "ITE courses show plain names while data names stay unchanged",
     );
-    await page.click('[data-fsbb-cell][data-row="1"][data-col="0"]');
+    await page.click('[data-fsbb-cell][data-row="0"][data-col="0"]');
     ok(
       !(await page.evaluate(
         () => document.documentElement.scrollWidth > window.innerWidth,
@@ -1297,21 +1292,7 @@ async function advise(page, subjects) {
       "P10-U16",
       `Every 'needs more work' box names the marks it needs, or says marks alone won't be enough (${farTexts.length} boxes, e.g. ${farTexts[farTexts.length - 1]})`,
     );
-    // ---- Why: a box that gains nothing explains itself, and courses say why ----
-    await page.click('[data-fsbb-cell][data-row="1"][data-col="3"]');
-    {
-      const head = await page.textContent("[data-fsbb-headline]");
-      ok(
-        !head.includes("LDL") &&
-          /Needs more work|Almost there/.test(head) &&
-          (await page.$("[data-fsbb-sub]")) === null &&
-          (await page.$("[data-fsbb-route]")) === null &&
-          (await page.$$("#fsbbDetails [data-advice='MOVE']")).length === 0 &&
-          (await page.$$("#fsbbDetails [data-advice='DROP']")).length === 0,
-        "P10-U17",
-        "A 'moving down won't help' box leads with the best row's status and marks, without an 'LDL' sentence, and gives no move or drop",
-      );
-    }
+    // ---- Why: courses say what they need ----
     // Slots counted at G2 show the G2 equivalent of a G3 grade, in Now and Need
     await page.click('[data-fsbb-cell][data-row="0"][data-col="2"]');
     {
@@ -1349,7 +1330,9 @@ async function advise(page, subjects) {
           ds.map((d) => [
             d.dataset.name,
             [...d.querySelectorAll("[data-slot-row]")].map((r) => ({
-              label: r.querySelector("[data-slot-tip]").firstChild.textContent.trim(),
+              label: r
+                .querySelector("[data-slot-tip]")
+                .firstChild.textContent.trim(),
               now: r.children[2].textContent.trim(),
             })),
           ]),
@@ -1357,11 +1340,18 @@ async function advise(page, subjects) {
       );
       const two = byCourse["MER (Pass 2G3)"] || [];
       const elmath = byCourse["MER (Pass EL & Math)"] || [];
-      const labels = Object.values(byCourse).flat().map((r) => r.label);
+      const labels = Object.values(byCourse)
+        .flat()
+        .map((r) => r.label);
       ok(
         two.map((r) => r.label).join() === "#1,#2" &&
-          elmath.map((r) => r.label).slice(0, 2).join() === "EL,MA" &&
-          !Object.values(byCourse).flat().some((r) => /G1/.test(r.now)),
+          elmath
+            .map((r) => r.label)
+            .slice(0, 2)
+            .join() === "EL,MA" &&
+          !Object.values(byCourse)
+            .flat()
+            .some((r) => /G1/.test(r.now)),
         "P10-T6",
         "ITE tables follow the course rule: 2 G3 passes show #1 and #2, English and Math show EL and MA, and no G1 figures appear",
       );
@@ -1373,13 +1363,13 @@ async function advise(page, subjects) {
           ")",
       );
     }
-    // Quick options strip: keep-G3 improvement versus moving down, previewed on the table
+    // LDL options: only LDL (no 'improve' cards); the table transforms to the previewed combination
     {
       const cards = await page.$$eval("[data-fsbb-opt]", (b) =>
-        b.map((x) => x.dataset.fsbbOpt),
+        b.map((x) => ({ key: x.dataset.fsbbOpt, text: x.innerText.replace(/\s+/g, " ") })),
       );
-      const data = await page.evaluate(() => {
-        const o = window.__spdTest.options(
+      const data = await page.evaluate(() =>
+        window.__spdTest.options(
           [
             { subjectId: "EL", level: "G3", grade: "B3" },
             { subjectId: "MATH", level: "G3", grade: "F9" },
@@ -1388,50 +1378,59 @@ async function advise(page, subjects) {
             { subjectId: "COMB_HUM", level: "G3", grade: "E8" },
           ],
           "School A",
-        );
-        return o;
-      });
-      const mathOpts = (data.find((g) => g.subjectId === "MATH") || {}).options || [];
-      const mv = mathOpts.find((o) => o.kind === "move");
-      const imp = mathOpts.find((o) => o.kind === "improve");
-      ok(
-        cards.includes("MATH:improve") &&
-          cards.includes("MATH:move") &&
-          mv &&
-          imp &&
-          mv.opens.length === 2 &&
-          mv.closes.length === 0 &&
-          imp.opens.length >= mv.opens.length,
-        "P10-O1",
-        "Maths F9 gets two quick options: improve to E8 (keep G3) and move to G2; the move opens the 2 Maths courses and closes none",
+        ),
       );
-      await page.click('[data-fsbb-opt="MATH:move"]');
-      const badges = await page.$$eval("[data-col-delta]", (n) => n.map((x) => x.textContent.replace(/\s+/g, "")));
-      const summary = await page.textContent("[data-opt-summary]");
+      const single = data.find((o) => o.key === "MATH>G2");
       ok(
-        badges.length >= 1 &&
-          badges[0].includes("+2") &&
-          /Previewing/.test(summary) &&
-          (await page.getAttribute('[data-fsbb-opt="MATH:move"]', "aria-pressed")) === "true",
+        cards.length >= 2 &&
+          cards.every((c) => c.text.startsWith("LDL ")) &&
+          !cards.some((c) => /improve|Keep G3/i.test(c.text)) &&
+          single &&
+          single.opens.length === 2 &&
+          single.closes.length === 0 &&
+          data.some((o) => o.row >= 1),
+        "P10-O1",
+        "The strip offers LDL options only: Maths to G2 opens the 2 Maths courses and closes none, and bigger mixes land on lower rows (" +
+          cards.map((c) => c.key).join(" | ") +
+          ")",
+      );
+      const eligBefore = await page.textContent("#eligibilityResultsContainer");
+      const before3 = await page.textContent('[data-fsbb-cell][data-row="0"][data-col="0"]');
+      await page.click('[data-fsbb-opt="MATH>G2"]');
+      const bar = await page.textContent("#fsbbPreviewBar");
+      const after3 = await page.textContent('[data-fsbb-cell][data-row="0"][data-col="0"]');
+      ok(
+        /Previewing LDL 1 subject/.test(bar) &&
+          (await page.$eval("[data-you]", (n) => n.textContent)).includes("Previewing") &&
+          (await page.$$("#fsbbTable tbody tr")).length === 1 &&
+          before3.includes("4 of 6") &&
+          after3.includes("6 of 6") &&
+          (await page.getAttribute('[data-fsbb-opt="MATH>G2"]', "aria-pressed")) === "true" &&
+          (await page.textContent("#eligibilityResultsContainer")) === eligBefore &&
+          (await page.$$("[data-col-delta]")).length === 0,
         "P10-O2",
-        "Tapping an option puts a green '+2' badge on the column heading and a 'Previewing' summary under the table (" + badges.join(" ") + ")",
+        "Previewing Maths at G2 rebuilds the table as that combination (3-Year goes from 4 to 6 of 6), shows a Previewing bar, no comparison badges, and leaves the eligibility cards on the real grades",
       );
       await page.click('[data-fsbb-cell][data-row="0"][data-col="0"]');
-      const tags = await page.$$eval("#fsbbCourses [data-tag='opens']", (n) => n.length);
-      ok(
-        tags === 2,
-        "P10-O3",
-        "The course list tags exactly the courses that open with an OPENS label (" + tags + ")",
+      await page.$$eval("#fsbbCourses [data-pw]", (ds) => ds.forEach((d) => (d.open = true)));
+      const mathRow = await page.$$eval("#fsbbCourses [data-slot-row]", (rs) =>
+        rs.map((r) => r.children[2].textContent.trim()).filter((t) => /was G3 F9/.test(t)),
       );
-      await page.click('[data-fsbb-opt="MATH:move"]');
       ok(
-        (await page.$$("[data-col-delta]")).length === 0 &&
-          (await page.$$("#fsbbCourses [data-tag]")).length === 0,
+        mathRow.length > 0 && mathRow.every((t) => /^G2 5 \(was G3 F9\)/.test(t)),
+        "P10-O3",
+        "In a preview the course tables show the moved subject with its real grade: " + (mathRow[0] || "none"),
+      );
+      await page.click("[data-opt-clear]");
+      ok(
+        (await page.$("#fsbbPreviewBar")) === null &&
+          (await page.$eval("[data-you]", (n) => n.textContent)).includes("You are here") &&
+          (await page.textContent('[data-fsbb-cell][data-row="0"][data-col="0"]')) === before3,
         "P10-O4",
-        "Tapping the option again clears the preview",
+        "'Back to my grades' returns the table to the real combination",
       );
     }
-    await page.click('[data-fsbb-cell][data-row="1"][data-col="0"]');
+    await page.click('[data-fsbb-cell][data-row="0"][data-col="0"]');
     {
       const head = await page.textContent("[data-fsbb-headline]");
       const needs = await page.$$eval(
@@ -1515,14 +1514,35 @@ async function advise(page, subjects) {
           ")",
       );
     }
-    await page.click('[data-fsbb-cell][data-row="3"][data-col="1"]');
     {
-      const head = await page.textContent("[data-fsbb-headline]");
+      const key4g1 = await page.$$eval("[data-fsbb-opt]", (bs) =>
+        bs.map((b) => b.dataset.fsbbOpt),
+      );
+      const g1Key = await page.evaluate(() => {
+        const bs = [...document.querySelectorAll("[data-fsbb-opt]")];
+        const hit = bs.find((b) => /4 G1 subjects/.test(b.innerText));
+        return hit ? hit.dataset.fsbbOpt : null;
+      });
+      let head = "";
+      let courses = 0;
+      let rowLabel = "";
+      if (g1Key) {
+        await page.click(`[data-fsbb-opt="${g1Key}"]`);
+        rowLabel = await page.$eval("#fsbbTable tbody th", (e) => e.innerText.replace(/\s+/g, " "));
+        await page.click('[data-fsbb-cell][data-col="1"]:not([data-status="na"])').catch(() => {});
+        head = await page.textContent("[data-fsbb-headline]").catch(() => "");
+        courses = (await page.$$("#fsbbCourses [data-pw]")).length;
+        await page.click("[data-opt-clear]");
+      }
       ok(
-        head.includes("join Year 1 of the 3-Year Higher Nitec") &&
-          (await page.$$("#fsbbCourses [data-pw]")).length === 6,
+        g1Key &&
+          /4 G1/.test(rowLabel) &&
+          head.includes("join Year 1 of the 3-Year Higher Nitec") &&
+          courses === 6,
         "P10-U20",
-        "2-Year at 4 G1 explains you join Year 1 of the 3-Year course (and may be offered the 2-year route), and lists the 3-Year courses you would join",
+        "Previewing a 4 G1 option moves the table to the 4 G1 row; 2-Year there explains you join Year 1 of the 3-Year course and lists the 3-Year courses (" +
+          key4g1.length +
+          " options)",
       );
     }
     // "See where you can go" jump button under the subject list

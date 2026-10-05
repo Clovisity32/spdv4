@@ -160,20 +160,27 @@ async function run(name, viewport, mode = "picker") {
       text: t.textContent.slice(0, 80),
     };
   });
-  await page.screenshot({ path: `debug/ux-student-${name}-3b-course-table.png` });
+  await page.screenshot({
+    path: `debug/ux-student-${name}-3b-course-table.png`,
+  });
   step("course-table", {
     tooltipOnTapMs: Date.now() - tapTip,
     tooltip: tipInfo,
     ...(await page.evaluate(() => {
-      const tb = document.querySelector("#fsbbCourses [data-easiest] [data-slot-table]");
+      const tb = document.querySelector(
+        "#fsbbCourses [data-easiest] [data-slot-table]",
+      );
       const rows = [...tb.querySelectorAll("[data-slot-row]")];
       const cells = [...tb.querySelectorAll("td")];
       return {
         slotRows: rows.length,
         orRows: tb.querySelectorAll("[data-slot-or]").length,
         extraRows: tb.querySelectorAll("[data-slot-extra]").length,
-        clippedCells: cells.filter((c) => c.scrollWidth > c.clientWidth + 1).length,
-        minFontPx: Math.min(...cells.map((c) => parseFloat(getComputedStyle(c).fontSize))),
+        clippedCells: cells.filter((c) => c.scrollWidth > c.clientWidth + 1)
+          .length,
+        minFontPx: Math.min(
+          ...cells.map((c) => parseFloat(getComputedStyle(c).fontSize)),
+        ),
         tableHeightPx: Math.round(tb.getBoundingClientRect().height),
         needs: rows.map((r) => r.children[3].innerText.trim()),
         total: (tb.querySelector("[data-slot-total]") || {}).innerText || "",
@@ -181,18 +188,31 @@ async function run(name, viewport, mode = "picker") {
     })),
   });
 
-  // Tap a lower row (the "what if I move down" question)
-  const tap2 = Date.now();
-  await page
-    .click('[data-fsbb-cell][data-row="2"][data-col="2"]')
-    .catch(() => {});
-  step("tap-lower-row", { ms: Date.now() - tap2 });
-  step("details-lower-row", {
-    headline: await page
-      .innerText("[data-fsbb-headline]")
-      .catch(() => "(none)"),
-  });
-  await page.screenshot({ path: `debug/ux-student-${name}-4-lower.png` });
+  // The "what if I move down" question: LDL options under the table
+  const opts = await page.evaluate(() =>
+    [...document.querySelectorAll("[data-fsbb-opt]")].map((b) => ({
+      key: b.dataset.fsbbOpt,
+      text: b.innerText.replace(/\s+/g, " ").slice(0, 160),
+    })),
+  );
+  step("ldl-options", { count: opts.length, options: opts });
+  if (opts.length) {
+    const tapOpt = Date.now();
+    await page.click(`[data-fsbb-opt="${opts[0].key}"]`);
+    await page.waitForSelector("#fsbbPreviewBar", { timeout: 5000 });
+    await page.waitForTimeout(900);
+    step("preview-option", {
+      ms: Date.now() - tapOpt,
+      bar: (await page.innerText("#fsbbPreviewBar")).replace(/\s+/g, " "),
+      rowLabel: (await page.innerText("#fsbbTable tbody th")).replace(/\s+/g, " "),
+      barInViewport: await page.evaluate(() => {
+        const r = document.querySelector("#fsbbPreviewBar").getBoundingClientRect();
+        return r.top >= 0 && r.top < window.innerHeight;
+      }),
+    });
+    await page.screenshot({ path: `debug/ux-student-${name}-4-preview.png` });
+    await page.click("[data-opt-clear]");
+  }
 
   // Keyboard: can a student reach a box without a mouse?
   await page.keyboard.press("Escape");
