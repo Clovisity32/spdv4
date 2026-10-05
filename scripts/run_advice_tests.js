@@ -399,10 +399,10 @@ async function advise(page, subjects) {
         tiers[0].length === 4 &&
         tiers[1].length === 2 &&
         tiers[3].length === 6 &&
-        tiers[4].length === 2 &&
-        tiers[5].length === 3,
+        tiers[4].length === 3 &&
+        tiers[5].length === 2,
       "P5d-1",
-      "Profile A: all 17 pathways on the staircase (4 open, 2 immediate, 6 stretch, 2 remote, 3 out of reach)",
+      "Profile A: all 17 pathways on the staircase (4 open, 2 immediate, 6 stretch, 3 remote, 2 out of reach); routes no longer ask for marks in subjects a pathway does not count",
     );
     ok(
       tiers[5].every(
@@ -1099,6 +1099,105 @@ async function advise(page, subjects) {
       "No free-time option for a strong student, or for a student who already has only 5 subjects",
     );
 
+    console.log(
+      "\nPhase 11: generic subjects stand for their specific versions",
+    );
+    {
+      const calcPoly = (subs) =>
+        page.evaluate(
+          (s) =>
+            window.__spdTest
+              .calculate(s, 0)
+              .filter((p) => p.id.startsWith("poly_yr1_elr2b2_"))
+              .map((p) => ({
+                id: p.id,
+                net: p.netScore === Infinity ? "inf" : p.netScore,
+                elig: p.isEligible,
+                roles: (p.subjectsUsed || []).map(
+                  (u) => `${u.role}=${u.subjectId}`,
+                ),
+              })),
+          subs,
+        );
+      const core = [
+        S("EL", "G3", "B3"),
+        S("COMB_HUM", "G3", "B3"),
+        S("COMB_SCI", "G3", "B3"),
+        S("PHY", "G3", "B3"),
+      ];
+      const noRole = (r) => r.roles.map((q) => q.split("=")[0]);
+      const pairs = [
+        [
+          "Mother Tongue = Chinese",
+          [...core, S("MT", "G3", "B3")],
+          [...core, S("CHI", "G3", "B3")],
+        ],
+        [
+          "Higher Mother Tongue = Higher Chinese",
+          [...core, S("HMT", "G3", "B3")],
+          [...core, S("HCHI", "G3", "B3")],
+        ],
+        [
+          "Media Studies = Media Studies (English)",
+          [
+            S("EL", "G3", "B3"),
+            S("MS", "G3", "B3"),
+            S("COMB_SCI", "G3", "B3"),
+            S("PHY", "G3", "B3"),
+            S("MT", "G3", "B3"),
+          ],
+          [
+            S("EL", "G3", "B3"),
+            S("MS_ENG", "G3", "B3"),
+            S("COMB_SCI", "G3", "B3"),
+            S("PHY", "G3", "B3"),
+            S("MT", "G3", "B3"),
+          ],
+        ],
+      ];
+      for (const [label, generic, specific] of pairs) {
+        const g = await calcPoly(generic);
+        const sp = await calcPoly(specific);
+        const a = (r) => r.find((p) => p.id === "poly_yr1_elr2b2_a");
+        ok(
+          a(g).net === a(sp).net &&
+            a(g).elig === a(sp).elig &&
+            a(g).net !== "inf" &&
+            noRole(a(g)).join() === noRole(a(sp)).join(),
+          "P11-" +
+            label.split(" ")[0] +
+            (label.includes("Higher")
+              ? "H"
+              : label.includes("Media")
+                ? "M"
+                : ""),
+          `${label}: the Humanities, Media & Communications course gives the same net score, eligibility and slots (net ${a(g).net})`,
+        );
+      }
+      // Tamil exists as a subject, so a Tamil student fills R2 like Chinese or Malay
+      const tam = await calcPoly([...core, S("TAM", "G3", "B3")]);
+      const mal = await calcPoly([...core, S("MAL", "G3", "B3")]);
+      const aT = tam.find((p) => p.id === "poly_yr1_elr2b2_a");
+      const aM = mal.find((p) => p.id === "poly_yr1_elr2b2_a");
+      ok(
+        aT.net !== "inf" &&
+          aT.net === aM.net &&
+          aT.roles.includes("R2=TAM") &&
+          aM.roles.includes("R2=MAL"),
+        "P11-T",
+        `Tamil (TAM) is a selectable subject and fills R2 in the Humanities, Media & Communications course exactly like Malay (net ${aT.net})`,
+      );
+      // Where a list is not language-specific, a generic subject is not aliased
+      const g = await calcPoly([...core, S("MT", "G3", "B3")]);
+      ok(
+        g
+          .filter((p) => p.id !== "poly_yr1_elr2b2_a")
+          .every((p) => !p.roles.some((r) => /^R[12]=(MT|HMT|MS)$/.test(r))),
+        "P11-N",
+        "Other polytechnic courses (whose lists do not name languages) never use a generic Mother Tongue as R1 or R2",
+      );
+    }
+
     // ---- UI ----
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(FILE_URL, { waitUntil: "domcontentloaded" });
@@ -1148,9 +1247,8 @@ async function advise(page, subjects) {
     );
     ok(
       (await page.$$eval("[data-fsbb-na]", (ns) =>
-          ns.every((n) => n.textContent.trim() === ""),
-        )) &&
-        (await page.$$("#fsbbTable tbody tr")).length === 1,
+        ns.every((n) => n.textContent.trim() === ""),
+      )) && (await page.$$("#fsbbTable tbody tr")).length === 1,
       "P10-U2",
       "The table shows one row (the student's own combination), and its poster-grey boxes are plain grey with no text",
     );
@@ -1225,8 +1323,14 @@ async function advise(page, subjects) {
     );
     // the table shows only the student's own row, with no 'LDL does not increase' boxes
     ok(
-      (await page.$$("[data-fsbb-cell][data-row='1'], [data-fsbb-cell][data-row='2'], [data-fsbb-cell][data-row='3']")).length === 0 &&
-        !(await page.textContent("#resultsAdviceSection")).includes("LDL does not increase"),
+      (
+        await page.$$(
+          "[data-fsbb-cell][data-row='1'], [data-fsbb-cell][data-row='2'], [data-fsbb-cell][data-row='3']",
+        )
+      ).length === 0 &&
+        !(await page.textContent("#resultsAdviceSection")).includes(
+          "LDL does not increase",
+        ),
       "P10-U9",
       "Lower rows and the 'LDL does not increase eligibility' boxes are gone from the table",
     );
@@ -1319,6 +1423,55 @@ async function advise(page, subjects) {
           ")",
       );
     }
+    // The table's rows add up to its total, and an empty slot is never silent
+    {
+      let checked = 0;
+      let bad = [];
+      let unnamed = [];
+      for (let ci = 0; ci < 6; ci++) {
+        await page.click(`[data-fsbb-col="${ci}"]`);
+        await page.$$eval("#fsbbCourses [data-pw]", (ds) =>
+          ds.forEach((d) => (d.open = true)),
+        );
+        const res = await page.$$eval("#fsbbCourses [data-pw]", (ds) =>
+          ds.map((d) => {
+            const tot = d.querySelector("[data-slot-total]");
+            const m = tot && /Total \+(\d+) marks/.exec(tot.textContent);
+            const sum = [...d.querySelectorAll("[data-slot-row]")].reduce(
+              (a, r) => {
+                const q = /^\+(\d+)/.exec(r.children[4].textContent.trim());
+                return a + (q ? Number(q[1]) : 0);
+              },
+              0,
+            );
+            const empty = [...d.querySelectorAll("[data-slot-row]")]
+              .filter((r) => /No subject yet/.test(r.textContent))
+              .map((r) => r.children[3].textContent.trim());
+            return {
+              name: d.dataset.name,
+              total: m ? Number(m[1]) : null,
+              sum,
+              empty,
+            };
+          }),
+        );
+        res.forEach((r) => {
+          if (r.total !== null) {
+            checked++;
+            if (r.total !== r.sum) bad.push(`${r.name} ${r.total}≠${r.sum}`);
+          }
+          r.empty.forEach((e) => {
+            if (!/^Needs /.test(e) || e === "Needs a matching subject")
+              unnamed.push(r.name);
+          });
+        });
+      }
+      ok(
+        checked > 0 && bad.length === 0 && unnamed.length === 0,
+        "P10-T8",
+        `Each course table's marks add up to its total (${checked} courses checked) and an empty slot says what would fit${bad.length ? " — " + bad.join("; ") : ""}`,
+      );
+    }
     // ITE courses: tables follow each course's own rule (no G1 aggregate)
     await page.click('[data-fsbb-cell][data-row="0"][data-col="0"]');
     await page.$$eval("#fsbbCourses [data-pw]", (ds) =>
@@ -1366,7 +1519,10 @@ async function advise(page, subjects) {
     // LDL options: only LDL (no 'improve' cards); the table transforms to the previewed combination
     {
       const cards = await page.$$eval("[data-fsbb-opt]", (b) =>
-        b.map((x) => ({ key: x.dataset.fsbbOpt, text: x.innerText.replace(/\s+/g, " ") })),
+        b.map((x) => ({
+          key: x.dataset.fsbbOpt,
+          text: x.innerText.replace(/\s+/g, " "),
+        })),
       );
       const data = await page.evaluate(() =>
         window.__spdTest.options(
@@ -1395,37 +1551,57 @@ async function advise(page, subjects) {
           ")",
       );
       const eligBefore = await page.textContent("#eligibilityResultsContainer");
-      const before3 = await page.textContent('[data-fsbb-cell][data-row="0"][data-col="0"]');
+      const before3 = await page.textContent(
+        '[data-fsbb-cell][data-row="0"][data-col="0"]',
+      );
       await page.click('[data-fsbb-opt="MATH>G2"]');
       const bar = await page.textContent("#fsbbPreviewBar");
-      const after3 = await page.textContent('[data-fsbb-cell][data-row="0"][data-col="0"]');
+      const after3 = await page.textContent(
+        '[data-fsbb-cell][data-row="0"][data-col="0"]',
+      );
       ok(
         /Previewing LDL 1 subject/.test(bar) &&
-          (await page.$eval("[data-you]", (n) => n.textContent)).includes("Previewing") &&
+          (await page.$eval("[data-you]", (n) => n.textContent)).includes(
+            "Previewing",
+          ) &&
           (await page.$$("#fsbbTable tbody tr")).length === 1 &&
           before3.includes("4 of 6") &&
           after3.includes("6 of 6") &&
-          (await page.getAttribute('[data-fsbb-opt="MATH>G2"]', "aria-pressed")) === "true" &&
-          (await page.textContent("#eligibilityResultsContainer")) === eligBefore &&
+          (await page.getAttribute(
+            '[data-fsbb-opt="MATH>G2"]',
+            "aria-pressed",
+          )) === "true" &&
+          (await page.textContent("#eligibilityResultsContainer")) ===
+            eligBefore &&
           (await page.$$("[data-col-delta]")).length === 0,
         "P10-O2",
         "Previewing Maths at G2 rebuilds the table as that combination (3-Year goes from 4 to 6 of 6), shows a Previewing bar, no comparison badges, and leaves the eligibility cards on the real grades",
       );
       await page.click('[data-fsbb-cell][data-row="0"][data-col="0"]');
-      await page.$$eval("#fsbbCourses [data-pw]", (ds) => ds.forEach((d) => (d.open = true)));
+      await page.$$eval("#fsbbCourses [data-pw]", (ds) =>
+        ds.forEach((d) => (d.open = true)),
+      );
       const mathRow = await page.$$eval("#fsbbCourses [data-slot-row]", (rs) =>
-        rs.map((r) => r.children[2].textContent.trim()).filter((t) => /was G3 F9/.test(t)),
+        rs
+          .map((r) => r.children[2].textContent.trim())
+          .filter((t) => /was G3 F9/.test(t)),
       );
       ok(
-        mathRow.length > 0 && mathRow.every((t) => /^G2 5 \(was G3 F9\)/.test(t)),
+        mathRow.length > 0 &&
+          mathRow.every((t) => /^G2 5 \(was G3 F9\)/.test(t)),
         "P10-O3",
-        "In a preview the course tables show the moved subject with its real grade: " + (mathRow[0] || "none"),
+        "In a preview the course tables show the moved subject with its real grade: " +
+          (mathRow[0] || "none"),
       );
       await page.click("[data-opt-clear]");
       ok(
         (await page.$("#fsbbPreviewBar")) === null &&
-          (await page.$eval("[data-you]", (n) => n.textContent)).includes("You are here") &&
-          (await page.textContent('[data-fsbb-cell][data-row="0"][data-col="0"]')) === before3,
+          (await page.$eval("[data-you]", (n) => n.textContent)).includes(
+            "You are here",
+          ) &&
+          (await page.textContent(
+            '[data-fsbb-cell][data-row="0"][data-col="0"]',
+          )) === before3,
         "P10-O4",
         "'Back to my grades' returns the table to the real combination",
       );
@@ -1528,8 +1704,12 @@ async function advise(page, subjects) {
       let rowLabel = "";
       if (g1Key) {
         await page.click(`[data-fsbb-opt="${g1Key}"]`);
-        rowLabel = await page.$eval("#fsbbTable tbody th", (e) => e.innerText.replace(/\s+/g, " "));
-        await page.click('[data-fsbb-cell][data-col="1"]:not([data-status="na"])').catch(() => {});
+        rowLabel = await page.$eval("#fsbbTable tbody th", (e) =>
+          e.innerText.replace(/\s+/g, " "),
+        );
+        await page
+          .click('[data-fsbb-cell][data-col="1"]:not([data-status="na"])')
+          .catch(() => {});
         head = await page.textContent("[data-fsbb-headline]").catch(() => "");
         courses = (await page.$$("#fsbbCourses [data-pw]")).length;
         await page.click("[data-opt-clear]");

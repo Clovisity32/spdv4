@@ -614,6 +614,7 @@
             category: "HUMANITIES_PURE",
           },
           { id: "MAL", name: "Malay", category: "MT_LANG" }, // Added specific language
+          { id: "TAM", name: "Tamil", category: "MT_LANG" }, // Added specific language
           { id: "MATH", name: "Mathematics", category: "MATH_PURE" },
           {
             id: "MECH_DESIGN_AUTO",
@@ -1361,6 +1362,19 @@
             .sort()
             .join(", "); // Filter out undefined names
 
+        // A generic subject a school offers (Mother Tongue, Higher Mother Tongue,
+        // Media Studies) stands for its specific versions, but only where a list
+        // names ALL of them (so it never counts where a list is language-specific).
+        const GENERIC_SUBJECT_ALIASES = {
+          MT: ["CHI", "MAL", "TAM"],
+          HMT: ["HCHI", "HMAL", "HTAM"],
+          MS: ["MS_ENG", "MS_CHI"],
+        };
+        const idInList = (id, list) =>
+          list.includes(id) ||
+          (!!GENERIC_SUBJECT_ALIASES[id] &&
+            GENERIC_SUBJECT_ALIASES[id].every((x) => list.includes(x)));
+
         const getStudentSubjectG2Grade = (studentSubject) => {
           if (studentSubject.level === "G2") return studentSubject.grade;
           if (studentSubject.level === "G3")
@@ -1565,6 +1579,16 @@
                 }
               }
             }
+            // A generic subject (e.g. Mother Tongue) covers a list that names all
+            // of its specific versions; it wins only if strictly better.
+            const generic = sortedPool.find(
+              (subj) =>
+                !currentUsedIds.has(subj.subjectId) &&
+                !criteria.includes(subj.subjectId) &&
+                idInList(subj.subjectId, criteria),
+            );
+            if (generic && generic[gradeField] < bestGradeAmongCriteria)
+              bestSubjectAmongCriteria = generic;
             bestCandidate = bestSubjectAmongCriteria;
           } else {
             for (const subj of sortedPool) {
@@ -4575,6 +4599,22 @@
                   cur = pick.d;
                 }
                 if (cur === 0) {
+                  // Drop steps that turn out not to matter (for example a
+                  // subject this pathway does not count), costliest first.
+                  base
+                    .map((_, i) => i)
+                    .filter((i) => grades[i] && idx[i] !== startIdx[i])
+                    .sort((a, b) => gapTo(b, idx[b]) - gapTo(a, idx[a]))
+                    .forEach((i) => {
+                      const keep = idx[i];
+                      idx[i] = startIdx[i];
+                      const d = deficitOf(
+                        calculateAllPathwaysStatus(trialOf(idx)).find(
+                          (x) => x.id === pid,
+                        ),
+                      );
+                      if (d !== 0) idx[i] = keep;
+                    });
                   let cost = 0;
                   base.forEach((s, i) => {
                     if (grades[i] && idx[i] !== startIdx[i]) {
@@ -5723,7 +5763,7 @@
         const fsbbSlotDefs = (pw) => {
           const catOf = (s) => getSubjectById(s.subjectId)?.category;
           const inCat = (list) => (s) => list.includes(catOf(s));
-          const inIds = (list) => (s) => list.includes(s.subjectId);
+          const inIds = (list) => (s) => idInList(s.subjectId, list);
           const anySubj = () => true;
           const g3 = (n) => (n ? G3_GRADES_OPTIONS[n - 1] : null);
           const m = pw.mer || {};
@@ -5988,6 +6028,30 @@
                   used.add(u.subjectId);
                 }
               });
+              // The calculation leaves a slot empty when the only fitting
+              // subjects are below the minimum grade. Show the best of those
+              // (one the route asks to improve comes first), so the table's
+              // rows add up to its total.
+              slots
+                .filter((sl) => !sl.primary)
+                .forEach((sl) => {
+                  const cands = subjects.filter(
+                    (s) =>
+                      !used.has(s.subjectId) &&
+                      sl.def.levels.includes(s.level) &&
+                      sl.def.allow(s),
+                  );
+                  const routed = cands.filter((s) =>
+                    routeRows.some((r) => r.subject === nameOf(s)),
+                  );
+                  const pick = (routed.length ? routed : cands).sort(
+                    (a, b) => rankOf(a, sl.def) - rankOf(b, sl.def),
+                  )[0];
+                  if (pick) {
+                    sl.primary = pick;
+                    used.add(pick.subjectId);
+                  }
+                });
             } else {
               slots.forEach((sl) => {
                 const pick = subjects
@@ -6054,6 +6118,17 @@
                 : "";
             return `${s.level} ${s.grade}${eqNow(s, def)}${moved}${g1 ? ` · G1 ${g1}` : ""}`;
           };
+          // Slots with a minimum grade (G3 E8, G2 4): what it takes to count.
+          const cutNeed = (s) => {
+            const g = s.level === "G3" ? "E8" : "4";
+            const lo = RAW_BANDS[s.level][g][0];
+            return {
+              need: `${g} (${lo}+ marks)`,
+              marks: hasRawMark(s)
+                ? `+${Math.max(0, lo - Number(s.rawMark))} marks`
+                : "—",
+            };
+          };
           // What an ITE pass asks of this subject at its own level.
           const passNeed = (s) => {
             if (s.level === "G3" || s.level === "G2") {
@@ -6067,6 +6142,15 @@
               };
             }
             return { need: "D", marks: "—" };
+          };
+          // "Needs: Art, Business Studies +9": what the school offers for this slot.
+          const fitNames = (def) => {
+            const names = getSchoolSubjects()
+              .filter((x) => x.id !== "EL" && def.allow({ subjectId: x.id }))
+              .map((x) => x.name);
+            return names.length
+              ? `Needs ${joinNames(names, 3)}`
+              : "Needs a matching subject";
           };
           const needFor = (s, primaryNeed) => {
             if (!primaryNeed) return { need: "OK", marks: "—" };
@@ -6114,16 +6198,18 @@
                     ? sl.def.levels.length === 1
                       ? "Needs a G3 subject"
                       : "Needs a subject"
-                    : "Needs a matching subject",
+                    : fitNames(sl.def),
                   marks: "—",
                 }
               : sl.def.ite
                 ? pn || fsbbPassIte(p)
                   ? needFor(p, pn)
                   : passNeed(p)
-                : noRoute
-                  ? { need: "—", marks: "—" }
-                  : needFor(p, pn);
+                : sl.def.cut && !pn && !passes(p)
+                  ? cutNeed(p)
+                  : noRoute
+                    ? { need: "—", marks: "—" }
+                    : needFor(p, pn);
             rowsHtml.push(
               `<tr data-slot-row data-role="${esc(sl.def.role)}" class="border-t border-slate-700">${td(tip(sl.def.label.split(" · ")[0], `${sl.def.label}. ${sl.def.rule}`))}${td(p ? esc(nameOf(p)) : '<span class="text-slate-400">No subject yet</span>', "text-slate-100")}${td(p ? esc(nowText(p, sl.g1, sl.def)) : "—", "text-slate-200")}${td(esc(shortNeed(eqNeed(nd.need, p, sl.def))), needCls(nd.need))}${td(esc(shortMarks(nd.marks)), "text-slate-200 whitespace-nowrap")}</tr>`,
             );
