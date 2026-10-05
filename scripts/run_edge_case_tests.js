@@ -1919,6 +1919,7 @@ function ok(cond, id, msg) {
     }
 
     // CARD-01: a track with something eligible starts open; the rest start collapsed
+    await page.click("#eligShowAll");
     const states = await trackStates(page);
     ok(
       states.length === 5 &&
@@ -2006,6 +2007,135 @@ function ok(cond, id, msg) {
         "Inside an open track every pathway card shows its name, status and scores",
       );
     }
+    // ════════════════════════════════════════════════════════════════════════
+    // Eligibility table, audience tabs, optional raw mark
+    // ════════════════════════════════════════════════════════════════════════
+    console.log("\n── Phase 14b: Pathway table, tabs, optional raw mark ──");
+    await reset(page);
+    await addMany(page, [
+      ["EL", "G3", "D7"],
+      ["MATH", "G3", "C6"],
+      ["BIO", "G3", "C6"],
+      ["HIST", "G3", "B4"],
+      ["GEOG", "G3", "B4"],
+    ]);
+    const trackVisible = (g) =>
+      page.isVisible(
+        '#eligibilityResultsContainer > details[data-track="' + g + '"]',
+      );
+    // RAW-OPT-01
+    ok(
+      (await page.textContent("#studentSubjectsTableContainer thead")).includes(
+        "(optional)",
+      ) &&
+        (await page.getAttribute("[data-row-raw]", "aria-label")) ===
+          "Raw mark (optional)",
+      "RAW-OPT-01",
+      "The Raw Mark column and each raw mark box say it is optional",
+    );
+    // TAB-01
+    await page.evaluate(() => localStorage.removeItem("spd.view"));
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.selectOption("#school", "School A");
+    await page.waitForTimeout(300);
+    await addMany(page, [
+      ["EL", "G3", "D7"],
+      ["MATH", "G3", "C6"],
+      ["BIO", "G3", "C6"],
+      ["HIST", "G3", "B4"],
+      ["GEOG", "G3", "B4"],
+    ]);
+    const exploreFirst =
+      (await page.isVisible("#panelExplore")) &&
+      (await page.isHidden("#panelPlan"));
+    await page.click("#tabPlan");
+    const planThen =
+      (await page.isHidden("#panelExplore")) &&
+      (await page.isVisible("#panelPlan")) &&
+      (await page.isVisible("#fsbbTable"));
+    ok(
+      exploreFirst && planThen,
+      "TAB-01",
+      "Explore shows first; the Plan tab swaps the panels and shows the Action Plan table",
+    );
+    // TAB-02
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(400);
+    ok(
+      (await page.getAttribute("#tabPlan", "aria-selected")) === "true" &&
+        !(await page.$eval("#panelPlan", (d) => d.classList.contains("hidden"))),
+      "TAB-02",
+      "The chosen tab is remembered after a reload",
+    );
+    await page.click("#tabExplore");
+    await page.selectOption("#school", "School A");
+    await page.waitForTimeout(300);
+    await addMany(page, [
+      ["EL", "G3", "D7"],
+      ["MATH", "G3", "C6"],
+      ["BIO", "G3", "C6"],
+      ["HIST", "G3", "B4"],
+      ["GEOG", "G3", "B4"],
+    ]);
+    // ETBL-01: boxes show status and count; nothing selected hides the cards
+    {
+      const boxes = await page.$$eval("[data-elig-cell]", (bs) =>
+        bs.map((b) => b.dataset.status + ":" + b.textContent.trim()),
+      );
+      ok(
+        boxes.length === 6 &&
+          boxes.some((b) => b.startsWith("open:")) &&
+          boxes.some((b) => b.startsWith("further:")) &&
+          !(await trackVisible("PFP")),
+        "ETBL-01",
+        "The table has six boxes with status and course counts; with nothing selected no pathway cards show (" +
+          boxes.join(" | ") +
+          ")",
+      );
+    }
+    // ETBL-02: PFP box shows only the PFP track, opened
+    await page.click('[data-elig-cell="2"]');
+    ok(
+      (await trackVisible("PFP")) &&
+        !(await trackVisible("JC/MI")) &&
+        (await page.$eval(
+          '#eligibilityResultsContainer > details[data-track="PFP"]',
+          (d) => d.open,
+        )),
+      "ETBL-02",
+      "Selecting the PFP box shows only the PFP track, open",
+    );
+    // ETBL-03: MI box shows only the MI card
+    await page.click('[data-elig-cell="4"]');
+    {
+      const shown = await page.$$eval(
+        "#eligibilityResultsContainer [data-pathway-id]",
+        (cs) =>
+          cs
+            .filter((c) => !c.hidden && c.closest("details").hidden === false)
+            .map((c) => c.dataset.pathwayId),
+      );
+      ok(
+        shown.join() === "mi",
+        "ETBL-03",
+        "Selecting the Millennia Institute box shows only the MI card (" +
+          shown.join() +
+          ")",
+      );
+    }
+    // ETBL-04: tapping again clears; Show every pathway shows all five tracks
+    await page.click('[data-elig-cell="4"]');
+    const cleared = !(await trackVisible("JC/MI"));
+    await page.click("#eligShowAll");
+    ok(
+      cleared &&
+        (await page.$$eval(
+          "#eligibilityResultsContainer > details[data-track]",
+          (ds) => ds.filter((d) => !d.hidden).length,
+        )) === 5,
+      "ETBL-04",
+      "Tapping the same box again clears the selection; Show every pathway shows all five tracks",
+    );
     // ════════════════════════════════════════════════════════════════════════
     // Phase 15: Subject picker
     // The Subjects dropdown lists the school's subjects with tick boxes; one
@@ -2095,7 +2225,7 @@ function ok(cond, id, msg) {
           start.every((v) => v === "G3 A1") &&
           (await page.isHidden("#subjectMenu")) &&
           (await page.textContent("#addMsg")).includes("Added 5 subjects") &&
-          (await page.isVisible("#fsbbTable")),
+          (await page.$("#fsbbTable")) !== null,
         "PICK-02",
         "Ticking five subjects and adding puts all five in the table at G3 A1; the buttons count them, the menu closes, a message shows and the Action Plan appears (" +
           start.join(", ") +
@@ -2236,22 +2366,54 @@ function ok(cond, id, msg) {
         return out;
       };
       await reset(page);
-      const a = await levelsOf(["AM", "DT", "NFS", "MUSIC", "POA", "HMT", "COMB_HUM", "SMART_ELEC_TECH", "HA", "GEOG", "COMB_SCI"]);
+      const a = await levelsOf([
+        "AM",
+        "DT",
+        "NFS",
+        "MUSIC",
+        "POA",
+        "HMT",
+        "COMB_HUM",
+        "SMART_ELEC_TECH",
+        "HA",
+        "GEOG",
+        "COMB_SCI",
+      ]);
       await reset(page);
       await page.selectOption("#school", "Yuhua Secondary School");
       await page.waitForTimeout(300);
-      const y = await levelsOf(["POA", "HMT", "DT", "MUSIC", "COMB_HUM", "COMP", "MOB_ROBOTICS"]);
+      const y = await levelsOf([
+        "POA",
+        "HMT",
+        "DT",
+        "MUSIC",
+        "COMB_HUM",
+        "COMP",
+        "MOB_ROBOTICS",
+      ]);
       ok(
-        a.AM === "G2/G3" && a.DT === "G1/G2/G3" && a.NFS === "G1/G2/G3" &&
-          a.MUSIC === "G1/G3" && a.POA === "G2/G3" && a.HMT === "G3" &&
-          a.COMB_HUM === "G2/G3" && a.SMART_ELEC_TECH === "G1" && a.HA === "G3" &&
-          a.GEOG === "G2/G3" && a.COMB_SCI === "G1/G2/G3" &&
-          y.POA === "G2/G3" && y.HMT === "G3" && y.DT === "G2/G3" &&
-          y.MUSIC === "G3" && y.COMB_HUM === "G2/G3" && y.COMP === "G1/G2/G3" &&
+        a.AM === "G2/G3" &&
+          a.DT === "G1/G2/G3" &&
+          a.NFS === "G1/G2/G3" &&
+          a.MUSIC === "G1/G3" &&
+          a.POA === "G2/G3" &&
+          a.HMT === "G3" &&
+          a.COMB_HUM === "G2/G3" &&
+          a.SMART_ELEC_TECH === "G1" &&
+          a.HA === "G3" &&
+          a.GEOG === "G2/G3" &&
+          a.COMB_SCI === "G1/G2/G3" &&
+          y.POA === "G2/G3" &&
+          y.HMT === "G3" &&
+          y.DT === "G2/G3" &&
+          y.MUSIC === "G3" &&
+          y.COMB_HUM === "G2/G3" &&
+          y.COMP === "G1/G2/G3" &&
           y.MOB_ROBOTICS === "G1",
         "PICK-10b",
         "Level choices follow SEAB 2027 (no G1 Combined Humanities, Principles of Accounts, Higher or Humanities subjects; Music G1/G3; Smart Electrical Technology G1) and Yuhua keeps its own narrower DT and Music (" +
-          JSON.stringify({ a, y }) + ")",
+          JSON.stringify({ a, y }) +
+          ")",
       );
     }
     // PICK-11: the 'Set grade' tag and note clear as the student edits

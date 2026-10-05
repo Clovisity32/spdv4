@@ -343,6 +343,9 @@
                     class="px-3 py-3 md:px-6 text-left text-xs font-medium text-sky-300 uppercase tracking-wider"
                   >
                     Raw Mark
+                    <span class="normal-case font-normal text-slate-400"
+                      >(optional)</span
+                    >
                   </th>
                   <th
                     class="px-3 py-3 md:px-6 text-right text-xs font-medium text-sky-300 uppercase tracking-wider"
@@ -366,67 +369,112 @@
         </div>
       </section>
 
-      <section
-        class="mb-10 p-6 bg-slate-800 shadow-2xl rounded-xl border border-slate-700"
+      <div
+        role="tablist"
+        aria-label="Choose a view"
+        class="mb-6 grid grid-cols-2 gap-2"
       >
-        <h2 class="text-2xl font-semibold mb-6 text-cyan-400 flex items-center">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            class="icon-lg mr-3 text-cyan-500"
-          >
-            <path
-              d="M12 2C17.523 2 22 6.477 22 12C22 17.523 17.523 22 12 22C6.477 22 2 17.523 2 12C2 6.477 6.477 2 12 2ZM12 4C7.582 4 4 7.582 4 12C4 16.418 7.582 20 12 20C16.418 20 20 16.418 20 12C20 7.582 16.418 4 12 4ZM12 11C11.448 11 11 11.448 11 12C11 12.552 11.448 13 12 13C12.552 13 13 12.552 13 11.448 12.552 11 12 11ZM12 6C9.791 6 8 7.791 8 10H10C10 8.896 10.896 8 12 8C13.104 8 14 8.896 14 10C14 12 11 11.75 11 15H13C13 12.75 16 12.5 16 10C16 7.791 14.209 6 12 6Z"
-            ></path>
-          </svg>
-          Pathway Eligibility
-        </h2>
-        <div
-          id="eligibilityResultsContainer"
-          class="grid md:grid-cols-2 lg:col-span-3 gap-6"
+        <button
+          type="button"
+          role="tab"
+          id="tabExplore"
+          aria-controls="panelExplore"
+          aria-selected="true"
+          class="min-h-[56px] px-3 py-2 rounded-lg border text-left focus:outline-none focus:ring-2 focus:ring-cyan-300"
         >
-          <div
-            id="eligibilityPlaceholder"
-            class="text-center py-8 text-slate-400 md:col-span-2 lg:col-span-3"
+          <span class="block font-semibold">Explore pathways</span>
+          <span class="block text-xs opacity-80"
+            >Sec 1–2 · what each pathway asks for</span
+          >
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id="tabPlan"
+          aria-controls="panelPlan"
+          aria-selected="false"
+          class="min-h-[56px] px-3 py-2 rounded-lg border text-left focus:outline-none focus:ring-2 focus:ring-cyan-300"
+        >
+          <span class="block font-semibold">Plan my subjects</span>
+          <span class="block text-xs opacity-80"
+            >Sec 3–4 · which subjects and levels to keep</span
+          >
+        </button>
+      </div>
+      <div id="panelExplore" role="tabpanel" aria-labelledby="tabExplore">
+        <section
+          class="mb-10 p-6 bg-slate-800 shadow-2xl rounded-xl border border-slate-700"
+        >
+          <h2
+            class="text-2xl font-semibold mb-6 text-cyan-400 flex items-center"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
               fill="currentColor"
-              class="icon-lg mx-auto mb-4 text-sky-500 w-12 h-12"
+              class="icon-lg mr-3 text-cyan-500"
             >
               <path
-                d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM11 7H13V11H11V7ZM11 13H13V17H11V13Z"
+                d="M12 2C17.523 2 22 6.477 22 12C22 17.523 17.523 22 12 22C6.477 22 2 17.523 2 12C2 6.477 6.477 2 12 2ZM12 4C7.582 4 4 7.582 4 12C4 16.418 7.582 20 12 20C16.418 20 20 16.418 20 12C20 7.582 16.418 4 12 4ZM12 11C11.448 11 11 11.448 11 12C11 12.552 11.448 13 12 13C12.552 13 13 12.552 13 11.448 12.552 11 12 11ZM12 6C9.791 6 8 7.791 8 10H10C10 8.896 10.896 8 12 8C13.104 8 14 8.896 14 10C14 12 11 11.75 11 15H13C13 12.75 16 12.5 16 10C16 7.791 14.209 6 12 6Z"
               ></path>
             </svg>
-            <p class="text-xl">
-              Please add subjects to see your eligible pathways.
-            </p>
+            Pathway Eligibility
+          </h2>
+          <div id="eligTableWrap" class="mb-6"></div>
+          <div
+            id="eligibilityResultsContainer"
+            class="grid md:grid-cols-2 lg:col-span-3 gap-6"
+          >
+            <div
+              id="eligibilityPlaceholder"
+              class="text-center py-8 text-slate-400 md:col-span-2 lg:col-span-3"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                class="icon-lg mx-auto mb-4 text-sky-500 w-12 h-12"
+              >
+                <path
+                  d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM11 7H13V11H11V7ZM11 13H13V17H11V13Z"
+                ></path>
+              </svg>
+              <p class="text-xl">
+                Please add subjects to see your eligible pathways.
+              </p>
+            </div>
           </div>
-        </div>
-      </section>
-
-      <section
-        id="resultsAdviceSection"
-        class="mb-10 p-6 bg-slate-800 shadow-2xl rounded-xl border border-slate-700 hidden"
+        </section>
+      </div>
+      <div
+        id="panelPlan"
+        role="tabpanel"
+        aria-labelledby="tabPlan"
+        class="hidden"
       >
-        <h2
-          id="actionPlanTitle"
-          tabindex="-1"
-          class="text-2xl font-semibold mb-4 text-cyan-400 outline-none"
+        <section
+          id="resultsAdviceSection"
+          class="mb-10 p-6 bg-slate-800 shadow-2xl rounded-xl border border-slate-700 hidden"
         >
-          Your Action Plan
-        </h2>
-        <div id="resultsAdviceContainer"></div>
-      </section>
+          <h2
+            id="actionPlanTitle"
+            tabindex="-1"
+            class="text-2xl font-semibold mb-4 text-cyan-400 outline-none"
+          >
+            Your Action Plan
+          </h2>
+          <div id="resultsAdviceContainer"></div>
+        </section>
+      </div>
 
       <footer class="text-center mt-12 text-sm text-slate-500">
         <p>
           &copy; <span id="currentYear"></span> Student Pathway Dashboard. For
           informational purposes only.
         </p>
-        <p class="font-semibold text-sky-300 mt-2">Updated as at June 2025</p>
+        <p class="font-semibold text-sky-300 mt-2">
+          Updated as at October 2026
+        </p>
         <p class="mt-2">
           Always verify eligibility criteria with official sources.
         </p>
@@ -3259,6 +3307,15 @@
           return n >= band[0] && n <= band[1] ? n : null;
         };
 
+        // The mark the Action Plan counts from: the entered mark, or the middle
+        // of the grade's band when none was entered (G1 has no bands: null).
+        const markOf = (s) => {
+          const raw = getValidRaw(s);
+          if (raw !== null) return raw;
+          const band = RAW_BANDS[s.level]?.[s.grade];
+          return band ? Math.floor((band[0] + band[1]) / 2) : null;
+        };
+
         const isCompulsoryLower = (s) =>
           (s.level === "G3" && (s.grade === "E8" || s.grade === "F9")) ||
           (s.level === "G2" && s.grade === "6");
@@ -4179,7 +4236,7 @@
             if (s.level === "G1") return [];
             const list =
               s.level === "G3" ? G3_GRADES_OPTIONS : G2_GRADES_OPTIONS;
-            const raw = getValidRaw(s);
+            const raw = markOf(s);
             const rungs = [];
             let prev = baseEval.eligible;
             for (let k = list.indexOf(s.grade) - 1; k >= 0; k--) {
@@ -4472,7 +4529,7 @@
             const startIdx = base.map((s, i) =>
               grades[i] ? grades[i].indexOf(s.grade) : -1,
             );
-            const raws = base.map(getValidRaw);
+            const raws = base.map(markOf);
             const markAt = (i, k) => RAW_BANDS[base[i].level][grades[i][k]][0];
             const gapTo = (i, k) =>
               k === startIdx[i]
@@ -4671,7 +4728,7 @@
               const gap = gapTo(i, route.idx[i]);
               total += gap;
               maxGap = Math.max(maxGap, gap);
-              if (raws[i] === null) estimated = true;
+              if (!hasRawMark(s) || getValidRaw(s) === null) estimated = true;
               parts.push({
                 gap,
                 text: `${nameOf(s)} ${s.level} ${s.grade} → ${grades[i][route.idx[i]]} (reach ${markAt(i, route.idx[i])} marks, +${marksText(gap)})`,
@@ -4684,7 +4741,7 @@
               });
             });
             parts.sort((x, y) => y.gap - x.gap);
-            const summary = `Total +${marksText(total)} across ${parts.length} subject${parts.length === 1 ? "" : "s"}${estimated ? " (estimated: add raw marks to confirm)" : ""}${route.greedy ? ". One workable route, not necessarily the cheapest" : ""}`;
+            const summary = `Total +${marksText(total)} across ${parts.length} subject${parts.length === 1 ? "" : "s"}${estimated ? " (estimated from the middle of each grade band: add raw marks to confirm)" : ""}${route.greedy ? ". One workable route, not necessarily the cheapest" : ""}`;
             return {
               text: `Improve ${parts.map((x) => x.text).join("; ")}. ${summary}.`,
               parts: parts.map((x) => x.text),
@@ -6186,9 +6243,10 @@
             const lo = RAW_BANDS[s.level][g][0];
             return {
               need: `${g} (${lo}+ marks)`,
-              marks: hasRawMark(s)
-                ? `+${Math.max(0, lo - Number(s.rawMark))} marks`
-                : "—",
+              marks:
+                markOf(s) !== null
+                  ? `+${Math.max(0, lo - markOf(s))} marks`
+                  : "—",
             };
           };
           // What an ITE pass asks of this subject at its own level.
@@ -6198,9 +6256,10 @@
               const lo = RAW_BANDS[s.level][g][0];
               return {
                 need: `${g} (${lo}+ marks)`,
-                marks: hasRawMark(s)
-                  ? `+${Math.max(0, lo - Number(s.rawMark))} marks`
-                  : "—",
+                marks:
+                  markOf(s) !== null
+                    ? `+${Math.max(0, lo - markOf(s))} marks`
+                    : "—",
               };
             }
             return { need: "D", marks: "—" };
@@ -6229,9 +6288,10 @@
             const lo = RAW_BANDS[s.level][tgt][0];
             return {
               need: `${tgt} (${lo}+ marks)`,
-              marks: hasRawMark(s)
-                ? `+${Math.max(0, lo - Number(s.rawMark))} marks`
-                : "—",
+              marks:
+                markOf(s) !== null
+                  ? `+${Math.max(0, lo - markOf(s))} marks`
+                  : "—",
             };
           };
           const td = (html, cls = "") =>
@@ -6665,8 +6725,46 @@
         });
         // "See where you can go": jump from the subject list to the table,
         // and move keyboard focus with it.
+        // Two views: Explore pathways (Sec 1-2) and Plan my subjects (Sec 3-4).
+        const VIEW_TABS = ["Explore", "Plan"];
+        const setView = (name, opts = {}) => {
+          if (!VIEW_TABS.includes(name)) name = "Explore";
+          VIEW_TABS.forEach((n) => {
+            const on = n === name;
+            const tab = document.getElementById("tab" + n);
+            tab.setAttribute("aria-selected", String(on));
+            tab.tabIndex = on ? 0 : -1;
+            tab.className = `min-h-[56px] px-3 py-2 rounded-lg border text-left focus:outline-none focus:ring-2 focus:ring-cyan-300 ${on ? "bg-cyan-600 border-cyan-300 text-white" : "bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700"}`;
+            document
+              .getElementById("panel" + n)
+              .classList.toggle("hidden", !on);
+          });
+          try {
+            localStorage.setItem("spd.view", name);
+          } catch (_) {}
+          if (opts.focus) document.getElementById("tab" + name).focus();
+        };
+        VIEW_TABS.forEach((n, i) => {
+          const tab = document.getElementById("tab" + n);
+          tab.addEventListener("click", () => setView(n));
+          tab.addEventListener("keydown", (e) => {
+            if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+            e.preventDefault();
+            setView(VIEW_TABS[(i + 1) % VIEW_TABS.length], { focus: true });
+          });
+        });
+        {
+          let saved = "Explore";
+          try {
+            saved = localStorage.getItem("spd.view") || "Explore";
+          } catch (_) {}
+          setView(saved);
+        }
+        // "See where you can go": jump from the subject list to the table,
+        // and move keyboard focus with it.
         document.getElementById("jumpToPlan").addEventListener("click", (e) => {
           e.preventDefault();
+          setView("Plan");
           resultsAdviceSection.scrollIntoView({
             behavior: "smooth",
             block: "start",
@@ -7073,8 +7171,9 @@
               rawEl.type = "number";
               rawEl.min = "0";
               rawEl.max = "100";
-              rawEl.placeholder = bandText(s.level, s.grade);
-              rawEl.setAttribute("aria-label", "Raw mark");
+              rawEl.placeholder = "Optional";
+              rawEl.title = `Optional. ${s.grade} is ${bandText(s.level, s.grade)}`;
+              rawEl.setAttribute("aria-label", "Raw mark (optional)");
               rawEl.dataset.rowRaw = "";
               rawEl.value = hasRawMark(s) ? s.rawMark : "";
               rawEl.className = `w-full px-3 py-2 min-w-[90px] bg-slate-700 border ${rawInvalid ? "border-red-500" : "border-slate-600"} rounded-md shadow-sm focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100 text-sm`;
@@ -7121,8 +7220,102 @@
             eligibilityGroupPref[track.dataset.track] = !track.open;
         });
 
+        // The pathway table above the cards: one box per post-sec option.
+        // Tapping a box shows that option's cards (null = none, "all" = all).
+        const eligView = { col: null };
+        const eligTableWrap = document.getElementById("eligTableWrap");
+        const eligColStatus = (col, results) => {
+          const ps = results.filter((p) => col.ids.includes(p.id));
+          const n = ps.filter((p) => p.isEligible || p.isCA).length;
+          const none =
+            ps.length > 0 &&
+            ps.every(
+              (p) => p.grossScore === Infinity && p.netScore === Infinity,
+            );
+          return {
+            n,
+            total: ps.length,
+            status: n > 0 ? "open" : none ? "impossible" : "further",
+          };
+        };
+        function renderEligibilityTable(results) {
+          if (studentSubjects.length === 0) {
+            eligTableWrap.innerHTML = "";
+            return;
+          }
+          const sel = eligView.col;
+          const head = FSBB_COLS.map(
+            (c, i) =>
+              `<th scope="col" class="p-0 h-px"><button type="button" data-elig-col="${i}" aria-pressed="${sel === i}" class="w-full h-full min-h-[68px] ${sel === i ? "bg-[#4c6ef5] ring-2 ring-cyan-300" : "bg-[#3b5bdb] hover:bg-[#4c6ef5]"} text-white font-semibold rounded px-1 py-2 text-[12px] sm:text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-cyan-300">${c.head.map(esc).join("<br>")}</button></th>`,
+          ).join("");
+          const cells = FSBB_COLS.map((c, i) => {
+            const s = eligColStatus(c, results);
+            const word =
+              s.status === "open"
+                ? "You qualify"
+                : s.status === "impossible"
+                  ? "Not possible with your subjects"
+                  : "Not yet";
+            const count =
+              s.status === "open" && s.total > 1
+                ? `${s.n} of ${s.total} courses`
+                : "";
+            return `<td class="p-0 h-px"><button type="button" data-elig-cell="${i}" data-status="${s.status}" aria-pressed="${sel === i}" aria-label="${esc(c.label)}: ${esc(word)} ${esc(count)}. Show details" class="${CELL_BOX} ${FSBB_STYLE[s.status]} flex flex-col items-center justify-center gap-1 text-center ${sel === i ? "ring-2 ring-cyan-300" : ""} focus:outline-none focus:ring-2 focus:ring-cyan-300"><span class="text-2xl font-black" aria-hidden="true">${FSBB_ICON[s.status]}</span><span class="text-[11px] sm:text-sm leading-tight font-semibold">${esc(word)}</span>${count ? `<span class="text-[11px] leading-tight">${count}</span>` : ""}</button></td>`;
+          }).join("");
+          const hint =
+            sel === null
+              ? "Tap a box to see its courses and requirements."
+              : sel === "all"
+                ? "Showing every pathway."
+                : `Showing ${FSBB_COLS[sel].label}.`;
+          eligTableWrap.innerHTML = `<div class="overflow-x-auto rounded-xl border border-slate-700"><table id="eligTable" class="min-w-[700px] w-full table-fixed border-separate border-spacing-1 text-center"><colgroup><col style="width:132px">${FSBB_COLS.map(() => "<col>").join("")}</colgroup><thead><tr><th class="sticky left-0 z-10 bg-slate-800"></th><th colspan="6" class="bg-[#1b2f5e] text-white tracking-[0.2em] text-xs font-bold py-2 rounded">POST-SEC PATHWAYS</th></tr><tr><th scope="col" class="sticky left-0 z-10 bg-slate-800"></th>${head}</tr></thead><tbody><tr><th scope="row" class="sticky left-0 z-10 bg-slate-800 text-left p-2 text-base text-slate-100 leading-tight">Your subjects</th>${cells}</tr></tbody></table></div><div class="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-300"><p id="eligHint">${esc(hint)}</p><button type="button" id="eligShowAll" class="min-h-[44px] px-4 rounded-lg border border-slate-500 text-sky-300 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-300">${sel === "all" ? "Hide pathway details" : "Show every pathway"}</button></div>`;
+        }
+        // Show only the tracks and cards the chosen box stands for.
+        function applyEligibilityFilter() {
+          const sel = eligView.col;
+          const col = typeof sel === "number" ? FSBB_COLS[sel] : null;
+          eligibilityResultsContainer
+            .querySelectorAll("details[data-track]")
+            .forEach((d) => {
+              let any = sel === "all";
+              d.querySelectorAll("[data-pathway-id]").forEach((card) => {
+                const show =
+                  sel === "all" ||
+                  (col !== null && col.ids.includes(card.dataset.pathwayId));
+                card.hidden = !show;
+                if (show) any = true;
+              });
+              d.hidden = !any;
+              if (col !== null && any) d.open = true;
+            });
+        }
+        eligTableWrap.addEventListener("click", (e) => {
+          const b = e.target.closest(
+            "[data-elig-cell],[data-elig-col],#eligShowAll",
+          );
+          if (!b) return;
+          let next;
+          if (b.id === "eligShowAll")
+            next = eligView.col === "all" ? null : "all";
+          else {
+            const i = Number(b.dataset.eligCell ?? b.dataset.eligCol);
+            next = eligView.col === i ? null : i;
+          }
+          eligView.col = next;
+          if (typeof next === "number")
+            eligibilityGroupPref[FSBB_COLS[next].group || "JC/MI"] = true;
+          updateAllCalculationsAndRender();
+          const again = eligTableWrap.querySelector(
+            typeof next === "number"
+              ? `[data-elig-cell="${next}"]`
+              : "#eligShowAll",
+          );
+          if (again) again.focus({ preventScroll: true });
+        });
+
         function renderEligibilityResults(eligibilityResults) {
           eligibilityResultsContainer.innerHTML = "";
+          renderEligibilityTable(eligibilityResults);
           if (studentSubjects.length === 0) {
             eligibilityPlaceholder.classList.add("hidden");
             eligibilityResultsContainer.appendChild(eligibilityPlaceholder);
@@ -7181,6 +7374,7 @@
                 "grid md:grid-cols-2 lg:col-span-3 gap-6";
               groupedPathways[group].forEach((pathway) => {
                 const card = document.createElement("div");
+                card.dataset.pathwayId = pathway.id;
                 const isEligible = pathway.isEligible;
                 const isCA = pathway.isCA;
                 let notEligibleLabel = "Not yet";
@@ -7302,6 +7496,7 @@
               eligibilityResultsContainer.appendChild(groupSection);
             }
           }
+          applyEligibilityFilter();
         }
 
         // ---- Subject picker ----
@@ -7497,6 +7692,7 @@
             return calculateAllPathwaysStatus(subjects);
           },
           pathways: PATHWAYS,
+          markOf,
           advise: (subjects, bonus, school) => {
             if (bonus !== undefined) bonusPoints = bonus;
             if (school !== undefined) selectedSchool = school;

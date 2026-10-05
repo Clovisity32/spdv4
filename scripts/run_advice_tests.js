@@ -46,6 +46,11 @@ async function advise(page, subjects) {
   const page = await browser.newPage();
   const pageErrors = [];
   page.on("pageerror", (e) => pageErrors.push(e.message));
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem("spd.view", "Plan");
+    } catch (_) {}
+  });
   await page.goto(FILE_URL);
 
   try {
@@ -1783,6 +1788,39 @@ async function advise(page, subjects) {
       "P10-U13",
       "The old choice cards, custom mix and separate explorer are gone",
     );
+
+    // MID: with no raw mark the plan counts from the middle of the grade band
+    {
+      const m = await page.evaluate(() => {
+        const f = window.__spdTest.markOf;
+        const g3 = (grade, rawMark) => ({ level: "G3", grade, rawMark });
+        const g2 = (grade, rawMark) => ({ level: "G2", grade, rawMark });
+        return {
+          f9: f(g3("F9", null)),
+          e8: f(g3("E8", null)),
+          a1: f(g3("A1", null)),
+          g26: f(g2("6", null)),
+          entered: f(g3("F9", 12)),
+          badEntered: f(g3("F9", 80)),
+          g1: f({ level: "G1", grade: "C", rawMark: null }),
+        };
+      });
+      ok(
+        m.f9 === 19 && m.e8 === 42 && m.a1 === 87 && 40 - m.f9 === 21,
+        "MID-01",
+        `No raw mark: F9 counts from 19, E8 from 42, A1 from 87; F9 to E8 needs +21 (${m.f9}, ${m.e8}, ${m.a1}), not +40`,
+      );
+      ok(
+        m.entered === 12 && m.badEntered === 19,
+        "MID-02",
+        `An entered mark wins (12); one outside the grade's band is ignored for the midpoint (${m.badEntered})`,
+      );
+      ok(
+        m.g26 === 24 && 50 - m.g26 === 26 && m.g1 === null,
+        "MID-03",
+        `G2 grade 6 counts from 24 (+26 to a 5); G1 has no bands (${m.g26}, ${m.g1})`,
+      );
+    }
 
     ok(
       pageErrors.length === 0,

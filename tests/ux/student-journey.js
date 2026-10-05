@@ -30,6 +30,11 @@ async function run(name, viewport, mode = "picker") {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
 
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem("spd.view", "Plan");
+    } catch (_) {}
+  });
   const t0 = Date.now();
   await page.goto(FILE_URL, { waitUntil: "load" });
   step("load", { ms: Date.now() - t0 });
@@ -204,9 +209,14 @@ async function run(name, viewport, mode = "picker") {
     step("preview-option", {
       ms: Date.now() - tapOpt,
       bar: (await page.innerText("#fsbbPreviewBar")).replace(/\s+/g, " "),
-      rowLabel: (await page.innerText("#fsbbTable tbody th")).replace(/\s+/g, " "),
+      rowLabel: (await page.innerText("#fsbbTable tbody th")).replace(
+        /\s+/g,
+        " ",
+      ),
       barInViewport: await page.evaluate(() => {
-        const r = document.querySelector("#fsbbPreviewBar").getBoundingClientRect();
+        const r = document
+          .querySelector("#fsbbPreviewBar")
+          .getBoundingClientRect();
         return r.top >= 0 && r.top < window.innerHeight;
       }),
     });
