@@ -143,6 +143,44 @@ async function run(name, viewport, mode = "picker") {
   step("details-your-row", detailWords);
   await page.screenshot({ path: `debug/ux-student-${name}-3-details.png` });
 
+  // The requirements table inside the easiest course
+  await page.$$eval("#fsbbCourses [data-pw]", (ds) =>
+    ds.forEach((d, i) => (d.open = i === 0)),
+  );
+  const tapTip = Date.now();
+  await page.click("#fsbbCourses [data-easiest] [data-slot-tip]");
+  const tipInfo = await page.evaluate(() => {
+    const t = document.querySelector(
+      "#fsbbCourses [data-easiest] [data-slot-tip] [role=tooltip]",
+    );
+    const r = t.getBoundingClientRect();
+    return {
+      visible: t.offsetParent !== null,
+      insideViewport: r.left >= 0 && r.right <= window.innerWidth,
+      text: t.textContent.slice(0, 80),
+    };
+  });
+  await page.screenshot({ path: `debug/ux-student-${name}-3b-course-table.png` });
+  step("course-table", {
+    tooltipOnTapMs: Date.now() - tapTip,
+    tooltip: tipInfo,
+    ...(await page.evaluate(() => {
+      const tb = document.querySelector("#fsbbCourses [data-easiest] [data-slot-table]");
+      const rows = [...tb.querySelectorAll("[data-slot-row]")];
+      const cells = [...tb.querySelectorAll("td")];
+      return {
+        slotRows: rows.length,
+        orRows: tb.querySelectorAll("[data-slot-or]").length,
+        extraRows: tb.querySelectorAll("[data-slot-extra]").length,
+        clippedCells: cells.filter((c) => c.scrollWidth > c.clientWidth + 1).length,
+        minFontPx: Math.min(...cells.map((c) => parseFloat(getComputedStyle(c).fontSize))),
+        tableHeightPx: Math.round(tb.getBoundingClientRect().height),
+        needs: rows.map((r) => r.children[3].innerText.trim()),
+        total: (tb.querySelector("[data-slot-total]") || {}).innerText || "",
+      };
+    })),
+  });
+
   // Tap a lower row (the "what if I move down" question)
   const tap2 = Date.now();
   await page

@@ -5,13 +5,13 @@ Previous audit: 1.8 (`reports/2026-10-05-student.md`). Scores are the auditor's 
 
 ## Scores
 
-| Screen                 | Previous | Now     | Notes                                                                                                                                  |
-| ---------------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Subject entry          | 1.6      | 1.7     | One way in instead of three; but the same six subjects now cost 21 interactions, not 15 (see Regression)                               |
-| Eligibility cards      | 1.9      | 1.9     | Unchanged                                                                                                                              |
-| Your Action Plan table | 1.9      | 1.9     | Still 2,109px (desktop) and 3,117px (phone) down the page; chronic                                                                     |
-| Tap-through details    | 1.8      | 1.8     | Unchanged                                                                                                                              |
-| **Overall**            | **1.8**  | **1.8** | Unchanged (1.83)                                                                                                                       |
+| Screen                 | Previous | Now     | Notes                                                                                                    |
+| ---------------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------- |
+| Subject entry          | 1.6      | 1.7     | One way in instead of three; but the same six subjects now cost 21 interactions, not 15 (see Regression) |
+| Eligibility cards      | 1.9      | 1.9     | Unchanged                                                                                                |
+| Your Action Plan table | 1.9      | 1.9     | Still 2,109px (desktop) and 3,117px (phone) down the page; chronic                                       |
+| Tap-through details    | 1.8      | 1.8     | Unchanged                                                                                                |
+| **Overall**            | **1.8**  | **1.8** | Unchanged (1.83)                                                                                         |
 
 ## Measurements
 
