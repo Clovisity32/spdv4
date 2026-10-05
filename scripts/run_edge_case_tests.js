@@ -2103,12 +2103,11 @@ function ok(cond, id, msg) {
     }
     // PICK-03: same results as adding one at a time
     ok(
-      (await page.isVisible("#defaultGradeNote")) &&
-        (await page.$$eval("#studentSubjectsTableBody tr", (rs) =>
-          rs.every((r) => r.innerText.includes("Set grade")),
-        )),
+      (await page.$$eval("#studentSubjectsTableBody tr", (rs) =>
+        rs.every((r) => r.innerText.includes("Set grade")),
+      )),
       "PICK-03",
-      "Every new row is tagged 'Set grade' and the note above the table asks the student to set level and grade",
+      "Every new row is tagged 'Set grade'",
     );
     for (const [id, g] of PROFILE15) await setRow(id, "G3", g);
     const viaPicker = [];
@@ -2231,15 +2230,14 @@ function ok(cond, id, msg) {
       const mathTag = (
         await page.textContent('[data-subject-row="MATH"]')
       ).includes("Set grade");
-      const noteMid = await page.isVisible("#defaultGradeNote");
       await setRow("MATH", "G3", "C6");
       ok(
         !elTag &&
           mathTag &&
-          noteMid &&
-          (await page.isHidden("#defaultGradeNote")),
+          !(await page.textContent('[data-subject-row="MATH"]')).includes("Set grade") &&
+          (await page.$("#defaultGradeNote")) === null,
         "PICK-11",
-        "A row loses its 'Set grade' tag when its grade is changed, and the note goes once every row has been set",
+        "A row loses its 'Set grade' tag when its grade is changed, and there is no separate note above the table",
       );
     }
     // PICK-12: the grade follows the raw mark; a mark that does not fit a

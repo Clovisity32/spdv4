@@ -325,14 +325,6 @@
           <h3 class="text-xl font-semibold mb-3 text-sky-400">
             Your Subjects:
           </h3>
-          <p
-            id="defaultGradeNote"
-            class="hidden mb-3 text-sm text-cyan-200"
-            role="status"
-          >
-            Subjects you just added start at G3 A1. Change the level and grade
-            of each one to your own.
-          </p>
           <div class="overflow-x-auto rounded-lg border border-slate-700">
             <table class="min-w-full divide-y divide-slate-700">
               <thead class="bg-slate-700">
@@ -6964,10 +6956,6 @@
             return;
           }
           studentSubjectsTableContainer.classList.remove("hidden");
-          defaultGradeNote.classList.toggle(
-            "hidden",
-            !studentSubjects.some((x) => defaultRows.has(x.subjectId)),
-          );
           studentSubjects.forEach((s, index) => {
             const row = studentSubjectsTableBody.insertRow();
             row.className = "hover:bg-slate-700/50 transition-colors";
@@ -7281,7 +7269,6 @@
         const subjectMenuAdd = document.getElementById("subjectMenuAdd");
         const addUpdateBtnText = document.getElementById("addUpdateBtnText");
         const addMsg = document.getElementById("addMsg");
-        const defaultGradeNote = document.getElementById("defaultGradeNote");
         const pickState = new Set(); // ticked subject ids (survive school changes)
         const defaultRows = new Set(); // added subjects still on their starting grade
 
