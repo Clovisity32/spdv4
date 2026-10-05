@@ -1,6 +1,6 @@
 /**
  * Edge Case Test Suite — Student Pathway Dashboard
- * Phases 1–14
+ * Phases 1–15
  *
  * Run: node scripts/run_edge_case_tests.js
  *
@@ -1992,6 +1992,285 @@ function ok(cond, id, msg) {
         "Inside an open track every pathway card shows its name, status and scores",
       );
     }
+    // ════════════════════════════════════════════════════════════════════════
+    // Phase 15: Add several subjects at once
+    // One panel lists every subject the school offers; picking a grade ticks the
+    // row; one button adds all ticked rows together (all or nothing).
+    // ════════════════════════════════════════════════════════════════════════
+    console.log("\n── Phase 15: Add several subjects at once ──");
+    const bulkOpen = () => page.click("#bulkAdd > summary");
+    const bulkFill = async (list) => {
+      for (const [id, grade, raw] of list) {
+        await page.selectOption(
+          '[data-bulk-row="' + id + '"] [data-bulk-grade]',
+          grade,
+        );
+        if (raw !== undefined)
+          await page.fill('[data-bulk-row="' + id + '"] [data-bulk-raw]', raw);
+      }
+    };
+    const tableRows = () =>
+      page.$$eval("#studentSubjectsTableBody tr", (r) => r.length);
+    const PROFILE15 = [
+      ["EL", "D7"],
+      ["MATH", "C6"],
+      ["BIO", "C6"],
+      ["HIST", "B4"],
+      ["GEOG", "B4"],
+    ];
+    const NAMES15 = [
+      "Junior College",
+      "Millennia",
+      "MER (Complete SEC)",
+      "MER (Pass Math)",
+      "Humanities, Media",
+      "Foundation Programme (PFP) - Science",
+    ];
+
+    await reset(page);
+    {
+      const rows = await page.$$eval("[data-bulk-row]", (r) => r.length);
+      const options = await page.$$eval("#subject option", (o) => o.length - 1);
+      ok(
+        rows === options &&
+          !(await page.$eval("#bulkAdd", (d) => d.open)) &&
+          (await page.isDisabled("#bulkAddBtn")),
+        "BULK-01",
+        "The panel lists every subject the school offers (" +
+          rows +
+          "), starts closed, and Add is disabled until something is ticked",
+      );
+    }
+    // BULK-02: several subjects in one go
+    await bulkOpen();
+    await bulkFill(PROFILE15);
+    {
+      const label = await page.textContent("#bulkAddBtn");
+      await page.click("#bulkAddBtn");
+      await page.waitForTimeout(500);
+      ok(
+        label.trim() === "Add 5 selected subjects" &&
+          (await tableRows()) === 5 &&
+          !(await page.$eval("#bulkAdd", (d) => d.open)) &&
+          (await page.textContent("#bulkMsg")).includes("Added 5 subjects") &&
+          (await page.isVisible("#fsbbTable")),
+        "BULK-02",
+        "Five subjects go in with one click: the button counts them, the table and Action Plan appear, and a confirmation shows",
+      );
+    }
+    // BULK-03: same results as adding one at a time
+    const viaBulk = [];
+    for (const n of NAMES15) viaBulk.push(await getResult(page, n));
+    await reset(page);
+    await addMany(
+      page,
+      PROFILE15.map(([id, g]) => [id, "G3", g]),
+    );
+    const viaSingle = [];
+    for (const n of NAMES15) viaSingle.push(await getResult(page, n));
+    ok(
+      JSON.stringify(viaBulk) === JSON.stringify(viaSingle) &&
+        viaBulk.every((r) => r.found),
+      "BULK-03",
+      "Adding subjects in bulk gives exactly the same eligibility results as adding them one by one",
+    );
+
+    // BULK-04: validation, all or nothing
+    await reset(page);
+    await bulkOpen();
+    await page.check('[data-bulk-row="EL"] [data-bulk-check]');
+    await page.selectOption('[data-bulk-row="MATH"] [data-bulk-grade]', "C6");
+    await page.click("#bulkAddBtn");
+    {
+      const err = await page.textContent("#bulkErr");
+      ok(
+        (await tableRows()) === 0 &&
+          (await page.isVisible("#bulkErr")) &&
+          err.includes("English Language: choose a grade") &&
+          (await page.getAttribute('[data-bulk-row="EL"]', "aria-invalid")) ===
+            "true",
+        "BULK-04",
+        "A ticked subject with no grade stops the whole batch (nothing added) and names the subject",
+      );
+    }
+    await page.selectOption('[data-bulk-row="EL"] [data-bulk-grade]', "B3");
+    await page.fill('[data-bulk-row="EL"] [data-bulk-raw]', "10");
+    await page.click("#bulkAddBtn");
+    {
+      const err = await page.textContent("#bulkErr");
+      ok(
+        (await tableRows()) === 0 &&
+          err.includes("English Language") &&
+          err.includes("65"),
+        "BULK-05",
+        "A raw mark that does not fit its grade blocks the batch and says what range the grade means (" +
+          err.slice(0, 90) +
+          ")",
+      );
+    }
+    // BULK-06: fixing it adds everything, and the raw mark is kept
+    await page.fill('[data-bulk-row="EL"] [data-bulk-raw]', "67");
+    await page.click("#bulkAddBtn");
+    await page.waitForTimeout(500);
+    {
+      const text = await page.$$eval("#studentSubjectsTableBody tr", (rs) =>
+        rs
+          .map(
+            (r) =>
+              r.innerText +
+              " " +
+              Array.from(r.querySelectorAll("input"))
+                .map((i) => i.value)
+                .join(" "),
+          )
+          .join(" | "),
+      );
+      ok(
+        (await tableRows()) === 2 && text.includes("67"),
+        "BULK-06",
+        "After the fix both subjects are added and the typed raw mark is kept",
+      );
+    }
+    // BULK-07: added subjects show as added and cannot be ticked again
+    await bulkOpen();
+    ok(
+      (await page.isDisabled('[data-bulk-row="EL"] [data-bulk-check]')) &&
+        (await page.textContent('[data-bulk-row="EL"]')).includes("Added") &&
+        (await page.isDisabled("#bulkAddBtn")),
+      "BULK-07",
+      "Subjects already added are marked 'Added' and locked, so nothing can be added twice",
+    );
+    // BULK-08: search keeps ticked rows visible
+    await page.check('[data-bulk-row="BIO"] [data-bulk-check]');
+    await page.fill("#bulkSearch", "chem");
+    {
+      const visible = await page.$$eval("[data-bulk-row]", (rs) =>
+        rs
+          .filter((r) => !r.classList.contains("hidden"))
+          .map((r) => r.dataset.bulkRow),
+      );
+      ok(
+        visible.includes("CHEM") &&
+          visible.includes("BIO") &&
+          visible.length < 6,
+        "BULK-08",
+        "Searching narrows the list to matches plus anything already ticked (" +
+          visible.join(", ") +
+          ")",
+      );
+    }
+    await page.fill("#bulkSearch", "");
+    ok(
+      (await page.$$eval("[data-bulk-row].hidden", (r) => r.length)) === 0,
+      "BULK-09",
+      "Clearing the search brings every subject back",
+    );
+    // BULK-10: level rules match the single form
+    {
+      const lv = (id) =>
+        page.$$eval(
+          '[data-bulk-row="' + id + '"] [data-bulk-level] option',
+          (o) => o.map((x) => x.value).join(","),
+        );
+      ok(
+        (await lv("BIO")) === "G3" &&
+          (await lv("DT")) === "G3,G2" &&
+          (await lv("MOB_ROBOTICS")) === "G1" &&
+          (await page.isDisabled(
+            '[data-bulk-row="MOB_ROBOTICS"] [data-bulk-raw]',
+          )),
+        "BULK-10",
+        "Each row offers only the levels that subject allows at this school (BIO G3, DT G3/G2, Mobile Robotics G1 with no raw mark)",
+      );
+    }
+    // BULK-11: changing school rebuilds the list
+    await page.selectOption("#school", "Yuhua Secondary School");
+    await page.waitForTimeout(200);
+    ok(
+      (await page.$$eval("[data-bulk-row]", (r) => r.length)) ===
+        (await page.$$eval("#subject option", (o) => o.length - 1)),
+      "BULK-11",
+      "Changing school rebuilds the list to that school's subjects",
+    );
+    // BULK-12: the single form still works alongside
+    await page.selectOption("#school", "School A");
+    await page.waitForTimeout(200);
+    await add(page, "PHY", "G3", "B4");
+    ok(
+      (await tableRows()) === 3,
+      "BULK-12",
+      "The existing one-at-a-time form still adds a subject after a bulk add",
+    );
+    // DUP-01: adding the same subject again shows a clear popup (title and text the right way round)
+    await page.selectOption("#subject", "PHY");
+    await page.waitForTimeout(200);
+    await page.click("#addUpdateSubjectBtn");
+    await page.waitForTimeout(300);
+    {
+      const title = await page.textContent("#messageBoxTitle");
+      const text = await page.textContent("#messageBoxText");
+      ok(
+        title.trim() === "Duplicate Subject" &&
+          text.includes("has already been added") &&
+          (await tableRows()) === 3,
+        "DUP-01",
+        "The duplicate-subject popup has the heading 'Duplicate Subject' and the explanation as its text (" +
+          title.trim() +
+          ")",
+      );
+      await page.click("#messageBoxOkButton");
+    }
+    // BULK-13: phone width
+    await page.setViewportSize({ width: 390, height: 844 });
+    await reset(page);
+    await bulkOpen();
+    await bulkFill([
+      ["EL", "B3"],
+      ["MATH", "C6"],
+    ]);
+    {
+      const noScroll = !(await page.evaluate(
+        () => document.documentElement.scrollWidth > window.innerWidth,
+      ));
+      await page.locator("#bulkAdd").scrollIntoViewIfNeeded();
+      const btnBox = await page.$eval("#bulkAddBtn", (b) => {
+        const r = b.getBoundingClientRect();
+        return { top: r.top, bottom: r.bottom, h: window.innerHeight };
+      });
+      ok(
+        noScroll && btnBox.bottom <= btnBox.h && btnBox.top >= 0,
+        "BULK-13",
+        "At 390px wide there is no sideways scroll and the Add button stays on screen while the list is long",
+      );
+    }
+    // BULK-14: phone shortcut to the panel is in the first screen, and works
+    await reset(page);
+    {
+      const box = await page.$eval("#bulkJump", (b) => {
+        const r = b.getBoundingClientRect();
+        return { bottom: r.bottom, h: window.innerHeight };
+      });
+      const inFirstScreen = box.bottom <= box.h;
+      await page.click("#bulkJump");
+      await page.waitForTimeout(900);
+      const opened = await page.$eval("#bulkAdd", (d) => d.open);
+      const nearTop = await page.$eval("#bulkAdd", (d) => {
+        const r = d.getBoundingClientRect();
+        return r.top < window.innerHeight * 0.5 && r.bottom > 0;
+      });
+      ok(
+        inFirstScreen && opened && nearTop,
+        "BULK-14",
+        "On a phone a button in the first screen opens 'Add several subjects at once' and scrolls to it",
+      );
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await reset(page);
+    ok(
+      !(await page.isVisible("#bulkJump")),
+      "BULK-15",
+      "That phone shortcut is hidden on a wide screen, where the panel is already in view",
+    );
   } catch (err) {
     // A thrown error mid-run must fail the suite, not print "All checks passed!".
     console.log(`
