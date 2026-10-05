@@ -5417,7 +5417,7 @@
                   ref: { row: bestRow, col: ci },
                   line1:
                     best === 0
-                      ? "Already open"
+                      ? "Eligible"
                       : "LDL does not increase eligibility",
                   line2: "",
                   cfg: null,
@@ -5635,7 +5635,7 @@
           open: "Eligible",
           close: "Almost there",
           further: "Needs more work",
-          have: "Already open",
+          have: "Eligible",
           nobetter: "LDL does not increase eligibility",
           later: "Possible after Year 1",
         };
@@ -5698,8 +5698,342 @@
           lower: "bg-amber-400",
           further: "bg-slate-400",
         };
+        // ---- Requirements table for one course: one row per slot ----
+        // Display only: slots come from the calc result (`subjectsUsed` roles);
+        // when a slot cannot be filled yet, a best-effort pick of the same kind
+        // is shown so the student can see what is missing.
+        const fsbbSlotDefs = (pw) => {
+          const catOf = (s) => getSubjectById(s.subjectId)?.category;
+          const inCat = (list) => (s) => list.includes(catOf(s));
+          const inIds = (list) => (s) => list.includes(s.subjectId);
+          const anySubj = () => true;
+          const g3 = (n) => (n ? G3_GRADES_OPTIONS[n - 1] : null);
+          const m = pw.mer || {};
+          const mk = (role, label, rule, allow, o = {}) => ({
+            role,
+            label,
+            rule,
+            allow,
+            levels: ["G3"],
+            ...o,
+          });
+          if (pw.calcType === "L1R4_G3") {
+            const c = pw.l1r4_config;
+            const mathGate = `Mathematics or Additional Mathematics must be ${g3(m.math_am_g3)} or better at G3.`;
+            return [
+              mk(
+                "L1",
+                "L1 · English or Higher Mother Tongue",
+                `L1 is your English or Higher Mother Tongue, whichever scores better. English must be ${g3(m.el_g3)} or better at G3.`,
+                inCat(c.L1),
+              ),
+              mk(
+                "R1",
+                "R1 · Humanities",
+                "R1 is your best Humanities subject at G3.",
+                inCat(c.R1_cat_ids),
+              ),
+              mk(
+                "R2",
+                "R2 · Math or Science",
+                `R2 is your best Math or Science subject at G3. ${mathGate}`,
+                inCat(c.R2_cat_ids),
+              ),
+              mk(
+                "R3",
+                "R3 · Humanities, Math or Science",
+                "R3 is your next best Humanities, Math or Science subject at G3.",
+                inCat(c.R3_cat_ids),
+              ),
+              mk(
+                "R4",
+                "R4 · Any other subject",
+                "R4 is your next best G3 subject of any kind.",
+                anySubj,
+              ),
+            ];
+          }
+          if (pw.calcType === "ELR2B2_G3_Mixed") {
+            const c = pw.elr2b2_config;
+            const rel = (crit, isIds) => (isIds ? inIds(crit) : inCat(crit));
+            return [
+              mk(
+                "EL",
+                "EL · English",
+                `English at G3. Minimum grade ${g3(m.el_g3)}.`,
+                inCat(c.EL),
+                { cut: true },
+              ),
+              mk(
+                "R1",
+                "R1 · Relevant subject",
+                `Your best subject from this course's R1 list at G3. Minimum grade ${g3(m.r1_g3)}.`,
+                rel(c.R1_criteria, c.R1_is_ids),
+                { cut: true },
+              ),
+              mk(
+                "R2",
+                "R2 · Relevant subject",
+                `Your best subject from this course's R2 list at G3. Minimum grade ${g3(m.r2_g3)}.`,
+                rel(c.R2_criteria, c.R2_is_ids),
+                { cut: true },
+              ),
+              mk(
+                "B1",
+                "B1 · Any subject",
+                "Your next best subject at G3 (any subject).",
+                anySubj,
+                { cut: true },
+              ),
+              mk(
+                "B2",
+                "B2 · Any subject",
+                "Your next best subject at G3 or G2 (any subject). A G2 grade is counted at its G2 equivalent.",
+                anySubj,
+                { levels: ["G3", "G2"], equiv: true, cut: true },
+              ),
+            ];
+          }
+          if (pw.calcType === "ELMAB3_G2") {
+            const two = { levels: ["G3", "G2"], equiv: true, cut: true };
+            const defs = [
+              mk(
+                "EL",
+                "EL · English",
+                `English, counted at its G2 equivalent. Must be ${m.el_g2 || "4"} or better.`,
+                inIds(SUBJECT_CATEGORIES_DEF.EL),
+                two,
+              ),
+              mk(
+                "MA",
+                "MA · Math or Add Math",
+                `Mathematics or Additional Mathematics, counted at its G2 equivalent. Must be ${m.math_am_g2 || "4"} or better.`,
+                inCat(SUBJECT_CATEGORIES_DEF.MATH_PURE),
+                two,
+              ),
+            ];
+            if (pw.group === "PFP") {
+              defs.push(
+                mk(
+                  "B1",
+                  "B1 · Relevant subject",
+                  `One subject from this course's relevant list, at its G2 equivalent. Must be ${m.relevant_subj_g2 || "4"} or better.`,
+                  inIds(m.relevant_subj_ids || []),
+                  two,
+                ),
+                mk(
+                  "B2",
+                  "B2 · Any subject",
+                  `Your next best subject, at its G2 equivalent. Must be ${m.other_two_subj_g2 || "4"} or better.`,
+                  anySubj,
+                  two,
+                ),
+                mk(
+                  "B3",
+                  "B3 · Any subject",
+                  `Your next best subject, at its G2 equivalent. Must be ${m.other_two_subj_g2 || "4"} or better.`,
+                  anySubj,
+                  two,
+                ),
+              );
+            } else {
+              [1, 2, 3].forEach((i) =>
+                defs.push(
+                  mk(
+                    `B${i}`,
+                    `B${i} · Any subject`,
+                    "One of your 3 next best subjects, at its G2 equivalent. Must be 4 or better (G3 9 and G2 5–6 do not count).",
+                    anySubj,
+                    two,
+                  ),
+                ),
+              );
+            }
+            return defs;
+          }
+          return [];
+        };
+
+        const fsbbSlotTableHtml = (pw, step, subjects, base, lines) => {
+          const nameOf = (s) =>
+            getSubjectById(s.subjectId)?.name || s.subjectId;
+          const rankOf = (s, def) =>
+            def && def.equiv
+              ? getNumericGrade(getStudentSubjectG2Grade(s), "G2")
+              : getNumericGrade(s.grade, s.level);
+          const passes = (s) =>
+            s.level === "G3"
+              ? getNumericGrade(s.grade, "G3") <= G3_TO_NUMERIC_RAW["E8"]
+              : s.level === "G2"
+                ? getNumericGrade(s.grade, "G2") <= G2_TO_NUMERIC_RAW["4"]
+                : false;
+          const routeRows = step.rows || (step.alt && step.alt.rows) || [];
+          const noRoute = step.tier >= 2 && !routeRows.length;
+          const used = new Set();
+          let slots = [];
+          const defs = fsbbSlotDefs(pw);
+          const ite = !defs.length;
+          if (!ite) {
+            const calcUsed = pw.subjectsUsed || [];
+            slots = defs.map((def) => ({ def, primary: null }));
+            if (calcUsed.length) {
+              slots.forEach((sl) => {
+                const u = calcUsed.find((x) => x.role === sl.def.role);
+                if (u) {
+                  sl.primary =
+                    subjects.find((s) => s.subjectId === u.subjectId) || u;
+                  used.add(u.subjectId);
+                }
+              });
+            } else {
+              slots.forEach((sl) => {
+                const pick = subjects
+                  .filter(
+                    (s) =>
+                      !used.has(s.subjectId) &&
+                      sl.def.levels.includes(s.level) &&
+                      sl.def.allow(s),
+                  )
+                  .sort((a, b) => rankOf(a, sl.def) - rankOf(b, sl.def))[0];
+                if (pick) {
+                  sl.primary = pick;
+                  used.add(pick.subjectId);
+                }
+              });
+            }
+          } else {
+            const calcUsed = pw.subjectsUsed || [];
+            if (!calcUsed.length) return "";
+            slots = calcUsed.map((u, i) => {
+              used.add(u.subjectId);
+              return {
+                def: {
+                  role: `S${i + 1}`,
+                  label: `Subject ${i + 1} · counted`,
+                  rule: "One of the subjects counted in this course's aggregate, using its G1 equivalent grade. The cut-off is set per course.",
+                  levels: ["G3", "G2", "G1"],
+                  allow: () => false,
+                },
+                primary: subjects.find((s) => s.subjectId === u.subjectId) || u,
+                g1: u.g1EquivGrade,
+              };
+            });
+          }
+          // Other subjects that could fill the same slot: a tie, or (when the
+          // slot needs work) one close enough to be worth considering.
+          const claimed = new Set(used);
+          slots.forEach((sl) => {
+            sl.alts = [];
+            if (!sl.primary || ite) return;
+            const pr = rankOf(sl.primary, sl.def);
+            const needsWork = routeRows.some(
+              (r) => r.subject === nameOf(sl.primary),
+            );
+            subjects
+              .filter(
+                (s) =>
+                  !used.has(s.subjectId) &&
+                  !claimed.has(s.subjectId) &&
+                  sl.def.levels.includes(s.level) &&
+                  sl.def.allow(s) &&
+                  (!sl.def.cut || passes(s)),
+              )
+              .forEach((s) => {
+                const d = rankOf(s, sl.def) - pr;
+                if (d === 0 || (needsWork && d > 0 && d <= 2)) {
+                  sl.alts.push(s);
+                  claimed.add(s.subjectId);
+                }
+              });
+          });
+          const extras = subjects.filter((s) => !claimed.has(s.subjectId));
+          const nowText = (s, g1) => {
+            const b = base.find((x) => x.subjectId === s.subjectId);
+            const moved =
+              b && (b.level !== s.level || b.grade !== s.grade)
+                ? ` (was ${b.level} ${b.grade})`
+                : "";
+            return `${s.level} ${s.grade}${moved}${g1 ? ` · G1 ${g1}` : ""}`;
+          };
+          const needFor = (s, primaryNeed) => {
+            if (!primaryNeed) return { need: "OK", marks: "—" };
+            return { need: primaryNeed.need, marks: primaryNeed.marks };
+          };
+          const altNeed = (s, pn) => {
+            const tgt = pn && String(pn.need).split(" ")[0];
+            if (!tgt || !RAW_BANDS[s.level] || !RAW_BANDS[s.level][tgt])
+              return { need: pn ? pn.need : "OK", marks: "—" };
+            if (
+              getNumericGrade(s.grade, s.level) <= getNumericGrade(tgt, s.level)
+            )
+              return { need: "OK", marks: "—" };
+            const lo = RAW_BANDS[s.level][tgt][0];
+            return {
+              need: `${tgt} (${lo}+ marks)`,
+              marks: hasRawMark(s)
+                ? `+${Math.max(0, lo - Number(s.rawMark))} marks`
+                : "—",
+            };
+          };
+          const td = (html, cls = "") =>
+            `<td class="px-1 sm:px-2 py-1.5 align-top text-[11px] sm:text-sm break-words ${cls}">${html}</td>`;
+          const tip = (label, text) =>
+            `<span data-slot-tip tabindex="0" class="group/tip relative inline-block cursor-help border-b border-dotted border-slate-400 font-semibold text-slate-100 rounded focus:outline-none focus:ring-2 focus:ring-cyan-400">${esc(label)}<span role="tooltip" class="hidden group-hover/tip:block group-focus/tip:block absolute left-0 top-full z-30 mt-1 w-64 max-w-[70vw] rounded-lg border border-slate-500 bg-slate-950 p-2 text-xs font-normal normal-case text-slate-100 shadow-xl">${esc(text)}</span></span>`;
+          const shortNeed = (n) => String(n).replace(/ \((\d+\+) marks\)/, " · $1");
+          const shortMarks = (m) => String(m).replace(/ marks?$/, "");
+          const needCls = (n) =>
+            n === "OK" ? "text-emerald-300" : "text-amber-300 font-semibold";
+          const rowsHtml = [];
+          slots.forEach((sl) => {
+            const p = sl.primary;
+            const pn = p && routeRows.find((r) => r.subject === nameOf(p));
+            const nd = !p
+              ? {
+                  need: "Needs a matching subject",
+                  marks: "—",
+                }
+              : noRoute
+                ? { need: "—", marks: "—" }
+                : needFor(p, pn);
+            rowsHtml.push(
+              `<tr data-slot-row data-role="${esc(sl.def.role)}" class="border-t border-slate-700">${td(tip(sl.def.label.split(" · ")[0], `${sl.def.label}. ${sl.def.rule}`) )}${td(p ? esc(nameOf(p)) : '<span class="text-slate-400">No subject yet</span>', "text-slate-100")}${td(p ? esc(nowText(p, sl.g1)) : "—", "text-slate-200")}${td(esc(shortNeed(nd.need)), needCls(nd.need))}${td(esc(shortMarks(nd.marks)), "text-slate-200 whitespace-nowrap")}</tr>`,
+            );
+            sl.alts.forEach((a) => {
+              const an = noRoute ? { need: "—", marks: "—" } : altNeed(a, pn);
+              rowsHtml.push(
+                `<tr data-slot-or class="bg-slate-800/40"><td class="px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-400 text-right">or</td>${td(esc(nameOf(a)), "text-slate-100")}${td(esc(nowText(a)), "text-slate-200")}${td(esc(shortNeed(an.need)), needCls(an.need))}${td(esc(shortMarks(an.marks)), "text-slate-200 whitespace-nowrap")}</tr>`,
+              );
+            });
+          });
+          extras.forEach((s) =>
+            rowsHtml.push(
+              `<tr data-slot-extra class="border-t border-slate-700 text-slate-400">${td(tip("Extra", "Not counted: this subject is not used by this course, so it does not affect the result."), "")}${td(esc(nameOf(s)))}${td(esc(nowText(s)))}${td("—")}${td("—")}</tr>`,
+            ),
+          );
+          const sum = step.summary || (step.alt && step.alt.summary) || "";
+          const scoreLine = (lines.find((l) => /^Aggregate/.test(l.text)) || {})
+            .text;
+          const totalBits = [sum, scoreLine].filter(Boolean);
+          const needed = lines
+            .filter(
+              (l) =>
+                !l.ok &&
+                !/^Aggregate/.test(l.text) &&
+                (ite || /Mother Tongue/.test(l.text)),
+            )
+            .slice(0, 5);
+          return `<div data-slot-table class="mt-2"><table class="w-full table-fixed text-left"><colgroup><col style="width:13%"><col style="width:31%"><col style="width:17%"><col style="width:24%"><col style="width:15%"></colgroup><thead><tr class="text-[11px] uppercase tracking-wide text-slate-400"><th class="px-1 sm:px-2 py-1">Slot</th><th class="px-1 sm:px-2 py-1">Your subject</th><th class="px-1 sm:px-2 py-1">Now</th><th class="px-1 sm:px-2 py-1">Need</th><th class="px-1 sm:px-2 py-1">Marks</th></tr></thead><tbody>${rowsHtml.join("")}</tbody></table>${totalBits.length ? `<p data-slot-total class="text-xs text-slate-300 mt-2">${totalBits.map((t) => esc(fsbbClip(t.replace(/^Aggregate cannot be worked out yet.*$/, "Aggregate cannot be counted yet: fix the highlighted rows first"), 140))).join(" · ")}</p>` : ""}${noRoute && step.blocker ? `<p class="text-sm text-slate-300 mt-2">Marks alone will not be enough. Even top grades in your current subjects would leave: ${esc(step.blocker)}.</p>` : ""}${needed.length ? `<ul class="mt-2 space-y-1">${needed.map((l) => `<li class="text-xs text-rose-300"><span aria-hidden="true">✗</span> ${esc(fsbbClip(l.text, 130))}</li>`).join("")}</ul>` : ""}</div>`;
+        };
+
         // The expandable course rows for one table column.
-        const fsbbCourseListHtml = (adv, ids, withWins, byId) => {
+        const fsbbCourseListHtml = (
+          adv,
+          ids,
+          withWins,
+          byId,
+          subjects,
+          base,
+        ) => {
           const qw = withWins ? computeQuickWins() : [];
           const winsFor = (s) =>
             s.tier === 0 ? [] : qw.filter((w) => w.unlocked.includes(s.name));
@@ -5802,6 +6136,33 @@
                   `<p data-qw data-subject="${esc(w.subject)}" data-from="${esc(w.from)}" data-to="${esc(w.to)}" class="text-sm text-emerald-300 mb-2">Quick win: ${esc(w.subject)} ${esc(w.from)} → ${esc(w.to)}${esc(marksFor(w))} opens this.</p>`,
               )
               .join("") + bodyCore(s);
+          // The slot table replaces the ✓/✗ list and the improve-route table;
+          // a course with no slots to show keeps the text version.
+          const slotBody = (s) => {
+            const pw = byId && byId.get(s.id);
+            const html = pw
+              ? fsbbSlotTableHtml(
+                  pw,
+                  s,
+                  subjects || [],
+                  base || [],
+                  reasonLines(pw),
+                )
+              : "";
+            if (!html) return "";
+            const lead =
+              s.tier === 1
+                ? `<p class="text-sm text-slate-200 mt-1">${esc(s.status === "close" && s.alt ? `Or move down a level: ${s.detail}` : s.detail)}</p>`
+                : "";
+            return lead + html;
+          };
+          const bodyOfSlots = (s) =>
+            winsFor(s)
+              .map(
+                (w) =>
+                  `<p data-qw data-subject="${esc(w.subject)}" data-from="${esc(w.from)}" data-to="${esc(w.to)}" class="text-sm text-emerald-300 mb-2">Quick win: ${esc(w.subject)} ${esc(w.from)} → ${esc(w.to)}${esc(marksFor(w))} opens this.</p>`,
+              )
+              .join("") + (slotBody(s) || bodyCore(s));
           const rank = { open: 0, close: 1, lower: 2, further: 3 };
           const steps = adv.staircase
             .flatMap((tr) => tr.steps)
@@ -5812,7 +6173,7 @@
           return steps
             .map(
               (s, i) =>
-                `<details data-pw data-id="${esc(s.id)}" data-group="${esc(s.group)}" data-name="${esc(s.name)}" data-quick="${winsFor(s).length ? 1 : 0}" data-status="${s.status}"${i === 0 ? " data-easiest open" : ""} class="group rounded-lg border ${i === 0 ? "border-emerald-500" : "border-slate-600"} bg-slate-900/40 mb-2"><summary class="flex items-center gap-3 p-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden"><span class="w-3 h-3 rounded-full shrink-0 ${courseDot[s.status]}"></span><span class="min-w-0 flex-1"><span class="block font-semibold text-slate-100">${esc(plain(s.name))}${i === 0 && steps.length > 1 ? ' <span class="ml-1 text-xs font-semibold text-emerald-300">Easiest way in</span>' : ""}</span><span class="block text-xs text-slate-400">${esc(shortText(s))}${winsFor(s).length ? ` · <span class="text-emerald-300">Quick win: ${esc(winsFor(s)[0].subject)} ${esc(winsFor(s)[0].short)}${winsFor(s).length > 1 ? ` (+${winsFor(s).length - 1})` : ""}</span>` : ""}</span></span><span class="text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span></summary><div class="px-3 pb-3 pt-1 border-t border-slate-700">${bodyOf(s)}</div></details>`,
+                `<details data-pw data-id="${esc(s.id)}" data-group="${esc(s.group)}" data-name="${esc(s.name)}" data-quick="${winsFor(s).length ? 1 : 0}" data-status="${s.status}"${i === 0 ? " data-easiest open" : ""} class="group rounded-lg border ${i === 0 ? "border-emerald-500" : "border-slate-600"} bg-slate-900/40 mb-2"><summary class="flex items-center gap-3 p-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden"><span class="w-3 h-3 rounded-full shrink-0 ${courseDot[s.status]}"></span><span class="min-w-0 flex-1"><span class="block font-semibold text-slate-100">${esc(plain(s.name))}${i === 0 && steps.length > 1 ? ' <span class="ml-1 text-xs font-semibold text-emerald-300">Easiest way in</span>' : ""}</span><span class="block text-xs text-slate-400">${esc(shortText(s))}${winsFor(s).length ? ` · <span class="text-emerald-300">Quick win: ${esc(winsFor(s)[0].subject)} ${esc(winsFor(s)[0].short)}${winsFor(s).length > 1 ? ` (+${winsFor(s).length - 1})` : ""}</span>` : ""}</span></span><span class="text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span></summary><div class="px-3 pb-3 pt-1 border-t border-slate-700">${bodyOfSlots(s)}</div></details>`,
             )
             .join("");
         };
@@ -5874,7 +6235,6 @@
             ).map((p) => [p.id, p]),
           );
           const here = real.row === g.r0;
-          const change = fsbbChangeLine(real.cfg);
           const nTxt = fsbbCourses(real.n, col.ids.length);
           // Short status line first; the route onto a lower row is its own line.
           let headline;
@@ -5899,16 +6259,12 @@
             if (cell.status === "have") {
               headline = here
                 ? "You already qualify on your own row. Moving down would not add anything."
-                : `Already open on the ${refRow} row. Moving down further would not add anything.`;
+                : `Eligible on the ${refRow} row. Moving down further would not add anything.`;
             } else {
               subline = `${here ? "On your own row" : `Best so far, on the ${refRow} row`}: ${headline}`;
               headline = "LDL does not increase eligibility here.";
             }
           }
-          const routeHtml =
-            !here && change
-              ? `<p data-fsbb-route class="text-sm text-slate-100 mt-2"><span class="font-semibold">To be on this row:</span> ${esc(change)}</p>`
-              : "";
           const tone = {
             open: "text-emerald-300",
             have: "text-emerald-300",
@@ -5917,47 +6273,24 @@
             nobetter: "text-slate-200",
             later: "text-sky-300",
           }[cell.status];
-          const moveRows = exp.advice.filter(
-            (a) =>
-              a.action === "MOVE" ||
-              a.action === "RAISE" ||
-              a.action === "DROP",
-          );
-          const keepNames = exp.advice
-            .filter((a) => a.action === "KEEP" || a.action === "EITHER")
-            .map((a) => a.name);
-          const keepPill = `<span class="inline-block w-16 text-center text-[11px] font-bold rounded px-1.5 py-1 ${ACTION_STYLE.KEEP}">KEEP</span>`;
-          const rowsHtml = moveRows
-            .map(
-              (a) =>
-                `<li data-advice="${esc(a.action)}" class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded border border-slate-700 bg-slate-900/40 px-3 py-2"><span class="inline-block w-16 text-center text-[11px] font-bold rounded px-1.5 py-1 ${ACTION_STYLE[a.action]}">${esc(a.action)}</span><span class="font-semibold text-slate-100">${esc(a.name)}</span><span class="text-sm text-slate-400">${esc(a.now)}${a.to ? ` → ${esc(a.to)}` : ""}</span><span class="basis-full text-sm text-slate-300">${esc(a.note)}</span></li>`,
-            )
-            .join("");
-          const closesTxt = exp.closes.length
-            ? `Moving a subject down would close ${joinNames(exp.closes, 4)}${exp.rowLoss ? " and drop you a row" : ""}.`
-            : exp.rowLoss
-              ? "Moving a subject down would drop you a row."
-              : "Moving a subject down would not open anything new.";
-          const keepHtml = moveRows.length
-            ? keepNames.length
-              ? `<li data-advice="KEEP" class="rounded border border-slate-700 bg-slate-900/40 px-3 py-2">${keepPill} <span class="font-semibold text-slate-100">${esc(keepNames.join(", "))}</span><span class="block text-sm text-slate-300 mt-1">Keep ${keepNames.length === 1 ? "it" : "them"} at the current level.</span></li>`
-              : ""
-            : `<li data-advice="KEEP" class="rounded border border-slate-700 bg-slate-900/40 px-3 py-2">${keepPill} <span class="font-semibold text-slate-100">Keep every subject at its current level.</span><span class="block text-sm text-slate-300 mt-1">${esc(closesTxt)}</span></li>`;
-          const freeHtml = exp.free
-            ? `<li data-advice="FREE" class="rounded border border-slate-700 bg-slate-900/40 px-3 py-2"><span class="inline-block w-16 text-center text-[11px] font-bold rounded px-1.5 py-1 ${ACTION_STYLE.OPTION}">OPTION</span> <span class="font-semibold text-slate-100">Free up study time</span><span class="block text-sm text-slate-300 mt-1">${esc(joinNames(exp.free.names, 3))} ${exp.free.names.length === 1 ? "is" : "are"} not needed for this pathway. Dropping ${exp.free.names.length === 1 ? "it" : "one of them"} frees time for your other subjects (${exp.free.left} left).</span></li>`
-            : "";
           const warnHtml = exp.warnings.length
             ? `<ul data-warnings class="mt-3 space-y-1">${exp.warnings.map((w) => `<li class="text-sm text-amber-300">⚠ ${esc(w)}</li>`).join("")}</ul>`
             : "";
           const estNote = real.est
             ? '<p class="text-xs text-slate-400 mt-2">Estimate: grades at a higher level are guessed from your current grades.</p>'
             : "";
-          const courses = fsbbCourseListHtml(adv, col.ids, here, byId);
+          const courses = fsbbCourseListHtml(
+            adv,
+            col.ids,
+            here,
+            byId,
+            real.cfg ? real.cfg.subjects : g.base,
+            g.base,
+          );
           const subHtml = subline
             ? `<p data-fsbb-sub class="text-sm text-slate-200 mt-1">${esc(subline)}</p>`
             : "";
-          const showRoute = cell.status !== "nobetter";
-          box.innerHTML = `<div class="flex items-start justify-between gap-3"><div><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">${esc(col.label)} · with ${esc(rowName)}</p><p data-fsbb-headline class="text-base sm:text-lg font-bold mt-1 ${tone}"><span aria-hidden="true">${FSBB_ICON[cell.status]}</span> ${esc(headline)}</p>${subHtml}${showRoute ? routeHtml : ""}</div><button type="button" data-fsbb-close class="shrink-0 text-sm px-3 min-h-[44px] sm:min-h-[36px] rounded-full border border-slate-500 text-slate-200 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400">Close</button></div>${estNote}<p class="text-sm font-semibold text-slate-100 mt-4">What to do with your subjects</p><ul class="mt-2 space-y-1.5">${rowsHtml}${keepHtml}${freeHtml}</ul>${warnHtml}<p class="text-sm font-semibold text-slate-100 mt-5">${real.of !== undefined ? "Courses you would join (3-Year Higher Nitec)" : `Courses in this column (${col.ids.length})`}</p><p class="text-xs text-slate-400 mb-2">Tap a course to see why, and what it takes.</p><div id="fsbbCourses">${courses}</div>`;
+          box.innerHTML = `<div class="flex items-start justify-between gap-3"><div><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">${esc(col.label)} · with ${esc(rowName)}</p><p data-fsbb-headline class="text-base sm:text-lg font-bold mt-1 ${tone}"><span aria-hidden="true">${FSBB_ICON[cell.status]}</span> ${esc(headline)}</p>${subHtml}</div><button type="button" data-fsbb-close class="shrink-0 text-sm px-3 min-h-[44px] sm:min-h-[36px] rounded-full border border-slate-500 text-slate-200 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400">Close</button></div>${estNote}<p class="text-sm font-semibold text-slate-100 mt-4">${real.of !== undefined ? "Courses you would join (3-Year Higher Nitec)" : `Courses in this column (${col.ids.length})`}</p><p class="text-xs text-slate-400 mb-2">Tap a course to see each requirement and what it takes. Hover or tap a requirement name for its rule.</p><div id="fsbbCourses">${courses}</div>${warnHtml}`;
           box.classList.remove("hidden");
           fsbbSyncSelection();
         }

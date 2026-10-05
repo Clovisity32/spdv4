@@ -1195,15 +1195,17 @@ async function advise(page, subjects) {
           '[data-fsbb-cell][data-row="0"][data-col="3"]',
           "aria-expanded",
         )) === "true" &&
-        (await page.$$("#fsbbDetails [data-advice]")).length >= 1 &&
+        (await page.$$("#fsbbDetails [data-slot-table]")).length >= 1 &&
         (await page.$$("#fsbbCourses [data-pw]")).length === 5 &&
+        !det.includes("What to do with your subjects") &&
+        !det.includes("Free up study time") &&
         (await page.$("#fsbbCourses [data-easiest]")) !== null &&
-        /Subject/i.test(det) &&
+        /Your subject/i.test(det) &&
         /Need/i.test(det) &&
         /Marks/i.test(det) &&
         /Easiest way in/.test(det),
       "P10-U6",
-      "Tapping Polytechnic Year 1 shows what to do with each subject, then its 5 courses with the easiest first",
+      "Tapping Polytechnic Year 1 lists its 5 courses with the easiest first, and the easiest opens a requirements table (no KEEP/MOVE list, no free-time option)",
     );
     await page.keyboard.press("Escape");
     ok(
@@ -1222,17 +1224,16 @@ async function advise(page, subjects) {
       "P10-U8",
       "Tapping a column heading opens that pathway for your row",
     );
-    // a lower row: the route is spelled out
+    // a lower row: the status line is short, the table shows the moved grades
     await page.click('[data-fsbb-cell][data-row="3"][data-col="1"]');
     const lowerHead = await page.textContent("[data-fsbb-headline]");
-    const lowerRoute = await page.textContent("[data-fsbb-route]");
+    const lowerTable = await page.textContent("#fsbbCourses");
     ok(
-      /G3→G[12]|Drop/.test(lowerRoute) &&
-        lowerRoute.startsWith("To be on this row:") &&
-        !/G3→G/.test(lowerHead) &&
-        (await page.$$("#fsbbDetails [data-advice]")).length >= 1,
+      !/G3→G/.test(lowerHead) &&
+        (await page.$("[data-fsbb-route]")) === null &&
+        lowerTable.includes("(was "),
       "P10-U9",
-      `A lower row keeps the status line short and gives the route on its own line (${lowerRoute.trim().slice(0, 60)})`,
+      "A lower row keeps the status line short and the table shows each moved subject with its original grade, e.g. '(was G3 …)'",
     );
     // quick-win lines, plain ITE names
     const winCount = await page.evaluate(
@@ -1314,29 +1315,60 @@ async function advise(page, subjects) {
     await page.click('[data-fsbb-cell][data-row="1"][data-col="0"]');
     {
       const head = await page.textContent("[data-fsbb-headline]");
-      const why = await page.$$eval("#fsbbCourses [data-why] li", (ls) =>
-        ls.map((l) => l.textContent.trim()),
+      const needs = await page.$$eval(
+        "#fsbbCourses [data-easiest] [data-slot-row] td:nth-child(4)",
+        (tds) => tds.map((t) => t.textContent.trim()),
       );
       ok(
         head.includes("already qualify") &&
-          why.length > 0 &&
-          why.some((l) => l.startsWith("✓")),
+          needs.length > 0 &&
+          needs.every((n) => n === "OK"),
         "P10-U18",
-        "An 'already open' box shows why you qualify: each requirement with a ✓ (" +
-          why.length +
-          " lines)",
+        "An eligible box opens a table where every requirement reads OK (" +
+          needs.length +
+          " rows)",
       );
     }
     await page.click('[data-fsbb-cell][data-row="0"][data-col="3"]');
     {
-      const why = await page.$$eval("#fsbbCourses [data-why] li", (ls) =>
-        ls.map((l) => l.textContent.trim()),
+      const needs = await page.$$eval(
+        "#fsbbCourses [data-easiest] [data-slot-row] td:nth-child(4)",
+        (tds) => tds.map((t) => t.textContent.trim()),
+      );
+      const total = await page.textContent("#fsbbCourses [data-easiest] [data-slot-total]");
+      ok(
+        needs.some((n) => n !== "OK" && n !== "—") && /Total \+\d+ marks/.test(total),
+        "P10-U19",
+        "A course you do not qualify for yet shows the grade each slot needs, and a total of marks",
+      );
+    }
+    // Table anatomy: extras, tooltips, plain wording
+    {
+      const labels = await page.$$eval("#fsbbCourses [data-easiest] [data-slot-row] td:first-child", (t) => t.map((x) => x.querySelector("[data-slot-tip]").firstChild.textContent.trim()));
+      const extras = await page.$$("#fsbbCourses [data-easiest] [data-slot-extra]");
+      ok(
+        labels.length >= 4 && labels.includes("EL"),
+        "P10-T1",
+        "Slot rows are named by requirement (" + labels.join(", ") + ")",
+      );
+      await page.hover("#fsbbCourses [data-easiest] [data-slot-row] [data-slot-tip]");
+      const tipText = await page.$eval("#fsbbCourses [data-easiest] [data-slot-row] [role=tooltip]", (e) => (e.offsetParent !== null ? e.textContent : ""));
+      ok(
+        tipText.length > 20 && /English|minimum|Minimum|best/i.test(tipText),
+        "P10-T2",
+        "Hovering a requirement name shows its rule (" + tipText.slice(0, 50) + "…)",
+      );
+      await page.mouse.move(0, 0);
+      await page.focus("#fsbbCourses [data-easiest] [data-slot-row] [data-slot-tip]");
+      ok(
+        await page.$eval("#fsbbCourses [data-easiest] [data-slot-row] [role=tooltip]", (e) => e.offsetParent !== null),
+        "P10-T3",
+        "The same rule opens on tap or keyboard focus (phones have no hover)",
       );
       ok(
-        why.some((l) => l.startsWith("✗")) &&
-          (await page.textContent("#fsbbCourses")).includes("Why not yet"),
-        "P10-U19",
-        "A course you do not qualify for yet shows what is missing with a ✗",
+        extras.length >= 1,
+        "P10-T4",
+        "A subject the course does not use is listed last as an extra (" + extras.length + ")",
       );
     }
     await page.click('[data-fsbb-cell][data-row="3"][data-col="1"]');
