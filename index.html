@@ -314,12 +314,7 @@
             <span id="addUpdateBtnText">Add Subjects</span>
           </button>
         </div>
-        <p
-          id="addMsg"
-          class="sr-only"
-          role="status"
-          aria-live="polite"
-        ></p>
+        <p id="addMsg" class="sr-only" role="status" aria-live="polite"></p>
 
         <div id="studentSubjectsTableContainer" class="mt-8 hidden">
           <h3 class="text-xl font-semibold mb-3 text-sky-400">
@@ -1253,14 +1248,12 @@
 
         const SCHOOL_A_SUBJECT_IDS = ALL_SUBJECTS_LIST.map((s) => s.id);
         const SCHOOL_A_LEVEL_RESTRICTIONS = {
-          AM: ["G3"],
+          // School A offers every level SEAB assesses (SEAB_LEVELS caps the rest).
+          AM: ["G2", "G3"],
           BIO: ["G3"],
           CHEM: ["G3"],
-          MUSIC: ["G3"],
           PHY: ["G3"],
           MOB_ROBOTICS: ["G1"],
-          DT: ["G2", "G3"],
-          NFS: ["G2", "G3"],
           EBS: ["G1"],
           DS: ["G3"],
           LIT_CHI: ["G3"],
@@ -1290,6 +1283,7 @@
           "HMT",
         ];
         const YUHUA_SECONDARY_SCHOOL_LEVEL_RESTRICTIONS = {
+          COMB_HUM: ["G2", "G3"], // no G1 Combined Humanities
           AM: ["G3"],
           BIO: ["G3"],
           CHEM: ["G3"],
@@ -1318,6 +1312,7 @@
           "HMT",
         ];
         const BROADRICK_SECONDARY_SCHOOL_LEVEL_RESTRICTIONS = {
+          COMB_HUM: ["G2", "G3"], // no G1 Combined Humanities
           AM: ["G3"],
           BIO: ["G3"],
           CHEM: ["G3"],
@@ -3155,6 +3150,58 @@
               })[c],
           );
 
+        // Levels SEAB assesses in 2027 (SEC syllabus lists for school
+        // candidates: seab.gov.sg G1/G2/G3 syllabuses). It is an upper limit:
+        // a school can offer fewer levels, never more. Subjects not listed here
+        // (Commerce, Media Studies, ITE applied subjects, Other) keep the
+        // school's own setting.
+        const SEAB_LEVELS = {
+          EL: ["G3", "G2", "G1"],
+          MATH: ["G3", "G2", "G1"],
+          AM: ["G3", "G2"],
+          COMP: ["G3", "G2", "G1"],
+          NFS: ["G3", "G2", "G1"],
+          ART: ["G3", "G2", "G1"],
+          DT: ["G3", "G2", "G1"],
+          CHI: ["G3", "G2", "G1"],
+          MAL: ["G3", "G2", "G1"],
+          TAM: ["G3", "G2", "G1"],
+          MT: ["G3", "G2", "G1"], // generic Mother Tongue = Chinese/Malay/Tamil
+          COMB_SCI: ["G3", "G2", "G1"],
+          POA: ["G3", "G2"],
+          HIST: ["G3", "G2"],
+          GEOG: ["G3", "G2"],
+          LIT_ENG: ["G3", "G2"],
+          COMB_HUM: ["G3", "G2"],
+          HUM_SS_GEOG: ["G3", "G2"],
+          HUM_SS_HIST: ["G3", "G2"],
+          HUM_SS_LIT_ENG: ["G3", "G2"],
+          HUM_SS_LIT_CHI: ["G3"],
+          HUM_SS_LIT_MAL: ["G3"],
+          HUM_SS_LIT_TAM: ["G3"],
+          LIT_CHI: ["G3"],
+          LIT_MAL: ["G3"],
+          LIT_TAM: ["G3"],
+          PHY: ["G3"],
+          CHEM: ["G3"],
+          BIO: ["G3"],
+          BIOTECH: ["G3"],
+          ECON: ["G3"],
+          BS: ["G3"],
+          DS: ["G3"],
+          ESS: ["G3"],
+          FOE: ["G3"],
+          HA: ["G3"],
+          HM: ["G3"],
+          HCHI: ["G3"],
+          HMAL: ["G3"],
+          HTAM: ["G3"],
+          HMT: ["G3"],
+          MUSIC: ["G3", "G1"], // no G2 Music
+          EBS: ["G1"],
+          MOB_ROBOTICS: ["G1"],
+          SMART_ELEC_TECH: ["G1"],
+        };
         const getAllowedLevels = (subjectId) => {
           let restrictions = {};
           if (selectedSchool === "Yuhua Secondary School")
@@ -3163,9 +3210,11 @@
             restrictions = BROADRICK_SECONDARY_SCHOOL_LEVEL_RESTRICTIONS;
           else if (selectedSchool === "School A")
             restrictions = SCHOOL_A_LEVEL_RESTRICTIONS;
-          return restrictions[subjectId]
+          const school = restrictions[subjectId]
             ? [...restrictions[subjectId]]
             : [...GRADE_LEVELS];
+          const national = SEAB_LEVELS[subjectId];
+          return national ? school.filter((l) => national.includes(l)) : school;
         };
 
         // Lower number = dropped / moved down first.

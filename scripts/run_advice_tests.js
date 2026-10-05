@@ -2,7 +2,7 @@
  * Results Action Plan tests — Student Pathway Dashboard
  *
  * Exercises window.__spdTest.advise (buildResultsAdvice) with School A
- * (every subject offered; AM/BIO/CHEM/PHY/MUSIC are G3-only).
+ * (every subject offered at the levels SEAB assesses; BIO/CHEM/PHY are G3-only).
  *
  * Run: node scripts/run_advice_tests.js
  */
@@ -84,13 +84,13 @@ async function advise(page, subjects) {
       S("MATH", "G3", "B3"),
       S("HIST", "G3", "B3"),
       S("MT", "G3", "B3"),
-      S("AM", "G3", "E8"),
+      S("PHY", "G3", "E8"),
     ]);
     ok(
       a.options[2].moves.length === 0 &&
-        a.options[2].blocked.some((s) => s.subjectId === "AM"),
+        a.options[2].blocked.some((s) => s.subjectId === "PHY"),
       "P1-3",
-      "AM is G3-only at the school, so it is flagged, not moved",
+      "Physics is G3-only (SEAB), so it is flagged, not moved",
     );
 
     console.log("\nPhase 2: Step 1 drops");
@@ -587,8 +587,8 @@ async function advise(page, subjects) {
           applicable.some((o) => o.realistic > flagged[0].realistic)
         )
           bad.push("recommended option is not the best");
-        if (a.options[2].moves.some((s) => s.subjectId === "AM"))
-          bad.push("AM moved down");
+        if (a.options[2].moves.some((s) => s.subjectId === "PHY"))
+          bad.push("PHY moved down");
       }
       return bad;
     }, SCHOOL);

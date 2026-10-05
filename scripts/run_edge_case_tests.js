@@ -5,10 +5,11 @@
  * Run: node scripts/run_edge_case_tests.js
  *
  * School A is used throughout (has all subjects; level restrictions noted below):
- *   G3-only: BIO, CHEM, PHY, AM, MUSIC, DS
- *   G2/G3:   DT, NFS
- *   G1-only: MOB_ROBOTICS, EBS
- *   Unrestricted (G3/G2/G1): EL, MATH, HIST, GEOG, MT, HMT, POA, ECON, LIT_ENG, COMB_SCI, COMB_HUM, etc.
+ *   G3-only: BIO, CHEM, PHY, DS, ECON, HMT, ...
+ *   G2/G3:   AM, HIST, GEOG, POA, LIT_ENG, COMB_HUM
+ *   G1/G3:   MUSIC          G1-only: MOB_ROBOTICS, EBS, SMART_ELEC_TECH
+ *   G3/G2/G1: EL, MATH, MT, COMB_SCI, ART, COMP, DT, NFS
+ *   (levels follow SEAB 2027 via SEAB_LEVELS; School A offers all of them)
  */
 
 const { chromium } = require("playwright");
@@ -276,12 +277,12 @@ function ok(cond, id, msg) {
     }
 
     // I-10: 4 x G2 6 → each maps to G1 D → 4 pts. Best4 = 16.
-    // Replace BIO G2 6 → ECON G2 6 (BIO G2 not available).
+    // Replace BIO G2 6 → ART G2 6 (BIO G2 not available).
     await reset(page);
     await addMany(page, [
       ["HIST", "G2", "6"],
       ["GEOG", "G2", "6"],
-      ["ECON", "G2", "6"],
+      ["ART", "G2", "6"],
       ["MATH", "G2", "6"],
     ]);
     {
@@ -1274,8 +1275,8 @@ function ok(cond, id, msg) {
     await addMany(page, [
       ["EL", "G3", "E8"],
       ["MATH", "G3", "E8"],
-      ["HIST", "G1", "A"],
-      ["GEOG", "G1", "A"],
+      ["ART", "G1", "A"],
+      ["COMP", "G1", "A"],
     ]);
     {
       const r = await getResult(page, "MER (Pass 2G3)");
@@ -1292,7 +1293,7 @@ function ok(cond, id, msg) {
       ["EL", "G3", "E8"],
       ["MATH", "G3", "F9"],
       ["HIST", "G3", "E8"],
-      ["GEOG", "G1", "A"],
+      ["COMP", "G1", "A"],
     ]);
     {
       const r = await getResult(page, "MER (Pass 2G3)");
@@ -1308,8 +1309,8 @@ function ok(cond, id, msg) {
     await addMany(page, [
       ["EL", "G3", "E8"],
       ["MATH", "G1", "A"],
-      ["HIST", "G1", "A"],
-      ["GEOG", "G1", "A"],
+      ["ART", "G1", "A"],
+      ["COMP", "G1", "A"],
     ]);
     {
       const r = await getResult(page, "MER (Pass 2G3)");
@@ -1334,12 +1335,12 @@ function ok(cond, id, msg) {
     }
 
     // G1E-1: 4 x G1 E → Best4 = 4×5 = 20 (G1 E allowed in ITE 3-Yr aggregate)
-    // BIO G1 not available → use ECON G1 E
+    // BIO G1 not available → use NFS G1 E (HIST/GEOG/ECON are not assessed at G1)
     await reset(page);
     await addMany(page, [
-      ["HIST", "G1", "E"],
-      ["GEOG", "G1", "E"],
-      ["ECON", "G1", "E"],
+      ["ART", "G1", "E"],
+      ["COMP", "G1", "E"],
+      ["NFS", "G1", "E"],
       ["MATH", "G1", "E"],
     ]);
     {
@@ -1353,12 +1354,12 @@ function ok(cond, id, msg) {
     }
 
     // G1E-2: HIST G1 D + 3 x G1 E → Best4 = 4+5+5+5 = 19
-    // BIO G1 not available → use ECON G1 E
+    // BIO G1 not available → use NFS G1 E (HIST/GEOG/ECON are not assessed at G1)
     await reset(page);
     await addMany(page, [
-      ["HIST", "G1", "D"],
-      ["GEOG", "G1", "E"],
-      ["ECON", "G1", "E"],
+      ["ART", "G1", "D"],
+      ["COMP", "G1", "E"],
+      ["NFS", "G1", "E"],
       ["MATH", "G1", "E"],
     ]);
     {
@@ -2103,9 +2104,9 @@ function ok(cond, id, msg) {
     }
     // PICK-03: same results as adding one at a time
     ok(
-      (await page.$$eval("#studentSubjectsTableBody tr", (rs) =>
+      await page.$$eval("#studentSubjectsTableBody tr", (rs) =>
         rs.every((r) => r.innerText.includes("Set grade")),
-      )),
+      ),
       "PICK-03",
       "Every new row is tagged 'Set grade'",
     );
@@ -2217,6 +2218,42 @@ function ok(cond, id, msg) {
           ")",
       );
     }
+    // PICK-10b: the level choices follow SEAB's 2027 lists and the school
+    {
+      const levelsOf = async (ids) => {
+        await pickTick(ids);
+        await page.click("#subjectMenuAdd");
+        await page.waitForTimeout(500);
+        const out = {};
+        for (const id of ids)
+          out[id] = (
+            await page.$$eval(rowSel(id, "level") + " option", (o) =>
+              o.map((x) => x.value),
+            )
+          )
+            .sort()
+            .join("/");
+        return out;
+      };
+      await reset(page);
+      const a = await levelsOf(["AM", "DT", "NFS", "MUSIC", "POA", "HMT", "COMB_HUM", "SMART_ELEC_TECH", "HA", "GEOG", "COMB_SCI"]);
+      await reset(page);
+      await page.selectOption("#school", "Yuhua Secondary School");
+      await page.waitForTimeout(300);
+      const y = await levelsOf(["POA", "HMT", "DT", "MUSIC", "COMB_HUM", "COMP", "MOB_ROBOTICS"]);
+      ok(
+        a.AM === "G2/G3" && a.DT === "G1/G2/G3" && a.NFS === "G1/G2/G3" &&
+          a.MUSIC === "G1/G3" && a.POA === "G2/G3" && a.HMT === "G3" &&
+          a.COMB_HUM === "G2/G3" && a.SMART_ELEC_TECH === "G1" && a.HA === "G3" &&
+          a.GEOG === "G2/G3" && a.COMB_SCI === "G1/G2/G3" &&
+          y.POA === "G2/G3" && y.HMT === "G3" && y.DT === "G2/G3" &&
+          y.MUSIC === "G3" && y.COMB_HUM === "G2/G3" && y.COMP === "G1/G2/G3" &&
+          y.MOB_ROBOTICS === "G1",
+        "PICK-10b",
+        "Level choices follow SEAB 2027 (no G1 Combined Humanities, Principles of Accounts, Higher or Humanities subjects; Music G1/G3; Smart Electrical Technology G1) and Yuhua keeps its own narrower DT and Music (" +
+          JSON.stringify({ a, y }) + ")",
+      );
+    }
     // PICK-11: the 'Set grade' tag and note clear as the student edits
     await reset(page);
     await pickTick(["EL", "MATH"]);
@@ -2234,7 +2271,9 @@ function ok(cond, id, msg) {
       ok(
         !elTag &&
           mathTag &&
-          !(await page.textContent('[data-subject-row="MATH"]')).includes("Set grade") &&
+          !(await page.textContent('[data-subject-row="MATH"]')).includes(
+            "Set grade",
+          ) &&
           (await page.$("#defaultGradeNote")) === null,
         "PICK-11",
         "A row loses its 'Set grade' tag when its grade is changed, and there is no separate note above the table",
