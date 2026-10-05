@@ -28,15 +28,28 @@ async function reset(page, bonus = 0) {
   await page.fill("#bonus", String(bonus));
 }
 
-async function add(page, subjectId, level, grade) {
-  await page.selectOption("#subject", subjectId);
-  await page.waitForTimeout(200);
-  await page.selectOption("#level", level);
-  await page.waitForTimeout(200);
-  await page.selectOption("#grade", grade);
-  await page.waitForTimeout(50);
-  await page.click("#addUpdateSubjectBtn");
+async function add(page, subjectId, level, grade, raw) {
+  // Tick the subject in the picker, add it (it lands at G3 A1), then set its
+  // level, grade and raw mark in the Your Subjects table.
+  if ((await page.getAttribute("#subjectPicker", "aria-expanded")) !== "true")
+    await page.click("#subjectPicker");
+  await page.check('[data-pick="' + subjectId + '"]');
+  await page.click("#subjectMenuAdd");
   await page.waitForTimeout(350);
+  const row = '[data-subject-row="' + subjectId + '"]';
+  if ((await page.inputValue(row + " [data-row-level]")) !== level) {
+    await page.selectOption(row + " [data-row-level]", level);
+    await page.waitForTimeout(200);
+  }
+  if (grade && (await page.inputValue(row + " [data-row-grade]")) !== grade) {
+    await page.selectOption(row + " [data-row-grade]", grade);
+    await page.waitForTimeout(200);
+  }
+  if (raw !== undefined) {
+    await page.fill(row + " [data-row-raw]", String(raw));
+    await page.press(row + " [data-row-raw]", "Tab");
+    await page.waitForTimeout(200);
+  }
 }
 
 async function getResult(page, nameSubstr) {

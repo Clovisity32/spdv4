@@ -204,16 +204,8 @@
           Enter Your Subjects & Grades
         </h2>
 
-        <button
-          type="button"
-          id="bulkJump"
-          class="md:hidden mb-4 w-full min-h-[44px] px-4 rounded-lg border border-cyan-600 text-cyan-300 font-semibold hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400"
-        >
-          Taking several subjects? Add them all at once ↓
-        </button>
-
-        <div class="grid md:grid-cols-4 lg:grid-cols-7 gap-4 mb-4 items-end">
-          <div>
+        <div class="grid md:grid-cols-2 lg:grid-cols-12 gap-4 mb-2 items-end">
+          <div class="lg:col-span-3">
             <label
               for="school"
               class="block text-sm font-medium text-sky-300 mb-1"
@@ -232,67 +224,57 @@
               <option value="School A">School A</option>
             </select>
           </div>
-          <div>
+          <div id="subjectPickerWrap" class="relative lg:col-span-4">
             <label
-              for="subject"
+              for="subjectPicker"
               class="block text-sm font-medium text-sky-300 mb-1"
-              >Subject</label
+              >Subjects</label
             >
-            <select
-              id="subject"
-              class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100"
+            <button
+              type="button"
+              id="subjectPicker"
+              aria-haspopup="true"
+              aria-expanded="false"
+              aria-controls="subjectMenu"
+              class="w-full min-h-[48px] p-3 flex items-center justify-between gap-2 bg-slate-700 border border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 text-gray-100 text-left"
             >
-              <option value="">Select Subject</option>
-            </select>
-          </div>
-          <div>
-            <label
-              for="level"
-              class="block text-sm font-medium text-sky-300 mb-1 tooltip"
-              >Level<sup><small>i</small></sup
-              ><span class="tooltiptext"
-                >G3 = O-Level (grades A1–F9). G2 = N(A)-Level (grades 1–6). G1 =
-                N(T)-Level (grades A–E).</span
-              ></label
+              <span id="subjectPickerLabel">Select subjects</span>
+              <span aria-hidden="true">▾</span>
+            </button>
+            <div
+              id="subjectMenu"
+              class="hidden absolute z-30 left-0 right-0 mt-1 rounded-lg border border-slate-600 bg-slate-800 shadow-xl"
             >
-            <select
-              id="level"
-              class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100"
-            ></select>
-          </div>
-          <div>
-            <label
-              for="grade"
-              class="block text-sm font-medium text-sky-300 mb-1"
-              >Grade</label
-            >
-            <select
-              id="grade"
-              class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100"
-            ></select>
-          </div>
-          <div>
-            <label
-              for="rawMark"
-              class="block text-sm font-medium text-sky-300 mb-1 tooltip"
-            >
-              Raw Mark (optional)<sup><small>i</small></sup>
-              <span class="tooltiptext"
-                >Your actual mark out of 100. It helps us check whether the next
-                grade up is realistically within reach. G1 subjects do not use
-                raw marks.</span
+              <div class="p-3 border-b border-slate-700">
+                <input
+                  id="subjectSearch"
+                  type="search"
+                  placeholder="Type to find a subject, e.g. Chemistry"
+                  aria-label="Find a subject"
+                  class="w-full p-3 min-h-[44px] bg-slate-700 border border-slate-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                />
+              </div>
+              <div
+                id="subjectList"
+                role="group"
+                aria-label="Subjects"
+                class="max-h-[50vh] overflow-auto p-2 grid gap-1"
+              ></div>
+              <div
+                class="sticky bottom-0 p-3 bg-slate-900/95 border-t border-slate-700 rounded-b-lg"
               >
-            </label>
-            <input
-              type="number"
-              id="rawMark"
-              min="0"
-              max="100"
-              placeholder="0–100"
-              class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100"
-            />
+                <button
+                  id="subjectMenuAdd"
+                  type="button"
+                  disabled
+                  class="w-full min-h-[44px] px-6 bg-gradient-to-r from-emerald-500 to-cyan-600 hover:from-emerald-600 hover:to-cyan-700 text-white font-semibold rounded-lg shadow-md transition duration-150 ease-in-out disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Add selected subjects
+                </button>
+              </div>
+            </div>
           </div>
-          <div>
+          <div class="lg:col-span-2">
             <label
               for="bonus"
               class="block text-sm font-medium text-sky-300 mb-1 tooltip"
@@ -315,7 +297,9 @@
           </div>
           <button
             id="addUpdateSubjectBtn"
-            class="w-full p-3 bg-gradient-to-r from-emerald-500 to-cyan-600 hover:from-emerald-600 hover:to-cyan-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition duration-150 ease-in-out flex items-center justify-center text-lg"
+            type="button"
+            disabled
+            class="lg:col-span-3 w-full min-h-[48px] p-3 bg-gradient-to-r from-emerald-500 to-cyan-600 hover:from-emerald-600 hover:to-cyan-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition duration-150 ease-in-out flex items-center justify-center text-lg disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -327,58 +311,15 @@
                 d="M12 2C6.486 2 2 6.486 2 12C2 17.514 6.486 22 12 22C17.514 22 22 17.514 22 12C22 6.486 17.514 2 12 2ZM17 13H13V17H11V13H7V11H11V7H13V11H17V13Z"
               ></path>
             </svg>
-            <span id="addUpdateBtnText">Add Subject</span>
+            <span id="addUpdateBtnText">Add Subjects</span>
           </button>
         </div>
-
-        <details
-          id="bulkAdd"
-          class="group mt-2 rounded-lg border border-slate-600 bg-slate-900/30"
-        >
-          <summary
-            class="flex items-center justify-between gap-3 px-4 min-h-[44px] cursor-pointer list-none [&::-webkit-details-marker]:hidden text-sky-300 font-semibold hover:text-sky-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded-lg"
-          >
-            <span>Add several subjects at once</span>
-            <span
-              class="text-2xl leading-none transition-transform group-open:rotate-90"
-              aria-hidden="true"
-              >›</span
-            >
-          </summary>
-          <div class="px-4 pb-4">
-            <p class="text-sm text-slate-300 mb-3">
-              Pick a grade for every subject you take. Subjects you leave blank
-              are skipped, and the bonus points above apply to all of them.
-            </p>
-            <input
-              id="bulkSearch"
-              type="search"
-              placeholder="Type to find a subject, e.g. Chemistry"
-              aria-label="Find a subject"
-              class="w-full mb-3 p-3 min-h-[44px] bg-slate-700 border border-slate-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-            />
-            <div id="bulkList" class="grid gap-2"></div>
-            <div
-              class="sticky bottom-0 -mx-4 px-4 py-3 mt-3 bg-slate-900/95 border-t border-slate-700 rounded-b-lg"
-            >
-              <p
-                id="bulkErr"
-                class="hidden mb-2 text-sm text-rose-300"
-                role="alert"
-              ></p>
-              <button
-                id="bulkAddBtn"
-                type="button"
-                disabled
-                class="w-full sm:w-auto min-h-[44px] px-6 bg-gradient-to-r from-emerald-500 to-cyan-600 hover:from-emerald-600 hover:to-cyan-700 text-white font-semibold rounded-lg shadow-md transition duration-150 ease-in-out disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Add selected subjects
-              </button>
-            </div>
-          </div>
-        </details>
+        <p class="text-sm text-slate-300">
+          Tick every subject you take, then add them. Each one starts at G3 A1;
+          set your own level and grade in the table below.
+        </p>
         <p
-          id="bulkMsg"
+          id="addMsg"
           class="mt-2 text-sm text-emerald-300"
           role="status"
           aria-live="polite"
@@ -388,32 +329,40 @@
           <h3 class="text-xl font-semibold mb-3 text-sky-400">
             Your Subjects:
           </h3>
+          <p
+            id="defaultGradeNote"
+            class="hidden mb-3 text-sm text-cyan-200"
+            role="status"
+          >
+            Subjects you just added start at G3 A1. Change the level and grade
+            of each one to your own.
+          </p>
           <div class="overflow-x-auto rounded-lg border border-slate-700">
             <table class="min-w-full divide-y divide-slate-700">
               <thead class="bg-slate-700">
                 <tr>
                   <th
-                    class="px-6 py-3 text-left text-xs font-medium text-sky-300 uppercase tracking-wider"
+                    class="px-3 py-3 md:px-6 text-left text-xs font-medium text-sky-300 uppercase tracking-wider"
                   >
                     Subject
                   </th>
                   <th
-                    class="px-6 py-3 text-left text-xs font-medium text-sky-300 uppercase tracking-wider"
+                    class="px-3 py-3 md:px-6 text-left text-xs font-medium text-sky-300 uppercase tracking-wider"
                   >
                     Level
                   </th>
                   <th
-                    class="px-6 py-3 text-left text-xs font-medium text-sky-300 uppercase tracking-wider"
+                    class="px-3 py-3 md:px-6 text-left text-xs font-medium text-sky-300 uppercase tracking-wider"
                   >
                     Grade
                   </th>
                   <th
-                    class="px-6 py-3 text-left text-xs font-medium text-sky-300 uppercase tracking-wider"
+                    class="px-3 py-3 md:px-6 text-left text-xs font-medium text-sky-300 uppercase tracking-wider"
                   >
                     Raw Mark
                   </th>
                   <th
-                    class="px-6 py-3 text-right text-xs font-medium text-sky-300 uppercase tracking-wider"
+                    class="px-3 py-3 md:px-6 text-right text-xs font-medium text-sky-300 uppercase tracking-wider"
                   >
                     Actions
                   </th>
@@ -1284,14 +1233,10 @@
         // --- State Variables ---
         let studentSubjects = [];
         let bonusPoints = 0;
-        let editingIndex = null;
         let selectedSchool = "Yuhua Secondary School";
 
         // --- DOM Elements ---
         const schoolSelect = document.getElementById("school");
-        const subjectSelect = document.getElementById("subject");
-        const levelSelect = document.getElementById("level");
-        const gradeSelect = document.getElementById("grade");
         const bonusInput = document.getElementById("bonus");
         const addUpdateSubjectBtn = document.getElementById(
           "addUpdateSubjectBtn",
@@ -1308,7 +1253,6 @@
         const eligibilityPlaceholder = document.getElementById(
           "eligibilityPlaceholder",
         );
-        const rawMarkInput = document.getElementById("rawMark");
         const resultsAdviceSection = document.getElementById(
           "resultsAdviceSection",
         );
@@ -6215,7 +6159,7 @@
           customMessageBox.classList.add("hidden"),
         );
 
-        // The subjects the selected school offers (single form and bulk panel).
+        // The subjects the selected school offers (feeds the subject picker).
         const getSchoolSubjects = () => {
           let currentSchoolSubjectIds = [];
           if (selectedSchool === "Yuhua Secondary School") {
@@ -6231,104 +6175,6 @@
             currentSchoolSubjectIds.includes(subject.id),
           );
         };
-
-        const populateSubjectDropdown = () => {
-          subjectSelect.innerHTML = '<option value="">Select Subject</option>';
-          getSchoolSubjects().forEach((subject) => {
-            const option = document.createElement("option");
-            option.value = subject.id;
-            option.textContent = subject.name;
-            subjectSelect.appendChild(option);
-          });
-          subjectSelect.value =
-            editingIndex !== null && studentSubjects[editingIndex]
-              ? studentSubjects[editingIndex].subjectId
-              : "";
-          populateLevelDropdown("", subjectSelect.value); // MODIFIED: Pass empty string to reset level
-        };
-
-        const populateLevelDropdown = (
-          currentLevel = "",
-          selectedSubjectId = "",
-        ) => {
-          levelSelect.innerHTML = "";
-          const selectedSubject = getSubjectById(selectedSubjectId);
-          let applicableLevels = [];
-          if (selectedSubject) {
-            applicableLevels = getAllowedLevels(selectedSubject.id);
-          } else {
-            const defaultOption = document.createElement("option");
-            defaultOption.value = "";
-            defaultOption.textContent = "Select Level";
-            defaultOption.disabled = true;
-            defaultOption.selected = true;
-            levelSelect.appendChild(defaultOption);
-            populateGradeDropdown("");
-            return;
-          }
-          if (applicableLevels.length === 0) {
-            const noLevelOption = document.createElement("option");
-            noLevelOption.value = "";
-            noLevelOption.textContent = "No levels available";
-            noLevelOption.disabled = true;
-            noLevelOption.selected = true;
-            levelSelect.appendChild(noLevelOption);
-            populateGradeDropdown("");
-            return;
-          }
-          if (selectedSubjectId === "DT" || selectedSubjectId === "NFS")
-            applicableLevels.sort((a, b) =>
-              a === "G3" && b === "G2" ? -1 : a === "G2" && b === "G3" ? 1 : 0,
-            );
-          applicableLevels.forEach((level) => {
-            const option = document.createElement("option");
-            option.value = level;
-            option.textContent = level;
-            if (level === currentLevel) option.selected = true;
-            levelSelect.appendChild(option);
-          });
-          // If currentLevel is empty or not in applicableLevels, select the best default.
-          if (!currentLevel || !applicableLevels.includes(currentLevel)) {
-            if (applicableLevels.includes("G3")) levelSelect.value = "G3";
-            else if (applicableLevels.length > 0)
-              levelSelect.value = applicableLevels[0];
-            else levelSelect.value = "";
-          } else {
-            levelSelect.value = currentLevel; // Re-select currentLevel if it's valid
-          }
-          populateGradeDropdown(levelSelect.value);
-        };
-
-        function populateGradeDropdown(level) {
-          gradeSelect.innerHTML = '<option value="">Select Grade</option>';
-          let grades = [];
-          if (level === "G3") grades = G3_GRADES_OPTIONS;
-          else if (level === "G2") grades = G2_GRADES_OPTIONS;
-          else if (level === "G1") grades = G1_GRADES_OPTIONS;
-          grades.forEach((g) => {
-            const option = document.createElement("option");
-            option.value = g;
-            option.textContent = g;
-            gradeSelect.appendChild(option);
-          });
-          if (grades.length > 0 && gradeSelect.options.length > 1)
-            gradeSelect.value = grades[0];
-          else if (grades.length === 0) gradeSelect.value = "";
-          gradeSelect.disabled = grades.length === 0;
-          updateRawMarkHint();
-        }
-
-        function updateRawMarkHint() {
-          const lvl = levelSelect.value;
-          const usable = lvl === "G3" || lvl === "G2";
-          rawMarkInput.disabled = !usable;
-          if (!usable) rawMarkInput.value = "";
-          rawMarkInput.placeholder = usable
-            ? bandText(lvl, gradeSelect.value) || "0–100"
-            : lvl === "G1"
-              ? "n/a at G1"
-              : "0–100";
-        }
 
         const populateRowGradeDropdown = (
           selectElement,
@@ -6357,16 +6203,21 @@
             return;
           }
           studentSubjectsTableContainer.classList.remove("hidden");
+          defaultGradeNote.classList.toggle(
+            "hidden",
+            !studentSubjects.some((x) => defaultRows.has(x.subjectId)),
+          );
           studentSubjects.forEach((s, index) => {
             const row = studentSubjectsTableBody.insertRow();
             row.className = "hover:bg-slate-700/50 transition-colors";
-            row.insertCell().outerHTML = `<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-100">${getSubjectById(s.subjectId)?.name || s.subjectId}</td>`;
+            row.dataset.subjectRow = s.subjectId;
+            row.insertCell().outerHTML = `<td class="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm font-medium text-gray-100">${esc(getSubjectById(s.subjectId)?.name || s.subjectId)}${defaultRows.has(s.subjectId) ? '<span class="mt-1 block w-fit rounded-full bg-cyan-900 md:ml-2 md:mt-0 md:inline-block px-2 py-0.5 text-xs font-semibold text-cyan-200">Set grade</span>' : ""}</td>`;
             const levelCell = row.insertCell();
             levelCell.className =
-              "px-6 py-4 whitespace-nowrap text-sm text-gray-300";
+              "px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm text-gray-300";
             const levelSelectEl = document.createElement("select");
             levelSelectEl.className =
-              "w-full px-3 py-2 min-w-[70px] bg-slate-700 border border-slate-600 rounded-md shadow-sm focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100 text-sm";
+              "w-full px-3 py-2 min-w-[64px] bg-slate-700 border border-slate-600 rounded-md shadow-sm focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100 text-sm";
             const applicableLevelsForRow = getAllowedLevels(s.subjectId);
             applicableLevelsForRow.forEach((levelOption) => {
               const option = document.createElement("option");
@@ -6375,8 +6226,10 @@
               if (levelOption === s.level) option.selected = true;
               levelSelectEl.appendChild(option);
             });
+            levelSelectEl.dataset.rowLevel = "";
             levelSelectEl.onchange = (e) => {
               const newLevel = e.target.value;
+              defaultRows.delete(s.subjectId);
               studentSubjects[index].level = newLevel;
               let defaultNewGrade = "";
               if (newLevel === "G3" && G3_GRADES_OPTIONS.length > 0)
@@ -6398,19 +6251,21 @@
             levelCell.appendChild(levelSelectEl);
             const gradeCell = row.insertCell();
             gradeCell.className =
-              "px-6 py-4 whitespace-nowrap text-sm text-gray-300";
+              "px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm text-gray-300";
             const gradeSelectEl = document.createElement("select");
             gradeSelectEl.className =
-              "grade-select w-full px-3 py-2 min-w-[70px] bg-slate-700 border border-slate-600 rounded-md shadow-sm focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100 text-sm";
+              "grade-select w-full px-3 py-2 min-w-[64px] bg-slate-700 border border-slate-600 rounded-md shadow-sm focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100 text-sm";
             populateRowGradeDropdown(gradeSelectEl, s.level, s.grade);
+            gradeSelectEl.dataset.rowGrade = "";
             gradeSelectEl.onchange = (e) => {
+              defaultRows.delete(s.subjectId);
               studentSubjects[index].grade = e.target.value;
               updateAllCalculationsAndRender();
             };
             gradeCell.appendChild(gradeSelectEl);
             const rawCell = row.insertCell();
             rawCell.className =
-              "px-6 py-4 whitespace-nowrap text-sm text-gray-300";
+              "px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm text-gray-300";
             if (s.level === "G1") {
               rawCell.innerHTML =
                 '<span class="text-slate-500">n/a at G1</span>';
@@ -6422,6 +6277,7 @@
               rawEl.max = "100";
               rawEl.placeholder = bandText(s.level, s.grade);
               rawEl.setAttribute("aria-label", "Raw mark");
+              rawEl.dataset.rowRaw = "";
               rawEl.value = hasRawMark(s) ? s.rawMark : "";
               rawEl.className = `w-full px-3 py-2 min-w-[90px] bg-slate-700 border ${rawInvalid ? "border-red-500" : "border-slate-600"} rounded-md shadow-sm focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100 text-sm`;
               rawEl.onchange = (e) => {
@@ -6439,7 +6295,7 @@
             }
             const actionsCell = row.insertCell();
             actionsCell.className =
-              "px-6 py-4 whitespace-nowrap text-sm font-medium text-right";
+              "px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm font-medium text-right";
             actionsCell.innerHTML = `<button onclick="handleDeleteSubjectWrapper(${index})" class="text-red-400 hover:text-red-300 transition-colors" aria-label="Delete subject"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-sm"><path d="M6 7H18V20C18 20.552 17.552 21 17 21H7C6.448 21 6 20.552 6 20V7Z"></path><path d="M19 4H15V3C15 2.448 14.552 2 14 2H10C9.448 2 9 2.448 9 3V4H5V6H19V4Z"></path></svg></button>`;
           });
         }
@@ -6636,269 +6492,144 @@
           }
         }
 
-        // ---- Add several subjects at once ----
-        // One row per subject the school offers. Picking a grade ticks the row;
-        // one button adds every ticked row together, with the same checks the
-        // single form uses (grade needed, raw mark must fit the grade).
-        const bulkAdd = document.getElementById("bulkAdd");
-        const bulkList = document.getElementById("bulkList");
-        const bulkAddBtn = document.getElementById("bulkAddBtn");
-        const bulkErr = document.getElementById("bulkErr");
-        const bulkMsg = document.getElementById("bulkMsg");
-        const bulkSearch = document.getElementById("bulkSearch");
-        const bulkState = {}; // subjectId -> { checked, level, grade, raw }
-        const BULK_SELECT =
-          "p-2 min-h-[44px] bg-slate-700 border border-slate-600 rounded-lg text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500";
-        const bulkLevelsFor = (id) => {
-          const lv = [...getAllowedLevels(id)];
-          if (id === "DT" || id === "NFS")
-            lv.sort((a, b) =>
-              a === "G3" && b === "G2" ? -1 : a === "G2" && b === "G3" ? 1 : 0,
-            );
-          return lv;
+        // ---- Subject picker ----
+        // The student ticks every subject they take and adds them in one go.
+        // Each lands in "Your Subjects" at the top grade (G3 A1 where G3 is
+        // offered); level, grade and raw mark are then set in that table.
+        const subjectPicker = document.getElementById("subjectPicker");
+        const subjectPickerLabel =
+          document.getElementById("subjectPickerLabel");
+        const subjectPickerWrap = document.getElementById("subjectPickerWrap");
+        const subjectMenu = document.getElementById("subjectMenu");
+        const subjectList = document.getElementById("subjectList");
+        const subjectSearch = document.getElementById("subjectSearch");
+        const subjectMenuAdd = document.getElementById("subjectMenuAdd");
+        const addUpdateBtnText = document.getElementById("addUpdateBtnText");
+        const addMsg = document.getElementById("addMsg");
+        const defaultGradeNote = document.getElementById("defaultGradeNote");
+        const pickState = new Set(); // ticked subject ids (survive school changes)
+        const defaultRows = new Set(); // added subjects still on their starting grade
+
+        const isAdded = (id) => studentSubjects.some((s) => s.subjectId === id);
+        const defaultLevelFor = (id) => {
+          const lv = getAllowedLevels(id);
+          return lv.includes("G3") ? "G3" : lv[0] || "";
         };
-        const bulkGradesFor = (level) =>
-          level === "G3"
+        const topGradeFor = (level) =>
+          (level === "G3"
             ? G3_GRADES_OPTIONS
             : level === "G2"
               ? G2_GRADES_OPTIONS
               : level === "G1"
                 ? G1_GRADES_OPTIONS
-                : [];
-        const bulkStateOf = (id) => {
-          const lv = bulkLevelsFor(id);
-          if (!bulkState[id])
-            bulkState[id] = {
-              checked: false,
-              level: lv.includes("G3") ? "G3" : lv[0] || "",
-              grade: "",
-              raw: "",
-            };
-          if (!lv.includes(bulkState[id].level))
-            bulkState[id].level = lv.includes("G3") ? "G3" : lv[0] || "";
-          return bulkState[id];
-        };
-        const bulkRawHint = (level, grade) =>
-          level === "G1" ? "n/a at G1" : bandText(level, grade) || "Mark";
-        const bulkGradeOptions = (level, selected) =>
-          '<option value="">Grade</option>' +
-          bulkGradesFor(level)
-            .map(
-              (g) =>
-                `<option value="${esc(g)}"${g === selected ? " selected" : ""}>${esc(g)}</option>`,
-            )
-            .join("");
-        const bulkIsAdded = (id) =>
-          studentSubjects.some((s) => s.subjectId === id);
+                : [])[0] || "";
+        // Ticked subjects this school offers that are not in the table yet.
+        const pickedIds = () =>
+          getSchoolSubjects()
+            .map((s) => s.id)
+            .filter((id) => pickState.has(id) && !isAdded(id));
 
-        const bulkRowHtml = (subject) => {
-          const id = subject.id;
-          const st = bulkStateOf(id);
-          const added = bulkIsAdded(id);
-          const dis = added ? " disabled" : "";
-          const levels = bulkLevelsFor(id);
-          return `<div data-bulk-row="${esc(id)}" data-bulk-name="${esc(subject.name.toLowerCase())}" class="flex flex-wrap items-center gap-2 rounded-lg border ${added ? "border-emerald-800 opacity-60" : st.checked ? "border-cyan-500" : "border-slate-700"} bg-slate-800/60 p-2"><label class="flex items-center gap-2 min-h-[44px] flex-1 min-w-[180px] cursor-pointer"><input type="checkbox" data-bulk-check aria-label="Include ${esc(subject.name)}" class="w-5 h-5 accent-cyan-500"${st.checked && !added ? " checked" : ""}${dis}><span class="text-slate-100 font-medium">${esc(subject.name)}</span>${added ? '<span class="text-xs text-emerald-300">Added</span>' : ""}</label><select data-bulk-level aria-label="${esc(subject.name)} level" class="${BULK_SELECT} w-[84px]"${dis}>${levels.map((l) => `<option value="${esc(l)}"${l === st.level ? " selected" : ""}>${esc(l)}</option>`).join("")}</select><select data-bulk-grade aria-label="${esc(subject.name)} grade" class="${BULK_SELECT} w-[100px]"${dis}>${bulkGradeOptions(st.level, st.grade)}</select><input type="number" data-bulk-raw min="0" max="100" aria-label="${esc(subject.name)} raw mark (optional)" placeholder="${esc(bulkRawHint(st.level, st.grade))}" value="${esc(st.raw)}" class="${BULK_SELECT} w-[104px]"${added || st.level === "G1" ? " disabled" : ""}></div>`;
-        };
-
-        function bulkUpdateButton() {
-          const n = getSchoolSubjects().filter(
-            (s) =>
-              bulkState[s.id] && bulkState[s.id].checked && !bulkIsAdded(s.id),
-          ).length;
-          bulkAddBtn.disabled = n === 0;
-          bulkAddBtn.textContent = n
+        function updatePickButtons() {
+          const n = pickedIds().length;
+          subjectPickerLabel.textContent = n
+            ? `${n} selected`
+            : "Select subjects";
+          subjectMenuAdd.textContent = n
             ? `Add ${plural(n, "selected subject")}`
             : "Add selected subjects";
+          subjectMenuAdd.disabled = n === 0;
+          addUpdateBtnText.textContent = n
+            ? `Add ${plural(n, "subject")}`
+            : "Add Subjects";
+          addUpdateSubjectBtn.disabled = n === 0;
         }
 
         // Typing in the search box hides other subjects; ticked ones stay
         // visible so the student can always review what will be added.
-        function bulkApplyFilter() {
-          const q = bulkSearch.value.trim().toLowerCase();
-          bulkList.querySelectorAll("[data-bulk-row]").forEach((row) => {
-            const st = bulkState[row.dataset.bulkRow];
+        function applyPickFilter() {
+          const q = subjectSearch.value.trim().toLowerCase();
+          subjectList.querySelectorAll("[data-pick-row]").forEach((row) => {
             row.classList.toggle(
               "hidden",
-              !!q && !row.dataset.bulkName.includes(q) && !(st && st.checked),
+              !!q &&
+                !row.dataset.pickName.includes(q) &&
+                !pickState.has(row.dataset.pickRow),
             );
           });
         }
 
-        function renderBulkList() {
-          bulkList.innerHTML = getSchoolSubjects().map(bulkRowHtml).join("");
-          bulkApplyFilter();
-          bulkUpdateButton();
-        }
-        bulkSearch.addEventListener("input", bulkApplyFilter);
-
-        // Refresh one row in place (keeps focus and scroll where they are).
-        function bulkSyncRow(row, id) {
-          const st = bulkStateOf(id);
-          row.querySelector("[data-bulk-check]").checked = st.checked;
-          row.classList.toggle("border-cyan-500", st.checked);
-          row.classList.toggle("border-slate-700", !st.checked);
-          row.classList.remove("border-rose-500");
-          row.removeAttribute("aria-invalid");
-          const grade = row.querySelector("[data-bulk-grade]");
-          grade.innerHTML = bulkGradeOptions(st.level, st.grade);
-          grade.value = st.grade;
-          const raw = row.querySelector("[data-bulk-raw]");
-          if (st.level === "G1") st.raw = "";
-          raw.disabled = st.level === "G1";
-          raw.value = st.raw;
-          raw.placeholder = bulkRawHint(st.level, st.grade);
+        function renderSubjectMenu() {
+          subjectList.innerHTML = getSchoolSubjects()
+            .map((s) => {
+              const added = isAdded(s.id);
+              const on = added || pickState.has(s.id);
+              return `<label data-pick-row="${esc(s.id)}" data-pick-name="${esc(s.name.toLowerCase())}" class="flex items-center gap-3 min-h-[44px] px-3 rounded-lg ${added ? "opacity-60" : "cursor-pointer hover:bg-slate-700"}"><input type="checkbox" data-pick="${esc(s.id)}" class="w-5 h-5 accent-cyan-500"${on ? " checked" : ""}${added ? " disabled" : ""}><span class="text-slate-100 font-medium">${esc(s.name)}</span>${added ? '<span class="ml-auto text-xs text-emerald-300">Added</span>' : ""}</label>`;
+            })
+            .join("");
+          applyPickFilter();
+          updatePickButtons();
         }
 
-        bulkList.addEventListener("change", (e) => {
-          const row = e.target.closest("[data-bulk-row]");
-          if (!row) return;
-          const id = row.dataset.bulkRow;
-          const st = bulkStateOf(id);
-          if (e.target.matches("[data-bulk-check]"))
-            st.checked = e.target.checked;
-          else if (e.target.matches("[data-bulk-level]")) {
-            st.level = e.target.value;
-            st.grade = "";
-            st.raw = "";
-          } else if (e.target.matches("[data-bulk-grade]")) {
-            st.grade = e.target.value;
-            if (st.grade) st.checked = true;
+        const menuIsOpen = () => !subjectMenu.classList.contains("hidden");
+        function setMenu(open) {
+          subjectMenu.classList.toggle("hidden", !open);
+          subjectPicker.setAttribute("aria-expanded", String(open));
+          if (open) {
+            addMsg.textContent = "";
+            subjectSearch.focus({ preventScroll: true });
           }
-          bulkSyncRow(row, id);
-          bulkUpdateButton();
+        }
+        subjectPicker.addEventListener("click", () => setMenu(!menuIsOpen()));
+        document.addEventListener("click", (e) => {
+          if (menuIsOpen() && !subjectPickerWrap.contains(e.target))
+            setMenu(false);
         });
-        bulkList.addEventListener("input", (e) => {
-          const row = e.target.closest("[data-bulk-row]");
-          if (row && e.target.matches("[data-bulk-raw]"))
-            bulkStateOf(row.dataset.bulkRow).raw = e.target.value;
-        });
-        bulkAdd.addEventListener("toggle", () => {
-          if (bulkAdd.open) {
-            bulkMsg.textContent = "";
-            bulkErr.classList.add("hidden");
+        subjectPickerWrap.addEventListener("keydown", (e) => {
+          if (e.key === "Escape" && menuIsOpen()) {
+            setMenu(false);
+            subjectPicker.focus();
           }
+        });
+        subjectSearch.addEventListener("input", applyPickFilter);
+        subjectSearch.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            handleAddPicked();
+          }
+        });
+        subjectList.addEventListener("change", (e) => {
+          const box = e.target.closest("[data-pick]");
+          if (!box) return;
+          if (box.checked) pickState.add(box.dataset.pick);
+          else pickState.delete(box.dataset.pick);
+          updatePickButtons();
         });
 
-        function handleBulkAdd() {
-          const picks = [];
-          const problems = [];
-          getSchoolSubjects().forEach((subject) => {
-            const st = bulkState[subject.id];
-            if (!st || !st.checked || bulkIsAdded(subject.id)) return;
-            if (!st.grade) {
-              problems.push({
-                id: subject.id,
-                text: `${subject.name}: choose a grade`,
-              });
-              return;
-            }
-            let rawMark = null;
-            if (String(st.raw).trim() !== "" && st.level !== "G1") {
-              const typed = Number(st.raw);
-              if (
-                getValidRaw({
-                  level: st.level,
-                  grade: st.grade,
-                  rawMark: typed,
-                }) === null
-              ) {
-                problems.push({
-                  id: subject.id,
-                  text: `${subject.name}: a grade of ${st.grade} at ${st.level} means a raw mark of ${bandText(st.level, st.grade)}, so correct the mark or leave it blank`,
-                });
-                return;
-              }
-              rawMark = typed;
-            }
-            picks.push({
-              subjectId: subject.id,
-              level: st.level,
-              grade: st.grade,
-              rawMark,
+        function handleAddPicked() {
+          const ids = pickedIds();
+          if (!ids.length) return;
+          ids.forEach((id) => {
+            const level = defaultLevelFor(id);
+            studentSubjects.push({
+              subjectId: id,
+              level,
+              grade: topGradeFor(level),
+              rawMark: null,
             });
+            defaultRows.add(id);
+            pickState.delete(id);
           });
-          if (problems.length) {
-            bulkErr.textContent = `Nothing was added yet. Please fix: ${problems.map((p) => p.text).join("; ")}.`;
-            bulkErr.classList.remove("hidden");
-            problems.forEach((p) => {
-              const row = bulkList.querySelector(`[data-bulk-row="${p.id}"]`);
-              if (row) {
-                row.classList.add("border-rose-500");
-                row.setAttribute("aria-invalid", "true");
-              }
-            });
-            const first = bulkList.querySelector(
-              `[data-bulk-row="${problems[0].id}"] select[data-bulk-grade]`,
-            );
-            if (first) first.focus();
-            return;
-          }
-          if (!picks.length) return;
-          bulkErr.classList.add("hidden");
-          picks.forEach((p) => {
-            studentSubjects.push(p);
-            Object.assign(bulkState[p.subjectId], {
-              checked: false,
-              grade: "",
-              raw: "",
-            });
-          });
+          setMenu(false);
+          subjectSearch.value = "";
           updateAllCalculationsAndRender(); // once for the whole batch
-          bulkAdd.open = false;
-          bulkMsg.textContent = `Added ${plural(picks.length, "subject")}. Your results are below.`;
+          addMsg.textContent = `Added ${plural(ids.length, "subject")}. Now set the level and grade of each one below.`;
+          const row = studentSubjectsTableBody.querySelector(
+            `[data-subject-row="${CSS.escape(ids[0])}"]`,
+          );
+          if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
         }
-        bulkAddBtn.addEventListener("click", handleBulkAdd);
-        // Phone shortcut at the top of the form: open the panel and go to it.
-        document.getElementById("bulkJump").addEventListener("click", () => {
-          bulkAdd.open = true;
-          bulkAdd.scrollIntoView({ behavior: "smooth", block: "start" });
-          bulkAdd.querySelector("summary").focus({ preventScroll: true });
-        });
-
-        function handleAddOrUpdateSubject() {
-          const currentSubjectVal = subjectSelect.value,
-            currentLevelVal = levelSelect.value,
-            currentGradeVal = gradeSelect.value;
-          if (!currentSubjectVal || !currentLevelVal || !currentGradeVal) {
-            showMessage("Please select subject, level, and grade.");
-            return;
-          }
-          if (studentSubjects.some((s) => s.subjectId === currentSubjectVal)) {
-            showMessage(
-              "This subject has already been added. Please edit the existing entry or choose a different subject.",
-              "Duplicate Subject",
-            );
-            return;
-          }
-          let rawMarkVal = null;
-          if (rawMarkInput.value.trim() !== "" && currentLevelVal !== "G1") {
-            const typed = Number(rawMarkInput.value);
-            const probe = {
-              level: currentLevelVal,
-              grade: currentGradeVal,
-              rawMark: typed,
-            };
-            if (getValidRaw(probe) === null) {
-              showMessage(
-                `A grade of ${currentGradeVal} at ${currentLevelVal} means a raw mark of ${bandText(currentLevelVal, currentGradeVal)}. Please correct the raw mark, or leave it blank.`,
-                "Raw mark does not match grade",
-              );
-              return;
-            }
-            rawMarkVal = typed;
-          }
-          studentSubjects.push({
-            subjectId: currentSubjectVal,
-            level: currentLevelVal,
-            grade: currentGradeVal,
-            rawMark: rawMarkVal,
-          });
-          rawMarkInput.value = "";
-          subjectSelect.value = "";
-          populateLevelDropdown("", "");
-          populateGradeDropdown("");
-          updateAllCalculationsAndRender();
-        }
+        subjectMenuAdd.addEventListener("click", handleAddPicked);
+        addUpdateSubjectBtn.addEventListener("click", handleAddPicked);
 
         window.handleDeleteSubjectWrapper = (index) => {
           messageBoxTitle.textContent = "Confirm Deletion";
@@ -6907,7 +6638,8 @@
           customMessageBox.classList.remove("hidden");
           messageBoxOkButton.onclick = () => {
             customMessageBox.classList.add("hidden");
-            studentSubjects.splice(index, 1);
+            const [gone] = studentSubjects.splice(index, 1);
+            if (gone) defaultRows.delete(gone.subjectId);
             updateAllCalculationsAndRender();
             messageBoxOkButton.onclick = () =>
               customMessageBox.classList.add("hidden");
@@ -6922,32 +6654,16 @@
           checkEligibility();
           renderStudentSubjectsTable();
           renderResultsAdvice();
-          renderBulkList();
+          renderSubjectMenu();
         }
 
         document.addEventListener("DOMContentLoaded", () => {
           currentYearSpan.textContent = new Date().getFullYear();
           selectedSchool = schoolSelect.value;
-          populateSubjectDropdown();
-
-          // Removed pre-fill for user to input subjects
-
           schoolSelect.addEventListener("change", (e) => {
             selectedSchool = e.target.value;
-            populateSubjectDropdown();
-            renderBulkList();
+            renderSubjectMenu();
           });
-          subjectSelect.addEventListener("change", (e) =>
-            populateLevelDropdown("", e.target.value),
-          ); // MODIFIED: Pass empty string to reset level
-          levelSelect.addEventListener("change", (e) =>
-            populateGradeDropdown(e.target.value),
-          );
-          gradeSelect.addEventListener("change", updateRawMarkHint);
-          addUpdateSubjectBtn.addEventListener(
-            "click",
-            handleAddOrUpdateSubject,
-          );
           bonusInput.addEventListener("change", updateAllCalculationsAndRender);
           bonusInput.addEventListener("keyup", (e) => {
             if (

@@ -5,9 +5,8 @@
  * compare a lower row) at desktop and phone width. It saves screenshots to
  * debug/ux-student-*.png and prints measurements the audit scores from.
  *
- * Enters the same six subjects two ways: one at a time (the single form) and
- * all at once (the "Add several subjects at once" panel), and counts the
- * interactions and time each takes.
+ * Enters six subjects through the subject picker (tick, add together, then set
+ * each grade in the table) and counts the interactions and time it takes.
  *
  * Run: node tests/ux/student-journey.js
  */
@@ -23,7 +22,7 @@ const SUBJECTS = [
   ["POA", "G3", "F9", "38"],
 ];
 
-async function run(name, viewport, mode = "single") {
+async function run(name, viewport, mode = "picker") {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport });
   const out = { name, steps: [] };
@@ -42,40 +41,34 @@ async function run(name, viewport, mode = "single") {
   await page.waitForTimeout(300);
   let addMs = 0;
   const entryStart = Date.now();
-  if (mode === "single") {
-    for (const [id, lvl, grd, raw] of SUBJECTS) {
-      await page.selectOption("#subject", id);
-      await page.waitForTimeout(150);
-      await page.selectOption("#level", lvl);
-      await page.waitForTimeout(150);
-      await page.selectOption("#grade", grd);
-      await page.fill("#rawMark", raw);
-      const tAdd = Date.now();
-      await page.click("#addUpdateSubjectBtn");
-      await page
-        .waitForSelector("#fsbbTable", { timeout: 5000 })
-        .catch(() => {});
-      addMs = Date.now() - tAdd;
-      clicks += 4; // subject, grade, mark, add (level stays at its G3 default)
-      await page.waitForTimeout(250);
-    }
-  } else {
-    await page.click("#bulkAdd > summary");
+  // Open the picker, tick all six, add them together (they land at G3 A1),
+  // then set each grade and raw mark in the Your Subjects table.
+  await page.click("#subjectPicker");
+  clicks++;
+  for (const [id] of SUBJECTS) {
+    await page.check('[data-pick="' + id + '"]');
     clicks++;
-    for (const [id, , grd, raw] of SUBJECTS) {
-      await page.selectOption(
-        '[data-bulk-row="' + id + '"] [data-bulk-grade]',
-        grd,
-      );
-      await page.fill('[data-bulk-row="' + id + '"] [data-bulk-raw]', raw);
-      clicks += 2; // grade, mark
+  }
+  const tAdd = Date.now();
+  await page.click("#subjectMenuAdd");
+  clicks++;
+  await page.waitForSelector("#fsbbTable", { timeout: 5000 }).catch(() => {});
+  addMs = Date.now() - tAdd;
+  await page.waitForTimeout(250);
+  for (const [id, lvl, grd, raw] of SUBJECTS) {
+    const row = '[data-subject-row="' + id + '"]';
+    if ((await page.inputValue(row + " [data-row-level]")) !== lvl) {
+      await page.selectOption(row + " [data-row-level]", lvl);
+      clicks++;
+      await page.waitForTimeout(200);
     }
-    const tAdd = Date.now();
-    await page.click("#bulkAddBtn");
+    await page.selectOption(row + " [data-row-grade]", grd);
     clicks++;
-    await page.waitForSelector("#fsbbTable", { timeout: 5000 }).catch(() => {});
-    addMs = Date.now() - tAdd;
-    await page.waitForTimeout(250);
+    await page.waitForTimeout(200);
+    await page.fill(row + " [data-row-raw]", raw);
+    await page.press(row + " [data-row-raw]", "Tab");
+    clicks++;
+    await page.waitForTimeout(200);
   }
   step("entry", {
     mode,
@@ -188,10 +181,7 @@ async function run(name, viewport, mode = "single") {
 
 (async () => {
   const results = [];
-  results.push(
-    await run("desktop-single", { width: 1200, height: 900 }, "single"),
-  );
-  results.push(await run("desktop-bulk", { width: 1200, height: 900 }, "bulk"));
-  results.push(await run("mobile-bulk", { width: 390, height: 844 }, "bulk"));
+  results.push(await run("desktop-picker", { width: 1200, height: 900 }));
+  results.push(await run("mobile-picker", { width: 390, height: 844 }));
   console.log(JSON.stringify(results, null, 2));
 })();

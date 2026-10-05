@@ -29,15 +29,28 @@ async function reset(page, bonus = 0) {
   await page.fill("#bonus", String(bonus));
 }
 
-async function add(page, subjectId, level, grade) {
-  await page.selectOption("#subject", subjectId);
-  await page.waitForTimeout(200);
-  await page.selectOption("#level", level);
-  await page.waitForTimeout(200);
-  await page.selectOption("#grade", grade);
-  await page.waitForTimeout(50);
-  await page.click("#addUpdateSubjectBtn");
+async function add(page, subjectId, level, grade, raw) {
+  // Tick the subject in the picker, add it (it lands at G3 A1), then set its
+  // level, grade and raw mark in the Your Subjects table.
+  if ((await page.getAttribute("#subjectPicker", "aria-expanded")) !== "true")
+    await page.click("#subjectPicker");
+  await page.check('[data-pick="' + subjectId + '"]');
+  await page.click("#subjectMenuAdd");
   await page.waitForTimeout(350);
+  const row = '[data-subject-row="' + subjectId + '"]';
+  if ((await page.inputValue(row + " [data-row-level]")) !== level) {
+    await page.selectOption(row + " [data-row-level]", level);
+    await page.waitForTimeout(200);
+  }
+  if (grade && (await page.inputValue(row + " [data-row-grade]")) !== grade) {
+    await page.selectOption(row + " [data-row-grade]", grade);
+    await page.waitForTimeout(200);
+  }
+  if (raw !== undefined) {
+    await page.fill(row + " [data-row-raw]", String(raw));
+    await page.press(row + " [data-row-raw]", "Tab");
+    await page.waitForTimeout(200);
+  }
 }
 
 async function addMany(page, subjects) {
@@ -1993,20 +2006,37 @@ function ok(cond, id, msg) {
       );
     }
     // ════════════════════════════════════════════════════════════════════════
-    // Phase 15: Add several subjects at once
-    // One panel lists every subject the school offers; picking a grade ticks the
-    // row; one button adds all ticked rows together (all or nothing).
+    // Phase 15: Subject picker
+    // The Subjects dropdown lists the school's subjects with tick boxes; one
+    // click adds every ticked subject to "Your Subjects" at the top grade
+    // (G3 A1), and level, grade and raw mark are then set in that table.
     // ════════════════════════════════════════════════════════════════════════
-    console.log("\n── Phase 15: Add several subjects at once ──");
-    const bulkOpen = () => page.click("#bulkAdd > summary");
-    const bulkFill = async (list) => {
-      for (const [id, grade, raw] of list) {
-        await page.selectOption(
-          '[data-bulk-row="' + id + '"] [data-bulk-grade]',
-          grade,
-        );
-        if (raw !== undefined)
-          await page.fill('[data-bulk-row="' + id + '"] [data-bulk-raw]', raw);
+    console.log("\n── Phase 15: Subject picker ──");
+    const pickOpen = async () => {
+      if (
+        (await page.getAttribute("#subjectPicker", "aria-expanded")) !== "true"
+      )
+        await page.click("#subjectPicker");
+    };
+    const pickTick = async (ids) => {
+      await pickOpen();
+      for (const id of ids) await page.check('[data-pick="' + id + '"]');
+    };
+    const rowSel = (id, part) =>
+      '[data-subject-row="' + id + '"] [data-row-' + part + "]";
+    const setRow = async (id, level, grade, raw) => {
+      if (level && (await page.inputValue(rowSel(id, "level"))) !== level) {
+        await page.selectOption(rowSel(id, "level"), level);
+        await page.waitForTimeout(200);
+      }
+      if (grade) {
+        await page.selectOption(rowSel(id, "grade"), grade);
+        await page.waitForTimeout(200);
+      }
+      if (raw !== undefined) {
+        await page.fill(rowSel(id, "raw"), String(raw));
+        await page.press(rowSel(id, "raw"), "Tab");
+        await page.waitForTimeout(200);
       }
     };
     const tableRows = () =>
@@ -2029,38 +2059,60 @@ function ok(cond, id, msg) {
 
     await reset(page);
     {
-      const rows = await page.$$eval("[data-bulk-row]", (r) => r.length);
-      const options = await page.$$eval("#subject option", (o) => o.length - 1);
+      const gone = await page.evaluate(() =>
+        ["bulkAdd", "bulkJump", "subject", "level", "grade", "rawMark"].every(
+          (id) => !document.getElementById(id),
+        ),
+      );
       ok(
-        rows === options &&
-          !(await page.$eval("#bulkAdd", (d) => d.open)) &&
-          (await page.isDisabled("#bulkAddBtn")),
-        "BULK-01",
-        "The panel lists every subject the school offers (" +
-          rows +
-          "), starts closed, and Add is disabled until something is ticked",
+        gone &&
+          (await page.isHidden("#subjectMenu")) &&
+          (await page.isDisabled("#addUpdateSubjectBtn")),
+        "PICK-01",
+        "The old 'add several' panel and the level/grade/raw-mark boxes are gone; the menu starts closed and Add is disabled until something is ticked",
       );
     }
-    // BULK-02: several subjects in one go
-    await bulkOpen();
-    await bulkFill(PROFILE15);
+    // PICK-02: tick several, add once
+    await pickTick(PROFILE15.map(([id]) => id));
     {
-      const label = await page.textContent("#bulkAddBtn");
-      await page.click("#bulkAddBtn");
+      const trigger = (await page.textContent("#subjectPickerLabel")).trim();
+      const menuLabel = (await page.textContent("#subjectMenuAdd")).trim();
+      const formLabel = (await page.textContent("#addUpdateBtnText")).trim();
+      await page.click("#subjectMenuAdd");
       await page.waitForTimeout(500);
+      const start = await page.$$eval("#studentSubjectsTableBody tr", (rs) =>
+        rs.map((r) => {
+          const sels = r.querySelectorAll("select");
+          return sels[0].value + " " + sels[1].value;
+        }),
+      );
       ok(
-        label.trim() === "Add 5 selected subjects" &&
+        trigger === "5 selected" &&
+          menuLabel === "Add 5 selected subjects" &&
+          formLabel === "Add 5 subjects" &&
           (await tableRows()) === 5 &&
-          !(await page.$eval("#bulkAdd", (d) => d.open)) &&
-          (await page.textContent("#bulkMsg")).includes("Added 5 subjects") &&
+          start.every((v) => v === "G3 A1") &&
+          (await page.isHidden("#subjectMenu")) &&
+          (await page.textContent("#addMsg")).includes("Added 5 subjects") &&
           (await page.isVisible("#fsbbTable")),
-        "BULK-02",
-        "Five subjects go in with one click: the button counts them, the table and Action Plan appear, and a confirmation shows",
+        "PICK-02",
+        "Ticking five subjects and adding puts all five in the table at G3 A1; the buttons count them, the menu closes, a message shows and the Action Plan appears (" +
+          start.join(", ") +
+          ")",
       );
     }
-    // BULK-03: same results as adding one at a time
-    const viaBulk = [];
-    for (const n of NAMES15) viaBulk.push(await getResult(page, n));
+    // PICK-03: same results as adding one at a time
+    ok(
+      (await page.isVisible("#defaultGradeNote")) &&
+        (await page.$$eval("#studentSubjectsTableBody tr", (rs) =>
+          rs.every((r) => r.innerText.includes("Set grade")),
+        )),
+      "PICK-03",
+      "Every new row is tagged 'Set grade' and the note above the table asks the student to set level and grade",
+    );
+    for (const [id, g] of PROFILE15) await setRow(id, "G3", g);
+    const viaPicker = [];
+    for (const n of NAMES15) viaPicker.push(await getResult(page, n));
     await reset(page);
     await addMany(
       page,
@@ -2069,208 +2121,173 @@ function ok(cond, id, msg) {
     const viaSingle = [];
     for (const n of NAMES15) viaSingle.push(await getResult(page, n));
     ok(
-      JSON.stringify(viaBulk) === JSON.stringify(viaSingle) &&
-        viaBulk.every((r) => r.found),
-      "BULK-03",
-      "Adding subjects in bulk gives exactly the same eligibility results as adding them one by one",
+      JSON.stringify(viaPicker) === JSON.stringify(viaSingle) &&
+        viaPicker.every((r) => r.found),
+      "PICK-04",
+      "Adding subjects together and then setting grades in the table gives exactly the same eligibility results as adding them one by one",
     );
-
-    // BULK-04: validation, all or nothing
-    await reset(page);
-    await bulkOpen();
-    await page.check('[data-bulk-row="EL"] [data-bulk-check]');
-    await page.selectOption('[data-bulk-row="MATH"] [data-bulk-grade]', "C6");
-    await page.click("#bulkAddBtn");
-    {
-      const err = await page.textContent("#bulkErr");
-      ok(
-        (await tableRows()) === 0 &&
-          (await page.isVisible("#bulkErr")) &&
-          err.includes("English Language: choose a grade") &&
-          (await page.getAttribute('[data-bulk-row="EL"]', "aria-invalid")) ===
-            "true",
-        "BULK-04",
-        "A ticked subject with no grade stops the whole batch (nothing added) and names the subject",
-      );
-    }
-    await page.selectOption('[data-bulk-row="EL"] [data-bulk-grade]', "B3");
-    await page.fill('[data-bulk-row="EL"] [data-bulk-raw]', "10");
-    await page.click("#bulkAddBtn");
-    {
-      const err = await page.textContent("#bulkErr");
-      ok(
-        (await tableRows()) === 0 &&
-          err.includes("English Language") &&
-          err.includes("65"),
-        "BULK-05",
-        "A raw mark that does not fit its grade blocks the batch and says what range the grade means (" +
-          err.slice(0, 90) +
-          ")",
-      );
-    }
-    // BULK-06: fixing it adds everything, and the raw mark is kept
-    await page.fill('[data-bulk-row="EL"] [data-bulk-raw]', "67");
-    await page.click("#bulkAddBtn");
-    await page.waitForTimeout(500);
-    {
-      const text = await page.$$eval("#studentSubjectsTableBody tr", (rs) =>
-        rs
-          .map(
-            (r) =>
-              r.innerText +
-              " " +
-              Array.from(r.querySelectorAll("input"))
-                .map((i) => i.value)
-                .join(" "),
-          )
-          .join(" | "),
-      );
-      ok(
-        (await tableRows()) === 2 && text.includes("67"),
-        "BULK-06",
-        "After the fix both subjects are added and the typed raw mark is kept",
-      );
-    }
-    // BULK-07: added subjects show as added and cannot be ticked again
-    await bulkOpen();
+    // PICK-05: added subjects are locked in the menu
+    await pickOpen();
     ok(
-      (await page.isDisabled('[data-bulk-row="EL"] [data-bulk-check]')) &&
-        (await page.textContent('[data-bulk-row="EL"]')).includes("Added") &&
-        (await page.isDisabled("#bulkAddBtn")),
-      "BULK-07",
-      "Subjects already added are marked 'Added' and locked, so nothing can be added twice",
+      (await page.isDisabled('[data-pick="EL"]')) &&
+        (await page.isChecked('[data-pick="EL"]')) &&
+        (await page.textContent('[data-pick-row="EL"]')).includes("Added") &&
+        (await page.isDisabled("#subjectMenuAdd")) &&
+        (await page.isDisabled("#addUpdateSubjectBtn")),
+      "PICK-05",
+      "Subjects already in the table show as ticked and 'Added' and are locked, so nothing can be added twice",
     );
-    // BULK-08: search keeps ticked rows visible
-    await page.check('[data-bulk-row="BIO"] [data-bulk-check]');
-    await page.fill("#bulkSearch", "chem");
+    // PICK-06: search keeps ticked rows visible
+    await reset(page);
+    await pickTick(["EL"]);
+    await page.fill("#subjectSearch", "chem");
     {
-      const visible = await page.$$eval("[data-bulk-row]", (rs) =>
+      const visible = await page.$$eval("[data-pick-row]", (rs) =>
         rs
           .filter((r) => !r.classList.contains("hidden"))
-          .map((r) => r.dataset.bulkRow),
+          .map((r) => r.dataset.pickRow),
       );
       ok(
         visible.includes("CHEM") &&
-          visible.includes("BIO") &&
+          visible.includes("EL") &&
           visible.length < 6,
-        "BULK-08",
+        "PICK-06",
         "Searching narrows the list to matches plus anything already ticked (" +
           visible.join(", ") +
           ")",
       );
     }
-    await page.fill("#bulkSearch", "");
+    await page.fill("#subjectSearch", "");
     ok(
-      (await page.$$eval("[data-bulk-row].hidden", (r) => r.length)) === 0,
-      "BULK-09",
+      (await page.$$eval("[data-pick-row].hidden", (r) => r.length)) === 0,
+      "PICK-07",
       "Clearing the search brings every subject back",
     );
-    // BULK-10: level rules match the single form
+    // PICK-08: Escape and outside click close the menu but keep the ticks
+    await page.keyboard.press("Escape");
     {
-      const lv = (id) =>
-        page.$$eval(
-          '[data-bulk-row="' + id + '"] [data-bulk-level] option',
-          (o) => o.map((x) => x.value).join(","),
-        );
+      const afterEsc = await page.isHidden("#subjectMenu");
+      const label = (await page.textContent("#subjectPickerLabel")).trim();
+      await page.click("#subjectPicker");
+      await page.click("h2");
       ok(
-        (await lv("BIO")) === "G3" &&
-          (await lv("DT")) === "G3,G2" &&
-          (await lv("MOB_ROBOTICS")) === "G1" &&
-          (await page.isDisabled(
-            '[data-bulk-row="MOB_ROBOTICS"] [data-bulk-raw]',
-          )),
-        "BULK-10",
-        "Each row offers only the levels that subject allows at this school (BIO G3, DT G3/G2, Mobile Robotics G1 with no raw mark)",
+        afterEsc &&
+          label === "1 selected" &&
+          (await page.isHidden("#subjectMenu")) &&
+          (await page.getAttribute("#subjectPicker", "aria-expanded")) ===
+            "false",
+        "PICK-08",
+        "Escape and a click outside both close the menu, and the ticks are kept ('" +
+          label +
+          "')",
       );
     }
-    // BULK-11: changing school rebuilds the list
-    await page.selectOption("#school", "Yuhua Secondary School");
-    await page.waitForTimeout(200);
+    // PICK-09: Enter in the search box adds the ticked subjects
+    await pickOpen();
+    await page.fill("#subjectSearch", "math");
+    await page.press("#subjectSearch", "Enter");
+    await page.waitForTimeout(400);
     ok(
-      (await page.$$eval("[data-bulk-row]", (r) => r.length)) ===
-        (await page.$$eval("#subject option", (o) => o.length - 1)),
-      "BULK-11",
-      "Changing school rebuilds the list to that school's subjects",
+      (await tableRows()) === 1 &&
+        (await page.isVisible(rowSel("EL", "level"))),
+      "PICK-09",
+      "Pressing Enter in the search box adds what is ticked (only English, which stayed ticked while searching)",
     );
-    // BULK-12: the single form still works alongside
-    await page.selectOption("#school", "School A");
-    await page.waitForTimeout(200);
-    await add(page, "PHY", "G3", "B4");
-    ok(
-      (await tableRows()) === 3,
-      "BULK-12",
-      "The existing one-at-a-time form still adds a subject after a bulk add",
-    );
-    // DUP-01: adding the same subject again shows a clear popup (title and text the right way round)
-    await page.selectOption("#subject", "PHY");
-    await page.waitForTimeout(200);
-    await page.click("#addUpdateSubjectBtn");
-    await page.waitForTimeout(300);
+    // PICK-10: starting level and grade follow what the subject allows
+    await reset(page);
+    await pickTick(["BIO", "DT", "MOB_ROBOTICS"]);
+    await page.click("#subjectMenuAdd");
+    await page.waitForTimeout(500);
     {
-      const title = await page.textContent("#messageBoxTitle");
-      const text = await page.textContent("#messageBoxText");
+      const bio = await page.inputValue(rowSel("BIO", "level"));
+      const dtLevel = await page.inputValue(rowSel("DT", "level"));
+      const dtGrade = await page.inputValue(rowSel("DT", "grade"));
+      const mobLevel = await page.inputValue(rowSel("MOB_ROBOTICS", "level"));
+      const mobGrade = await page.inputValue(rowSel("MOB_ROBOTICS", "grade"));
+      const mobRawBoxes = await page.$$(rowSel("MOB_ROBOTICS", "raw"));
       ok(
-        title.trim() === "Duplicate Subject" &&
-          text.includes("has already been added") &&
-          (await tableRows()) === 3,
-        "DUP-01",
-        "The duplicate-subject popup has the heading 'Duplicate Subject' and the explanation as its text (" +
-          title.trim() +
+        bio === "G3" &&
+          dtLevel === "G3" &&
+          dtGrade === "A1" &&
+          mobLevel === "G1" &&
+          mobGrade === "A" &&
+          mobRawBoxes.length === 0,
+        "PICK-10",
+        "Each subject starts at its own top grade: BIO and DT at G3 A1, Mobile Robotics (G1 only) at G1 A with no raw mark (" +
+          [bio, dtLevel, dtGrade, mobLevel, mobGrade].join(" ") +
           ")",
       );
-      await page.click("#messageBoxOkButton");
     }
-    // BULK-13: phone width
+    // PICK-11: the 'Set grade' tag and note clear as the student edits
+    await reset(page);
+    await pickTick(["EL", "MATH"]);
+    await page.click("#subjectMenuAdd");
+    await page.waitForTimeout(500);
+    await setRow("EL", "G3", "B3");
+    {
+      const elTag = (
+        await page.textContent('[data-subject-row="EL"]')
+      ).includes("Set grade");
+      const mathTag = (
+        await page.textContent('[data-subject-row="MATH"]')
+      ).includes("Set grade");
+      const noteMid = await page.isVisible("#defaultGradeNote");
+      await setRow("MATH", "G3", "C6");
+      ok(
+        !elTag &&
+          mathTag &&
+          noteMid &&
+          (await page.isHidden("#defaultGradeNote")),
+        "PICK-11",
+        "A row loses its 'Set grade' tag when its grade is changed, and the note goes once every row has been set",
+      );
+    }
+    // PICK-12: a raw mark that does not fit the grade is flagged in the table
+    await setRow("EL", "G3", "B3", 10);
+    ok(
+      (await page.textContent('[data-subject-row="EL"]')).includes(
+        "Mark ignored",
+      ),
+      "PICK-12",
+      "A raw mark that does not fit its grade is flagged in the table ('Mark ignored') instead of being used",
+    );
+    // PICK-13: ticks survive a school change
+    await reset(page);
+    await pickTick(["EL"]);
+    await page.selectOption("#school", "Yuhua Secondary School");
+    await page.waitForTimeout(300);
+    ok(
+      (await page.isChecked('[data-pick="EL"]')) &&
+        (await page.textContent("#subjectPickerLabel")).trim() ===
+          "1 selected" &&
+        (await page.$$eval("[data-pick-row]", (r) => r.length)) > 5,
+      "PICK-13",
+      "Changing school rebuilds the list but keeps ticks for subjects both schools offer",
+    );
+    // PICK-14: phone width
     await page.setViewportSize({ width: 390, height: 844 });
     await reset(page);
-    await bulkOpen();
-    await bulkFill([
-      ["EL", "B3"],
-      ["MATH", "C6"],
-    ]);
+    await pickOpen();
     {
       const noScroll = !(await page.evaluate(
         () => document.documentElement.scrollWidth > window.innerWidth,
       ));
-      await page.locator("#bulkAdd").scrollIntoViewIfNeeded();
-      const btnBox = await page.$eval("#bulkAddBtn", (b) => {
+      const trig = await page.$eval(
+        "#subjectPicker",
+        (b) => b.getBoundingClientRect().height,
+      );
+      await page.check('[data-pick="EL"]');
+      const menu = await page.$eval("#subjectMenuAdd", (b) => {
         const r = b.getBoundingClientRect();
         return { top: r.top, bottom: r.bottom, h: window.innerHeight };
       });
       ok(
-        noScroll && btnBox.bottom <= btnBox.h && btnBox.top >= 0,
-        "BULK-13",
-        "At 390px wide there is no sideways scroll and the Add button stays on screen while the list is long",
-      );
-    }
-    // BULK-14: phone shortcut to the panel is in the first screen, and works
-    await reset(page);
-    {
-      const box = await page.$eval("#bulkJump", (b) => {
-        const r = b.getBoundingClientRect();
-        return { bottom: r.bottom, h: window.innerHeight };
-      });
-      const inFirstScreen = box.bottom <= box.h;
-      await page.click("#bulkJump");
-      await page.waitForTimeout(900);
-      const opened = await page.$eval("#bulkAdd", (d) => d.open);
-      const nearTop = await page.$eval("#bulkAdd", (d) => {
-        const r = d.getBoundingClientRect();
-        return r.top < window.innerHeight * 0.5 && r.bottom > 0;
-      });
-      ok(
-        inFirstScreen && opened && nearTop,
-        "BULK-14",
-        "On a phone a button in the first screen opens 'Add several subjects at once' and scrolls to it",
+        noScroll && trig >= 44 && menu.top >= 0 && menu.bottom <= menu.h,
+        "PICK-14",
+        "At 390px wide, with the menu open, there is no sideways scroll, the trigger is at least 44px tall and the Add button is on screen",
       );
     }
     await page.setViewportSize({ width: 1440, height: 900 });
-    await reset(page);
-    ok(
-      !(await page.isVisible("#bulkJump")),
-      "BULK-15",
-      "That phone shortcut is hidden on a wide screen, where the panel is already in view",
-    );
   } catch (err) {
     // A thrown error mid-run must fail the suite, not print "All checks passed!".
     console.log(`

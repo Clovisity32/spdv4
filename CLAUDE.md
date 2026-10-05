@@ -54,11 +54,11 @@ One role: **student** — Singapore Sec 4/5 student exploring post-secondary opt
 
 ## Core Task Flow
 
-1. Select school → subject dropdown filters to that school's offerings
-2. Select subject → level dropdown filters to allowed levels for that subject
-3. Select level → grade dropdown populates (G3: A1–F9 / G2: 1–6 / G1: A–E)
-4. Enter CCA bonus points (0–5)
-5. Click **Add Subject** → row appears in subject table (or open **Add several subjects at once**, pick a grade for each subject you take, and add them together)
+1. Select school → the **Subjects** dropdown lists that school's offerings
+2. Open the dropdown, tick every subject you take (search box narrows the list), enter CCA bonus points (0–5)
+3. Click **Add N subjects** → each ticked subject lands in the "Your Subjects" table at G3 A1 (or the top grade of its only level), tagged "Set grade"
+4. Set each subject's level, grade and optional raw mark in the table (the tag and note clear as rows are edited)
+5. Added subjects show as "Added" and are locked in the dropdown, so a subject cannot be added twice
 6. Eligibility cards update automatically across all pathway groups
 7. "Your Action Plan" shows the FSBB Summary table with the student's row marked; tap a box for the easiest way in
 
@@ -86,7 +86,7 @@ spdv4/
 │       └── screenshot.md
 └── scripts/
     ├── screenshot.js
-    ├── run_edge_case_tests.js   ← 172 assertions across 15 phases
+    ├── run_edge_case_tests.js   ← 170 assertions across 15 phases
     ├── run_invariant_tests.js   ← 102 assertions across 3 phases
     ├── run_ca_tests.js          ← 18 conditional-admission checks
     └── run_advice_tests.js      ← Action Plan engine + FSBB table UI (96 checks)
@@ -111,7 +111,7 @@ Tracks always render in this fixed order, JC/MI down to ITE 3-Year Higher Nitec,
 
 **`mer: {}` always fails** — In `checkMerRequirements`, an empty MER object causes `pathway.mer && pathway.mer.el_g2 && condition` to short-circuit to `undefined` → `overallMerMet = false` → pathway always shows Not Eligible. For pathways with no real MER requirement use `mer: { el_g2: "6", math_am_g2: "6" }` (grade 6 = worst passing grade, so condition is always true for any valid student).
 
-**Screenshot element IDs** — `#school` (use value `"School A"` for the test school), `#subject`, `#level`, `#grade`, `#addUpdateSubjectBtn`. School must be selected first and given 300 ms before selecting a subject.
+**Screenshot / test element IDs** — `#school` (use value `"School A"` for the test school), `#subjectPicker` (opens the menu), `[data-pick="ID"]` (tick boxes), `#subjectMenuAdd` / `#addUpdateSubjectBtn` (add ticked subjects), `#subjectSearch`, `#addMsg`. After adding, set values in the table row `[data-subject-row="ID"]` via `[data-row-level]`, `[data-row-grade]`, `[data-row-raw]`. There are no `#subject` / `#level` / `#grade` / `#rawMark` fields any more. School must be selected first and given 300 ms before opening the picker.
 
 **Conditional Admission masks MER-failure tests** — `checkMerRequirements` sets `conditionalAdmission = true` for JC/MI when `merMet = false` but gross ≤ 12 (JC, threshold ≤ 16) or ≤ 15 (MI, threshold > 16), OR when all 4 R-subjects score ≤ 2. A test expecting MER-failure → `isEligible = false` must use gross > 15 AND at least one R-subject grade > 2 to stay clear of both CA paths.
 
@@ -136,3 +136,4 @@ Tracks always render in this fixed order, JC/MI down to ITE 3-Year Higher Nitec,
 | 2026-10 | FSBB table: wording and free-time hint | A lower box that gains nothing now reads "LDL does not increase eligibility" (status `nobetter`; "Already open" for `have` is unchanged). 2-Year Higher Nitec at 4 G1 is its own box, "Possible after Year 1" (status `later`): per the poster those students join Year 1 of the 3-Year course and may be offered the 2-year route, so it no longer shows a 3-Year course count; its details list the 3-Year courses they would join (`courseCol`). The free-time DROP idea is back as a separate OPTION line (`exp.free`), never part of a route: it only names weaker subjects (`weakness >= 0.5`), only with more than 5 subjects, only when dropping leaves every eligible or within-reach pathway intact, and never a subject that the column's own improvement routes ask you to raise; with 6 subjects it carries the "only 5 subjects left" warning. `run_advice_tests.js` now 96 checks |
 | 2026-10 | Add several subjects at once | New `<details id="bulkAdd">` panel under the single-subject form: one row per subject the school offers (`getSchoolSubjects()`, shared with the single form), each with level (only the levels that subject allows), grade and optional raw mark; picking a grade ticks the row; a search box (`#bulkSearch`) narrows the list but ticked rows stay visible; the Add button is sticky at the bottom of the panel. One click adds every ticked row with the same checks as the single form (grade needed, raw mark must fit the grade) and is all-or-nothing, naming each problem subject; the results and Action Plan update once. Added subjects show "Added" and are locked. State lives in `bulkState`, so ticks survive school changes and re-renders. Single form unchanged. Phase 15 of `run_edge_case_tests.js` (BULK-01–13) added; now 169 assertions |
 | 2026-10 | UX audit 2 + small fixes | Second student UX audit (`tests/ux/`, friction 1.9 → 1.8; journey now runs one-at-a-time and bulk entry, 25 → 15 interactions for six subjects). Phone-only button `#bulkJump` at the top of the entry form opens and scrolls to the bulk panel (hidden from `md` up). The "Duplicate Subject" popup had its title and message swapped; fixed (`DUP-01`). `run_edge_case_tests.js` now 172 assertions (BULK-14/15, DUP-01) |
+| 2026-10 | Subject picker replaces bulk panel | Removed `#bulkAdd`, `#bulkJump` and the single-subject Subject/Level/Grade/Raw Mark fields. The form is now School · **Subjects** dropdown (`#subjectPicker` → `#subjectMenu`: search box, tick list `[data-pick]`, sticky `#subjectMenuAdd`) · Bonus · `#addUpdateSubjectBtn` ("Add N subjects"). One click adds every ticked subject to Your Subjects at G3 A1 (top grade of its only level for G2/G1-only subjects, no raw mark), each row tagged "Set grade" with a note above the table until its level or grade is edited (`defaultRows`); level, grade and raw mark are then set in the table (`[data-subject-row]`, `[data-row-level|grade|raw]`). Added subjects are ticked, locked and marked "Added" in the menu, so duplicates cannot happen; ticks survive school changes; Escape / outside click close the menu and keep ticks; Enter in the search box adds. Table cells use tighter padding on phones so Level and Grade stay in view. Calc functions untouched. Phase 15 of `run_edge_case_tests.js` rewritten as PICK-01–14 (parity with one-by-one entry kept); `add()` helpers in the edge, CA and advice runners and `tests/ux/student-journey.js` use the picker. `run_edge_case_tests.js` now 170 assertions |

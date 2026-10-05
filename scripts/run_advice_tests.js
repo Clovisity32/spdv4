@@ -1112,14 +1112,23 @@ async function advise(page, subjects) {
       ["COMB_HUM", "G3", "E8", "43"],
       ["POA", "G3", "F9", "38"],
     ]) {
-      await page.selectOption("#subject", id);
-      await page.waitForTimeout(200);
-      await page.selectOption("#level", lvl);
-      await page.waitForTimeout(200);
-      await page.selectOption("#grade", grd);
-      await page.fill("#rawMark", raw);
-      await page.click("#addUpdateSubjectBtn");
+      if (
+        (await page.getAttribute("#subjectPicker", "aria-expanded")) !== "true"
+      )
+        await page.click("#subjectPicker");
+      await page.check('[data-pick="' + id + '"]');
+      await page.click("#subjectMenuAdd");
       await page.waitForTimeout(350);
+      const row = '[data-subject-row="' + id + '"]';
+      if ((await page.inputValue(row + " [data-row-level]")) !== lvl) {
+        await page.selectOption(row + " [data-row-level]", lvl);
+        await page.waitForTimeout(200);
+      }
+      await page.selectOption(row + " [data-row-grade]", grd);
+      await page.waitForTimeout(200);
+      await page.fill(row + " [data-row-raw]", raw);
+      await page.press(row + " [data-row-raw]", "Tab");
+      await page.waitForTimeout(250);
     }
     const heads = await page.$$eval("[data-fsbb-col]", (bs) =>
       bs.map((b) => b.innerText.trim().replace(/\s+/g, " ")),
