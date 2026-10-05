@@ -2242,15 +2242,59 @@ function ok(cond, id, msg) {
         "A row loses its 'Set grade' tag when its grade is changed, and the note goes once every row has been set",
       );
     }
-    // PICK-12: a raw mark that does not fit the grade is flagged in the table
-    await setRow("EL", "G3", "B3", 10);
-    ok(
-      (await page.textContent('[data-subject-row="EL"]')).includes(
-        "Mark ignored",
-      ),
-      "PICK-12",
-      "A raw mark that does not fit its grade is flagged in the table ('Mark ignored') instead of being used",
-    );
+    // PICK-12: the grade follows the raw mark; a mark that does not fit a
+    // grade picked by hand is still flagged.
+    {
+      const elSel = '[data-subject-row="EL"]';
+      const gradeOf = () => page.inputValue(elSel + " [data-row-grade]");
+      const typeMark = async (v) => {
+        await page.fill(elSel + " [data-row-raw]", String(v));
+        await page.press(elSel + " [data-row-raw]", "Tab");
+        await page.waitForTimeout(200);
+      };
+      await setRow("EL", "G3", "B3");
+      await typeMark(10);
+      const lowGrade = await gradeOf();
+      await typeMark(68);
+      const midGrade = await gradeOf();
+      await typeMark(75);
+      const topGrade = await gradeOf();
+      const noFlag = !(await page.textContent(elSel)).includes("Mark ignored");
+      await page.selectOption(elSel + " [data-row-grade]", "C6");
+      await page.waitForTimeout(200);
+      const flagged = (await page.textContent(elSel)).includes("Mark ignored");
+      await typeMark(150);
+      const rangeHint = (await page.textContent(elSel)).includes(
+        "Enter a mark from 0 to 100",
+      );
+      ok(
+        lowGrade === "F9" &&
+          midGrade === "B3" &&
+          topGrade === "A1" &&
+          noFlag &&
+          flagged &&
+          rangeHint,
+        "PICK-12",
+        `The grade follows the raw mark (10 → ${lowGrade}, 68 → ${midGrade}, 75 → ${topGrade}); a grade picked by hand that does not fit the mark is flagged; a mark above 100 asks for 0 to 100`,
+      );
+      // G2 bands and the 'Set grade' tag
+      await reset(page);
+      await pickTick(["MATH"]);
+      await page.click("#subjectMenuAdd");
+      await page.waitForTimeout(500);
+      const tagBefore = (await page.textContent('[data-subject-row="MATH"]')).includes("Set grade");
+      await setRow("MATH", "G2", "1");
+      await page.fill('[data-subject-row="MATH"] [data-row-raw]', "72");
+      await page.press('[data-subject-row="MATH"] [data-row-raw]', "Tab");
+      await page.waitForTimeout(200);
+      ok(
+        tagBefore &&
+          (await page.inputValue('[data-subject-row="MATH"] [data-row-grade]')) === "2" &&
+          !(await page.textContent('[data-subject-row="MATH"]')).includes("Set grade"),
+        "PICK-12b",
+        "At G2 a mark of 72 sets grade 2, and the row's 'Set grade' tag clears",
+      );
+    }
     // PICK-13: ticks survive a school change
     await reset(page);
     await pickTick(["EL"]);

@@ -3178,6 +3178,19 @@
           return b[1] === 100 ? `${b[0]} and above` : `${b[0]}–${b[1]}`;
         };
 
+        // The grade whose raw-mark band holds this mark (null if it is not 0-100).
+        const gradeFromRaw = (level, mark) => {
+          const bands = RAW_BANDS[level];
+          if (!bands || !Number.isFinite(mark) || mark < 0 || mark > 100)
+            return null;
+          const n = Math.floor(mark);
+          return (
+            Object.keys(bands).find(
+              (g) => n >= bands[g][0] && n <= bands[g][1],
+            ) || null
+          );
+        };
+
         const hasRawMark = (s) =>
           s.rawMark !== null && s.rawMark !== undefined && s.rawMark !== "";
 
@@ -6879,14 +6892,27 @@
               rawEl.className = `w-full px-3 py-2 min-w-[90px] bg-slate-700 border ${rawInvalid ? "border-red-500" : "border-slate-600"} rounded-md shadow-sm focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100 text-sm`;
               rawEl.onchange = (e) => {
                 const v = e.target.value.trim();
-                studentSubjects[index].rawMark = v === "" ? null : Number(v);
+                const row = studentSubjects[index];
+                if (v === "") row.rawMark = null;
+                else {
+                  // The grade follows the mark: it moves to the band that holds it.
+                  row.rawMark = Math.floor(Number(v));
+                  const g = gradeFromRaw(row.level, row.rawMark);
+                  if (g) {
+                    row.grade = g;
+                    defaultRows.delete(s.subjectId);
+                  }
+                }
                 updateAllCalculationsAndRender();
               };
               rawCell.appendChild(rawEl);
               if (rawInvalid) {
                 const hint = document.createElement("p");
                 hint.className = "text-xs text-red-400 mt-1";
-                hint.textContent = `${s.grade} is ${bandText(s.level, s.grade)}. Mark ignored.`;
+                hint.textContent =
+                  Number(s.rawMark) < 0 || Number(s.rawMark) > 100
+                    ? "Enter a mark from 0 to 100. Mark ignored."
+                    : `${s.grade} is ${bandText(s.level, s.grade)}. Mark ignored.`;
                 rawCell.appendChild(hint);
               }
             }
