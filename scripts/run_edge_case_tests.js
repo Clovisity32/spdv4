@@ -2235,10 +2235,10 @@ function ok(cond, id, msg) {
     // PICK-03: same results as adding one at a time
     ok(
       await page.$$eval("#studentSubjectsTableBody tr", (rs) =>
-        rs.every((r) => r.innerText.includes("Set grade")),
+        rs.every((r) => !r.innerText.includes("Set grade")),
       ),
       "PICK-03",
-      "Every new row is tagged 'Set grade'",
+      "New rows carry no 'Set grade' tag",
     );
     for (const [id, g] of PROFILE15) await setRow(id, "G3", g);
     const viaPicker = [];
@@ -2432,13 +2432,13 @@ function ok(cond, id, msg) {
       await setRow("MATH", "G3", "C6");
       ok(
         !elTag &&
-          mathTag &&
+          !mathTag &&
           !(await page.textContent('[data-subject-row="MATH"]')).includes(
             "Set grade",
           ) &&
           (await page.$("#defaultGradeNote")) === null,
         "PICK-11",
-        "A row loses its 'Set grade' tag when its grade is changed, and there is no separate note above the table",
+        "No row shows a 'Set grade' tag, before or after its grade is changed, and there is no note above the table",
       );
     }
     // PICK-12: the grade follows the raw mark; a mark that does not fit a
@@ -2489,7 +2489,7 @@ function ok(cond, id, msg) {
       await page.press('[data-subject-row="MATH"] [data-row-raw]', "Tab");
       await page.waitForTimeout(200);
       ok(
-        tagBefore &&
+        !tagBefore &&
           (await page.inputValue(
             '[data-subject-row="MATH"] [data-row-grade]',
           )) === "2" &&
@@ -2497,7 +2497,7 @@ function ok(cond, id, msg) {
             "Set grade",
           ),
         "PICK-12b",
-        "At G2 a mark of 72 sets grade 2, and the row's 'Set grade' tag clears",
+        "At G2 a mark of 72 sets grade 2, with no 'Set grade' tag",
       );
     }
     // PICK-13: ticks survive a school change
