@@ -314,13 +314,9 @@
             <span id="addUpdateBtnText">Add Subjects</span>
           </button>
         </div>
-        <p class="text-sm text-slate-300">
-          Tick every subject you take, then add them. Each one starts at G3 A1;
-          set your own level and grade in the table below.
-        </p>
         <p
           id="addMsg"
-          class="mt-2 text-sm text-emerald-300"
+          class="sr-only"
           role="status"
           aria-live="polite"
         ></p>
@@ -431,14 +427,10 @@
         <h2
           id="actionPlanTitle"
           tabindex="-1"
-          class="text-2xl font-semibold mb-1 text-cyan-400 outline-none"
+          class="text-2xl font-semibold mb-4 text-cyan-400 outline-none"
         >
           Your Action Plan
         </h2>
-        <p class="text-sm text-slate-400 mb-5">
-          The same table your school used to brief you, filled in with your own
-          results. Find your row, then tap a box to see the easiest way in.
-        </p>
         <div id="resultsAdviceContainer"></div>
       </section>
 
@@ -7405,7 +7397,7 @@
           setMenu(false);
           subjectSearch.value = "";
           updateAllCalculationsAndRender(); // once for the whole batch
-          addMsg.textContent = `Added ${plural(ids.length, "subject")}. Now set the level and grade of each one below.`;
+          addMsg.textContent = `Added ${plural(ids.length, "subject")}.`;
           const row = studentSubjectsTableBody.querySelector(
             `[data-subject-row="${CSS.escape(ids[0])}"]`,
           );
