@@ -5947,13 +5947,24 @@
               });
           });
           const extras = subjects.filter((s) => !claimed.has(s.subjectId));
-          const nowText = (s, g1) => {
+          // Slots counted at G2: show the G2 equivalent a G3 grade is scored as.
+          const eqNow = (s, def) =>
+            def && def.equiv && s.level === "G3"
+              ? ` → G2 ${getStudentSubjectG2Grade(s)}`
+              : "";
+          const eqNeed = (need, s, def) => {
+            const m = /^([A-F]\d)(?!\w)/.exec(String(need));
+            return def && def.equiv && s && s.level === "G3" && m
+              ? `${need} → G2 ${convertG3toG2(m[1])}`
+              : need;
+          };
+          const nowText = (s, g1, def) => {
             const b = base.find((x) => x.subjectId === s.subjectId);
             const moved =
               b && (b.level !== s.level || b.grade !== s.grade)
                 ? ` (was ${b.level} ${b.grade})`
                 : "";
-            return `${s.level} ${s.grade}${moved}${g1 ? ` · G1 ${g1}` : ""}`;
+            return `${s.level} ${s.grade}${eqNow(s, def)}${moved}${g1 ? ` · G1 ${g1}` : ""}`;
           };
           const needFor = (s, primaryNeed) => {
             if (!primaryNeed) return { need: "OK", marks: "—" };
@@ -5996,12 +6007,12 @@
                 ? { need: "—", marks: "—" }
                 : needFor(p, pn);
             rowsHtml.push(
-              `<tr data-slot-row data-role="${esc(sl.def.role)}" class="border-t border-slate-700">${td(tip(sl.def.label.split(" · ")[0], `${sl.def.label}. ${sl.def.rule}`) )}${td(p ? esc(nameOf(p)) : '<span class="text-slate-400">No subject yet</span>', "text-slate-100")}${td(p ? esc(nowText(p, sl.g1)) : "—", "text-slate-200")}${td(esc(shortNeed(nd.need)), needCls(nd.need))}${td(esc(shortMarks(nd.marks)), "text-slate-200 whitespace-nowrap")}</tr>`,
+              `<tr data-slot-row data-role="${esc(sl.def.role)}" class="border-t border-slate-700">${td(tip(sl.def.label.split(" · ")[0], `${sl.def.label}. ${sl.def.rule}`) )}${td(p ? esc(nameOf(p)) : '<span class="text-slate-400">No subject yet</span>', "text-slate-100")}${td(p ? esc(nowText(p, sl.g1, sl.def)) : "—", "text-slate-200")}${td(esc(shortNeed(eqNeed(nd.need, p, sl.def))), needCls(nd.need))}${td(esc(shortMarks(nd.marks)), "text-slate-200 whitespace-nowrap")}</tr>`,
             );
             sl.alts.forEach((a) => {
               const an = noRoute ? { need: "—", marks: "—" } : altNeed(a, pn);
               rowsHtml.push(
-                `<tr data-slot-or class="bg-slate-800/40"><td class="px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-400 text-right">or</td>${td(esc(nameOf(a)), "text-slate-100")}${td(esc(nowText(a)), "text-slate-200")}${td(esc(shortNeed(an.need)), needCls(an.need))}${td(esc(shortMarks(an.marks)), "text-slate-200 whitespace-nowrap")}</tr>`,
+                `<tr data-slot-or class="bg-slate-800/40"><td class="px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-400 text-right">or</td>${td(esc(nameOf(a)), "text-slate-100")}${td(esc(nowText(a, undefined, sl.def)), "text-slate-200")}${td(esc(shortNeed(eqNeed(an.need, a, sl.def))), needCls(an.need))}${td(esc(shortMarks(an.marks)), "text-slate-200 whitespace-nowrap")}</tr>`,
               );
             });
           });
@@ -6253,7 +6264,6 @@
           if (real.of !== undefined && real.status === "later")
             headline =
               "With 4 G1 subjects you join Year 1 of the 3-Year Higher Nitec. You may be offered the 2-year route if you meet the requirements in your Year 1 Semester 1 exams.";
-          let subline = "";
           if (cell.ref) {
             const refRow = FSBB_ROWS[real.row].full;
             if (cell.status === "have") {
@@ -6261,10 +6271,15 @@
                 ? "You already qualify on your own row. Moving down would not add anything."
                 : `Eligible on the ${refRow} row. Moving down further would not add anything.`;
             } else {
-              subline = `${here ? "On your own row" : `Best so far, on the ${refRow} row`}: ${headline}`;
-              headline = "LDL does not increase eligibility here.";
+              // Moving down gains nothing: lead with what the best row still needs.
+              headline = here
+                ? headline
+                : headline.replace(/ on this row/, ` on the ${refRow} row`);
             }
           }
+          // A box that gains nothing shows the status of the row it points to.
+          const shownStatus =
+            cell.status === "nobetter" ? real.status : cell.status;
           const tone = {
             open: "text-emerald-300",
             have: "text-emerald-300",
@@ -6272,7 +6287,7 @@
             further: "text-slate-200",
             nobetter: "text-slate-200",
             later: "text-sky-300",
-          }[cell.status];
+          }[shownStatus];
           const warnHtml = exp.warnings.length
             ? `<ul data-warnings class="mt-3 space-y-1">${exp.warnings.map((w) => `<li class="text-sm text-amber-300">⚠ ${esc(w)}</li>`).join("")}</ul>`
             : "";
@@ -6287,10 +6302,7 @@
             real.cfg ? real.cfg.subjects : g.base,
             g.base,
           );
-          const subHtml = subline
-            ? `<p data-fsbb-sub class="text-sm text-slate-200 mt-1">${esc(subline)}</p>`
-            : "";
-          box.innerHTML = `<div class="flex items-start justify-between gap-3"><div><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">${esc(col.label)} · with ${esc(rowName)}</p><p data-fsbb-headline class="text-base sm:text-lg font-bold mt-1 ${tone}"><span aria-hidden="true">${FSBB_ICON[cell.status]}</span> ${esc(headline)}</p>${subHtml}</div><button type="button" data-fsbb-close class="shrink-0 text-sm px-3 min-h-[44px] sm:min-h-[36px] rounded-full border border-slate-500 text-slate-200 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400">Close</button></div>${estNote}<p class="text-sm font-semibold text-slate-100 mt-4">${real.of !== undefined ? "Courses you would join (3-Year Higher Nitec)" : `Courses in this column (${col.ids.length})`}</p><p class="text-xs text-slate-400 mb-2">Tap a course to see each requirement and what it takes. Hover or tap a requirement name for its rule.</p><div id="fsbbCourses">${courses}</div>${warnHtml}`;
+          box.innerHTML = `<div class="flex items-start justify-between gap-3"><div><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">${esc(col.label)} · with ${esc(rowName)}</p><p data-fsbb-headline class="text-base sm:text-lg font-bold mt-1 ${tone}"><span aria-hidden="true">${FSBB_ICON[shownStatus]}</span> ${esc(headline)}</p></div><button type="button" data-fsbb-close class="shrink-0 text-sm px-3 min-h-[44px] sm:min-h-[36px] rounded-full border border-slate-500 text-slate-200 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400">Close</button></div>${estNote}<p class="text-sm font-semibold text-slate-100 mt-4">${real.of !== undefined ? "Courses you would join (3-Year Higher Nitec)" : `Courses in this column (${col.ids.length})`}</p><p class="text-xs text-slate-400 mb-2">Tap a course to see each requirement and what it takes. Hover or tap a requirement name for its rule.</p><div id="fsbbCourses">${courses}</div>${warnHtml}`;
           box.classList.remove("hidden");
           fsbbSyncSelection();
         }

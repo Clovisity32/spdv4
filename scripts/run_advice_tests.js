@@ -1301,15 +1301,38 @@ async function advise(page, subjects) {
     await page.click('[data-fsbb-cell][data-row="1"][data-col="3"]');
     {
       const head = await page.textContent("[data-fsbb-headline]");
-      const sub = await page.textContent("[data-fsbb-sub]");
       ok(
-        head.includes("LDL does not increase eligibility") &&
-          sub.includes("On your own row") &&
+        !head.includes("LDL") &&
+          /Needs more work|Almost there/.test(head) &&
+          (await page.$("[data-fsbb-sub]")) === null &&
           (await page.$("[data-fsbb-route]")) === null &&
           (await page.$$("#fsbbDetails [data-advice='MOVE']")).length === 0 &&
           (await page.$$("#fsbbDetails [data-advice='DROP']")).length === 0,
         "P10-U17",
-        "A 'moving down won't help' box says so, points back at your own row, and gives no move or drop",
+        "A 'moving down won't help' box leads with the best row's status and marks, without an 'LDL' sentence, and gives no move or drop",
+      );
+    }
+    // Slots counted at G2 show the G2 equivalent of a G3 grade, in Now and Need
+    await page.click('[data-fsbb-cell][data-row="0"][data-col="2"]');
+    {
+      const rows = await page.$$eval(
+        "#fsbbCourses [data-easiest] [data-slot-row]",
+        (rs) =>
+          rs.map((r) => ({
+            now: r.children[2].textContent.trim(),
+            need: r.children[3].textContent.trim(),
+          })),
+      );
+      ok(
+        rows.length > 0 &&
+          rows
+            .filter((r) => r.now.startsWith("G3"))
+            .every((r) => /→ G2 [1-6]/.test(r.now)) &&
+          rows.some((r) => /\d\+ → G2 [1-6]/.test(r.need)),
+        "P10-T5",
+        "PFP slots are counted at G2, so a G3 grade shows its G2 equivalent in Now, and the target shows its G2 equivalent in Need (" +
+          rows.slice(0, 2).map((r) => r.now + " / " + r.need).join("; ") +
+          ")",
       );
     }
     await page.click('[data-fsbb-cell][data-row="1"][data-col="0"]');
