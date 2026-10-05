@@ -1331,8 +1331,104 @@ async function advise(page, subjects) {
           rows.some((r) => /\d\+ → G2 [1-6]/.test(r.need)),
         "P10-T5",
         "PFP slots are counted at G2, so a G3 grade shows its G2 equivalent in Now, and the target shows its G2 equivalent in Need (" +
-          rows.slice(0, 2).map((r) => r.now + " / " + r.need).join("; ") +
+          rows
+            .slice(0, 2)
+            .map((r) => r.now + " / " + r.need)
+            .join("; ") +
           ")",
+      );
+    }
+    // ITE courses: tables follow each course's own rule (no G1 aggregate)
+    await page.click('[data-fsbb-cell][data-row="0"][data-col="0"]');
+    await page.$$eval("#fsbbCourses [data-pw]", (ds) =>
+      ds.forEach((d) => (d.open = true)),
+    );
+    {
+      const byCourse = await page.$$eval("#fsbbCourses [data-pw]", (ds) =>
+        Object.fromEntries(
+          ds.map((d) => [
+            d.dataset.name,
+            [...d.querySelectorAll("[data-slot-row]")].map((r) => ({
+              label: r.querySelector("[data-slot-tip]").firstChild.textContent.trim(),
+              now: r.children[2].textContent.trim(),
+            })),
+          ]),
+        ),
+      );
+      const two = byCourse["MER (Pass 2G3)"] || [];
+      const elmath = byCourse["MER (Pass EL & Math)"] || [];
+      const labels = Object.values(byCourse).flat().map((r) => r.label);
+      ok(
+        two.map((r) => r.label).join() === "#1,#2" &&
+          elmath.map((r) => r.label).slice(0, 2).join() === "EL,MA" &&
+          !Object.values(byCourse).flat().some((r) => /G1/.test(r.now)),
+        "P10-T6",
+        "ITE tables follow the course rule: 2 G3 passes show #1 and #2, English and Math show EL and MA, and no G1 figures appear",
+      );
+      ok(
+        labels.every((l) => l.length <= 4),
+        "P10-T7",
+        "First-column labels are at most 4 characters, so they cannot spill into the subject column on a phone (" +
+          [...new Set(labels)].join(", ") +
+          ")",
+      );
+    }
+    // Quick options strip: keep-G3 improvement versus moving down, previewed on the table
+    {
+      const cards = await page.$$eval("[data-fsbb-opt]", (b) =>
+        b.map((x) => x.dataset.fsbbOpt),
+      );
+      const data = await page.evaluate(() => {
+        const o = window.__spdTest.options(
+          [
+            { subjectId: "EL", level: "G3", grade: "B3" },
+            { subjectId: "MATH", level: "G3", grade: "F9" },
+            { subjectId: "MT", level: "G3", grade: "C6" },
+            { subjectId: "COMB_SCI", level: "G3", grade: "D7" },
+            { subjectId: "COMB_HUM", level: "G3", grade: "E8" },
+          ],
+          "School A",
+        );
+        return o;
+      });
+      const mathOpts = (data.find((g) => g.subjectId === "MATH") || {}).options || [];
+      const mv = mathOpts.find((o) => o.kind === "move");
+      const imp = mathOpts.find((o) => o.kind === "improve");
+      ok(
+        cards.includes("MATH:improve") &&
+          cards.includes("MATH:move") &&
+          mv &&
+          imp &&
+          mv.opens.length === 2 &&
+          mv.closes.length === 0 &&
+          imp.opens.length >= mv.opens.length,
+        "P10-O1",
+        "Maths F9 gets two quick options: improve to E8 (keep G3) and move to G2; the move opens the 2 Maths courses and closes none",
+      );
+      await page.click('[data-fsbb-opt="MATH:move"]');
+      const badges = await page.$$eval("[data-col-delta]", (n) => n.map((x) => x.textContent.replace(/\s+/g, "")));
+      const summary = await page.textContent("[data-opt-summary]");
+      ok(
+        badges.length >= 1 &&
+          badges[0].includes("+2") &&
+          /Previewing/.test(summary) &&
+          (await page.getAttribute('[data-fsbb-opt="MATH:move"]', "aria-pressed")) === "true",
+        "P10-O2",
+        "Tapping an option puts a green '+2' badge on the column heading and a 'Previewing' summary under the table (" + badges.join(" ") + ")",
+      );
+      await page.click('[data-fsbb-cell][data-row="0"][data-col="0"]');
+      const tags = await page.$$eval("#fsbbCourses [data-tag='opens']", (n) => n.length);
+      ok(
+        tags === 2,
+        "P10-O3",
+        "The course list tags exactly the courses that open with an OPENS label (" + tags + ")",
+      );
+      await page.click('[data-fsbb-opt="MATH:move"]');
+      ok(
+        (await page.$$("[data-col-delta]")).length === 0 &&
+          (await page.$$("#fsbbCourses [data-tag]")).length === 0,
+        "P10-O4",
+        "Tapping the option again clears the preview",
       );
     }
     await page.click('[data-fsbb-cell][data-row="1"][data-col="0"]');
@@ -1358,40 +1454,65 @@ async function advise(page, subjects) {
         "#fsbbCourses [data-easiest] [data-slot-row] td:nth-child(4)",
         (tds) => tds.map((t) => t.textContent.trim()),
       );
-      const total = await page.textContent("#fsbbCourses [data-easiest] [data-slot-total]");
+      const total = await page.textContent(
+        "#fsbbCourses [data-easiest] [data-slot-total]",
+      );
       ok(
-        needs.some((n) => n !== "OK" && n !== "—") && /Total \+\d+ marks/.test(total),
+        needs.some((n) => n !== "OK" && n !== "—") &&
+          /Total \+\d+ marks/.test(total),
         "P10-U19",
         "A course you do not qualify for yet shows the grade each slot needs, and a total of marks",
       );
     }
     // Table anatomy: extras, tooltips, plain wording
     {
-      const labels = await page.$$eval("#fsbbCourses [data-easiest] [data-slot-row] td:first-child", (t) => t.map((x) => x.querySelector("[data-slot-tip]").firstChild.textContent.trim()));
-      const extras = await page.$$("#fsbbCourses [data-easiest] [data-slot-extra]");
+      const labels = await page.$$eval(
+        "#fsbbCourses [data-easiest] [data-slot-row] td:first-child",
+        (t) =>
+          t.map((x) =>
+            x.querySelector("[data-slot-tip]").firstChild.textContent.trim(),
+          ),
+      );
+      const extras = await page.$$(
+        "#fsbbCourses [data-easiest] [data-slot-extra]",
+      );
       ok(
         labels.length >= 4 && labels.includes("EL"),
         "P10-T1",
         "Slot rows are named by requirement (" + labels.join(", ") + ")",
       );
-      await page.hover("#fsbbCourses [data-easiest] [data-slot-row] [data-slot-tip]");
-      const tipText = await page.$eval("#fsbbCourses [data-easiest] [data-slot-row] [role=tooltip]", (e) => (e.offsetParent !== null ? e.textContent : ""));
+      await page.hover(
+        "#fsbbCourses [data-easiest] [data-slot-row] [data-slot-tip]",
+      );
+      const tipText = await page.$eval(
+        "#fsbbCourses [data-easiest] [data-slot-row] [role=tooltip]",
+        (e) => (e.offsetParent !== null ? e.textContent : ""),
+      );
       ok(
         tipText.length > 20 && /English|minimum|Minimum|best/i.test(tipText),
         "P10-T2",
-        "Hovering a requirement name shows its rule (" + tipText.slice(0, 50) + "…)",
+        "Hovering a requirement name shows its rule (" +
+          tipText.slice(0, 50) +
+          "…)",
       );
       await page.mouse.move(0, 0);
-      await page.focus("#fsbbCourses [data-easiest] [data-slot-row] [data-slot-tip]");
+      await page.focus(
+        "#fsbbCourses [data-easiest] [data-slot-row] [data-slot-tip]",
+      );
       ok(
-        await page.$eval("#fsbbCourses [data-easiest] [data-slot-row] [role=tooltip]", (e) => e.offsetParent !== null),
+        await page.$eval(
+          "#fsbbCourses [data-easiest] [data-slot-row] [role=tooltip]",
+          (e) => e.offsetParent !== null,
+        ),
         "P10-T3",
         "The same rule opens on tap or keyboard focus (phones have no hover)",
       );
       ok(
         extras.length >= 1,
         "P10-T4",
-        "A subject the course does not use is listed last as an extra (" + extras.length + ")",
+        "A subject the course does not use is listed last as an extra (" +
+          extras.length +
+          ")",
       );
     }
     await page.click('[data-fsbb-cell][data-row="3"][data-col="1"]');

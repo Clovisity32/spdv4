@@ -5612,6 +5612,8 @@
         // ---- Rendering ----
         const fsbbState = { grid: null };
         const fsbbView = { row: null, col: null };
+        // Quick options: one change at a time, previewed on the table.
+        const fsbbPreview = { key: null, list: [], now: new Set() };
         const FSBB_STYLE = {
           open: "bg-emerald-600 border-emerald-300 text-white",
           close: "bg-sky-700/40 border-sky-400 text-sky-50",
@@ -5851,16 +5853,98 @@
             }
             return defs;
           }
+          if (pw.calcType === "ITE_Hnitec_Specific") {
+            const r = pw.requirements || {};
+            const passRule =
+              "pass at G3 (E8 or better), G2 (5 or better) or G1 (D or better). G3 grade 9 does not count";
+            const ite = (role, label, rule, allow) =>
+              mk(role, label, rule, allow, {
+                levels: ["G3", "G2", "G1"],
+                ite: true,
+                noAlt: true,
+              });
+            if (r.type === "2_G3_ONLY")
+              return [1, 2].map((i) =>
+                mk(
+                  `G${i}`,
+                  `#${i} · G3 pass`,
+                  `G3 pass number ${i} of 2: a subject taken at G3 with grade E8 or better. Grade F9 does not count, and subjects at G2 or G1 do not count for this course.`,
+                  anySubj,
+                  { ite: true, noAlt: true },
+                ),
+              );
+            const defs = [];
+            (r.pre_requisite_subject_ids || []).forEach((id) => {
+              if (id === "EL")
+                defs.push(
+                  ite(
+                    "EL",
+                    "EL · English",
+                    `English: ${passRule}.`,
+                    inIds(SUBJECT_CATEGORIES_DEF.EL),
+                  ),
+                );
+              else if (id === "MATH")
+                defs.push(
+                  ite(
+                    "MA",
+                    "MA · Math or Add Math",
+                    `Mathematics or Additional Mathematics: ${passRule}.`,
+                    inCat(SUBJECT_CATEGORIES_DEF.MATH_PURE),
+                  ),
+                );
+              else if (id === "MATH_OR_SCIENCE")
+                defs.push(
+                  ite(
+                    "MS",
+                    "M/S · Math or Science",
+                    `One Mathematics or Science subject: ${passRule}.`,
+                    (s) =>
+                      SUBJECT_CATEGORIES_DEF.MATH_SCIENCE.includes(catOf(s)) ||
+                      (r.specific_science_in_lieu_subjects || []).includes(
+                        s.subjectId,
+                      ),
+                  ),
+                );
+            });
+            for (let i = 1; i <= (r.req_g1g2_other_count || 0); i++)
+              defs.push(
+                ite(
+                  `O${i}`,
+                  `+${i} · Any other pass`,
+                  `Another subject: ${passRule}.`,
+                  anySubj,
+                ),
+              );
+            return defs;
+          }
           return [];
         };
+
+        // ITE pass: G3 E8 or better, G2 5 or better, G1 D or better.
+        const fsbbPassIte = (s) =>
+          s.level === "G3"
+            ? getNumericGrade(s.grade, "G3") <= G3_TO_NUMERIC_RAW["E8"]
+            : s.level === "G2"
+              ? getNumericGrade(s.grade, "G2") <= G2_TO_NUMERIC_RAW["5"]
+              : s.level === "G1"
+                ? G1_GRADES_OPTIONS.includes(s.grade) &&
+                  getNumericGrade(s.grade, "G1") <= G1_TO_NUMERIC_RAW_ITE["D"]
+                : false;
 
         const fsbbSlotTableHtml = (pw, step, subjects, base, lines) => {
           const nameOf = (s) =>
             getSubjectById(s.subjectId)?.name || s.subjectId;
           const rankOf = (s, def) =>
-            def && def.equiv
-              ? getNumericGrade(getStudentSubjectG2Grade(s), "G2")
-              : getNumericGrade(s.grade, s.level);
+            def && def.ite
+              ? fsbbPassIte(s)
+                ? def.levels.length === 1
+                  ? getNumericGrade(s.grade, s.level)
+                  : getG1Equivalent(s).numericG1EquivGrade
+                : 100 + getNumericGrade(s.grade, s.level)
+              : def && def.equiv
+                ? getNumericGrade(getStudentSubjectG2Grade(s), "G2")
+                : getNumericGrade(s.grade, s.level);
           const passes = (s) =>
             s.level === "G3"
               ? getNumericGrade(s.grade, "G3") <= G3_TO_NUMERIC_RAW["E8"]
@@ -5872,9 +5956,12 @@
           const used = new Set();
           let slots = [];
           const defs = fsbbSlotDefs(pw);
-          const ite = !defs.length;
-          if (!ite) {
-            const calcUsed = pw.subjectsUsed || [];
+          const completed = pw.calcType === "ITE_Hnitec_Completed";
+          const isIteCourse = String(pw.calcType).startsWith("ITE");
+          if (!defs.length && !completed) return "";
+          {
+            const calcUsed =
+              defs.length && defs[0].ite ? [] : pw.subjectsUsed || [];
             slots = defs.map((def) => ({ def, primary: null }));
             if (calcUsed.length) {
               slots.forEach((sl) => {
@@ -5901,30 +5988,13 @@
                 }
               });
             }
-          } else {
-            const calcUsed = pw.subjectsUsed || [];
-            if (!calcUsed.length) return "";
-            slots = calcUsed.map((u, i) => {
-              used.add(u.subjectId);
-              return {
-                def: {
-                  role: `S${i + 1}`,
-                  label: `Subject ${i + 1} · counted`,
-                  rule: "One of the subjects counted in this course's aggregate, using its G1 equivalent grade. The cut-off is set per course.",
-                  levels: ["G3", "G2", "G1"],
-                  allow: () => false,
-                },
-                primary: subjects.find((s) => s.subjectId === u.subjectId) || u,
-                g1: u.g1EquivGrade,
-              };
-            });
           }
           // Other subjects that could fill the same slot: a tie, or (when the
           // slot needs work) one close enough to be worth considering.
           const claimed = new Set(used);
           slots.forEach((sl) => {
             sl.alts = [];
-            if (!sl.primary || ite) return;
+            if (!sl.primary || sl.def.noAlt) return;
             const pr = rankOf(sl.primary, sl.def);
             const needsWork = routeRows.some(
               (r) => r.subject === nameOf(sl.primary),
@@ -5946,7 +6016,9 @@
                 }
               });
           });
-          const extras = subjects.filter((s) => !claimed.has(s.subjectId));
+          const extras = completed
+            ? []
+            : subjects.filter((s) => !claimed.has(s.subjectId));
           // Slots counted at G2: show the G2 equivalent a G3 grade is scored as.
           const eqNow = (s, def) =>
             def && def.equiv && s.level === "G3"
@@ -5965,6 +6037,20 @@
                 ? ` (was ${b.level} ${b.grade})`
                 : "";
             return `${s.level} ${s.grade}${eqNow(s, def)}${moved}${g1 ? ` · G1 ${g1}` : ""}`;
+          };
+          // What an ITE pass asks of this subject at its own level.
+          const passNeed = (s) => {
+            if (s.level === "G3" || s.level === "G2") {
+              const g = s.level === "G3" ? "E8" : "5";
+              const lo = RAW_BANDS[s.level][g][0];
+              return {
+                need: `${g} (${lo}+ marks)`,
+                marks: hasRawMark(s)
+                  ? `+${Math.max(0, lo - Number(s.rawMark))} marks`
+                  : "—",
+              };
+            }
+            return { need: "D", marks: "—" };
           };
           const needFor = (s, primaryNeed) => {
             if (!primaryNeed) return { need: "OK", marks: "—" };
@@ -5990,24 +6076,40 @@
             `<td class="px-1 sm:px-2 py-1.5 align-top text-[11px] sm:text-sm break-words ${cls}">${html}</td>`;
           const tip = (label, text) =>
             `<span data-slot-tip tabindex="0" class="group/tip relative inline-block cursor-help border-b border-dotted border-slate-400 font-semibold text-slate-100 rounded focus:outline-none focus:ring-2 focus:ring-cyan-400">${esc(label)}<span role="tooltip" class="hidden group-hover/tip:block group-focus/tip:block absolute left-0 top-full z-30 mt-1 w-64 max-w-[70vw] rounded-lg border border-slate-500 bg-slate-950 p-2 text-xs font-normal normal-case text-slate-100 shadow-xl">${esc(text)}</span></span>`;
-          const shortNeed = (n) => String(n).replace(/ \((\d+\+) marks\)/, " · $1");
+          const shortNeed = (n) =>
+            String(n).replace(/ \((\d+\+) marks\)/, " · $1");
           const shortMarks = (m) => String(m).replace(/ marks?$/, "");
           const needCls = (n) =>
             n === "OK" ? "text-emerald-300" : "text-amber-300 font-semibold";
           const rowsHtml = [];
+          if (completed) {
+            const need = (pw.requirements || {}).min_total_subjects || 4;
+            const n = subjects.length;
+            rowsHtml.push(
+              `<tr data-slot-row data-role="SEC" class="border-t border-slate-700">${td(tip("All", `Complete the secondary school certificate by taking at least ${need} subjects.`))}${td("Subjects you take", "text-slate-100")}${td(String(n), "text-slate-200")}${td(n >= need ? "OK" : `${need - n} more`, needCls(n >= need ? "OK" : "x"))}${td("—", "text-slate-200")}</tr>`,
+            );
+          }
           slots.forEach((sl) => {
             const p = sl.primary;
             const pn = p && routeRows.find((r) => r.subject === nameOf(p));
             const nd = !p
               ? {
-                  need: "Needs a matching subject",
+                  need: sl.def.ite
+                    ? sl.def.levels.length === 1
+                      ? "Needs a G3 subject"
+                      : "Needs a subject"
+                    : "Needs a matching subject",
                   marks: "—",
                 }
-              : noRoute
-                ? { need: "—", marks: "—" }
-                : needFor(p, pn);
+              : sl.def.ite
+                ? pn || fsbbPassIte(p)
+                  ? needFor(p, pn)
+                  : passNeed(p)
+                : noRoute
+                  ? { need: "—", marks: "—" }
+                  : needFor(p, pn);
             rowsHtml.push(
-              `<tr data-slot-row data-role="${esc(sl.def.role)}" class="border-t border-slate-700">${td(tip(sl.def.label.split(" · ")[0], `${sl.def.label}. ${sl.def.rule}`) )}${td(p ? esc(nameOf(p)) : '<span class="text-slate-400">No subject yet</span>', "text-slate-100")}${td(p ? esc(nowText(p, sl.g1, sl.def)) : "—", "text-slate-200")}${td(esc(shortNeed(eqNeed(nd.need, p, sl.def))), needCls(nd.need))}${td(esc(shortMarks(nd.marks)), "text-slate-200 whitespace-nowrap")}</tr>`,
+              `<tr data-slot-row data-role="${esc(sl.def.role)}" class="border-t border-slate-700">${td(tip(sl.def.label.split(" · ")[0], `${sl.def.label}. ${sl.def.rule}`))}${td(p ? esc(nameOf(p)) : '<span class="text-slate-400">No subject yet</span>', "text-slate-100")}${td(p ? esc(nowText(p, sl.g1, sl.def)) : "—", "text-slate-200")}${td(esc(shortNeed(eqNeed(nd.need, p, sl.def))), needCls(nd.need))}${td(esc(shortMarks(nd.marks)), "text-slate-200 whitespace-nowrap")}</tr>`,
             );
             sl.alts.forEach((a) => {
               const an = noRoute ? { need: "—", marks: "—" } : altNeed(a, pn);
@@ -6030,7 +6132,7 @@
               (l) =>
                 !l.ok &&
                 !/^Aggregate/.test(l.text) &&
-                (ite || /Mother Tongue/.test(l.text)),
+                (isIteCourse || /Mother Tongue/.test(l.text)),
             )
             .slice(0, 5);
           return `<div data-slot-table class="mt-2"><table class="w-full table-fixed text-left"><colgroup><col style="width:13%"><col style="width:31%"><col style="width:17%"><col style="width:24%"><col style="width:15%"></colgroup><thead><tr class="text-[11px] uppercase tracking-wide text-slate-400"><th class="px-1 sm:px-2 py-1">Slot</th><th class="px-1 sm:px-2 py-1">Your subject</th><th class="px-1 sm:px-2 py-1">Now</th><th class="px-1 sm:px-2 py-1">Need</th><th class="px-1 sm:px-2 py-1">Marks</th></tr></thead><tbody>${rowsHtml.join("")}</tbody></table>${totalBits.length ? `<p data-slot-total class="text-xs text-slate-300 mt-2">${totalBits.map((t) => esc(fsbbClip(t.replace(/^Aggregate cannot be worked out yet.*$/, "Aggregate cannot be counted yet: fix the highlighted rows first"), 140))).join(" · ")}</p>` : ""}${noRoute && step.blocker ? `<p class="text-sm text-slate-300 mt-2">Marks alone will not be enough. Even top grades in your current subjects would leave: ${esc(step.blocker)}.</p>` : ""}${needed.length ? `<ul class="mt-2 space-y-1">${needed.map((l) => `<li class="text-xs text-rose-300"><span aria-hidden="true">✗</span> ${esc(fsbbClip(l.text, 130))}</li>`).join("")}</ul>` : ""}</div>`;
@@ -6174,6 +6276,15 @@
                   `<p data-qw data-subject="${esc(w.subject)}" data-from="${esc(w.from)}" data-to="${esc(w.to)}" class="text-sm text-emerald-300 mb-2">Quick win: ${esc(w.subject)} ${esc(w.from)} → ${esc(w.to)}${esc(marksFor(w))} opens this.</p>`,
               )
               .join("") + (slotBody(s) || bodyCore(s));
+          const previewTag = (id) => {
+            const o = fsbbPreviewData();
+            if (!o) return "";
+            return o.opens.includes(id)
+              ? ' <span data-tag="opens" class="ml-1 rounded bg-emerald-600 px-1.5 py-0.5 text-[11px] font-bold text-white">OPENS</span>'
+              : o.closes.includes(id)
+                ? ' <span data-tag="closes" class="ml-1 rounded bg-rose-600 px-1.5 py-0.5 text-[11px] font-bold text-white">CLOSES</span>'
+                : "";
+          };
           const rank = { open: 0, close: 1, lower: 2, further: 3 };
           const steps = adv.staircase
             .flatMap((tr) => tr.steps)
@@ -6184,7 +6295,7 @@
           return steps
             .map(
               (s, i) =>
-                `<details data-pw data-id="${esc(s.id)}" data-group="${esc(s.group)}" data-name="${esc(s.name)}" data-quick="${winsFor(s).length ? 1 : 0}" data-status="${s.status}"${i === 0 ? " data-easiest open" : ""} class="group rounded-lg border ${i === 0 ? "border-emerald-500" : "border-slate-600"} bg-slate-900/40 mb-2"><summary class="flex items-center gap-3 p-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden"><span class="w-3 h-3 rounded-full shrink-0 ${courseDot[s.status]}"></span><span class="min-w-0 flex-1"><span class="block font-semibold text-slate-100">${esc(plain(s.name))}${i === 0 && steps.length > 1 ? ' <span class="ml-1 text-xs font-semibold text-emerald-300">Easiest way in</span>' : ""}</span><span class="block text-xs text-slate-400">${esc(shortText(s))}${winsFor(s).length ? ` · <span class="text-emerald-300">Quick win: ${esc(winsFor(s)[0].subject)} ${esc(winsFor(s)[0].short)}${winsFor(s).length > 1 ? ` (+${winsFor(s).length - 1})` : ""}</span>` : ""}</span></span><span class="text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span></summary><div class="px-3 pb-3 pt-1 border-t border-slate-700">${bodyOfSlots(s)}</div></details>`,
+                `<details data-pw data-id="${esc(s.id)}" data-group="${esc(s.group)}" data-name="${esc(s.name)}" data-quick="${winsFor(s).length ? 1 : 0}" data-status="${s.status}"${i === 0 ? " data-easiest open" : ""} class="group rounded-lg border ${i === 0 ? "border-emerald-500" : "border-slate-600"} bg-slate-900/40 mb-2"><summary class="flex items-center gap-3 p-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden"><span class="w-3 h-3 rounded-full shrink-0 ${courseDot[s.status]}"></span><span class="min-w-0 flex-1"><span class="block font-semibold text-slate-100">${esc(plain(s.name))}${previewTag(s.id)}${i === 0 && steps.length > 1 ? ' <span class="ml-1 text-xs font-semibold text-emerald-300">Easiest way in</span>' : ""}</span><span class="block text-xs text-slate-400">${esc(shortText(s))}${winsFor(s).length ? ` · <span class="text-emerald-300">Quick win: ${esc(winsFor(s)[0].subject)} ${esc(winsFor(s)[0].short)}${winsFor(s).length > 1 ? ` (+${winsFor(s).length - 1})` : ""}</span>` : ""}</span></span><span class="text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span></summary><div class="px-3 pb-3 pt-1 border-t border-slate-700">${bodyOfSlots(s)}</div></details>`,
             )
             .join("");
         };
@@ -6314,6 +6425,16 @@
             fsbbCloseDetails();
             return;
           }
+          const optBtn = e.target.closest("[data-fsbb-opt]");
+          if (optBtn || e.target.closest("[data-opt-clear]")) {
+            fsbbPreview.key =
+              optBtn && fsbbPreview.key !== optBtn.dataset.fsbbOpt
+                ? optBtn.dataset.fsbbOpt
+                : null;
+            fsbbApplyPreview();
+            renderFsbbDetails();
+            return;
+          }
           const g = fsbbState.grid;
           if (!g) return;
           if (cellBtn) {
@@ -6404,6 +6525,162 @@
           setTimeout(next, 0);
         }
 
+        // Single-subject changes that open at least one course: improve one
+        // grade (keep the level) or move that subject down a level.
+        const fsbbOptions = (base) => {
+          const openIds = (list) =>
+            new Set(
+              calculateAllPathwaysStatus(list)
+                .filter((p) => p.isEligible)
+                .map((p) => p.id),
+            );
+          const now = openIds(base);
+          const groups = [];
+          base.forEach((s, i) => {
+            const name = getSubjectById(s.subjectId)?.name || s.subjectId;
+            const make = (kind, changed, extra) => {
+              const after = openIds(
+                base.map((x, j) => (j === i ? changed : x)),
+              );
+              return {
+                key: `${s.subjectId}:${kind}`,
+                kind,
+                subjectId: s.subjectId,
+                name,
+                after,
+                opens: [...after].filter((id) => !now.has(id)),
+                closes: [...now].filter((id) => !after.has(id)),
+                ...extra,
+              };
+            };
+            const opts = [];
+            const next = getNextBetterGrade(s.grade, s.level);
+            if (next) {
+              const r = reachInfo(s);
+              opts.push(
+                make(
+                  "improve",
+                  {
+                    ...s,
+                    grade: next,
+                    rawMark: RAW_BANDS[s.level]?.[next]?.[0] ?? null,
+                  },
+                  {
+                    level: s.level,
+                    from: s.grade,
+                    to: next,
+                    marks: r.status === "unknown" ? null : r.needed,
+                  },
+                ),
+              );
+            }
+            const mv = moveDown(s);
+            if (mv)
+              opts.push(
+                make("move", mv, {
+                  level: mv.level,
+                  from: s.grade,
+                  to: mv.grade,
+                  fromLevel: s.level,
+                }),
+              );
+            const useful = opts.filter((o) => o.opens.length);
+            if (useful.length)
+              groups.push({ subjectId: s.subjectId, name, options: useful });
+          });
+          const score = (g) =>
+            Math.max(...g.options.map((o) => o.opens.length));
+          groups.sort((a, b) => score(b) - score(a));
+          return { now, groups: groups.slice(0, 3) };
+        };
+
+        // "2 in 3-Year Higher Nitec, 1 in Junior College": short and countable.
+        const fsbbOptNames = (ids) => {
+          const per = new Map();
+          ids.forEach((id) => {
+            const c = FSBB_COLS[FSBB_COL_OF_ID[id]];
+            if (c) per.set(c.label, (per.get(c.label) || 0) + 1);
+          });
+          return [...per].map(([label, n]) => `${n} in ${label}`).join(", ");
+        };
+
+        const fsbbOptionsHtml = (groups) => {
+          if (!groups.length) return "";
+          const card = (o) => {
+            const title =
+              o.kind === "improve"
+                ? `Keep ${o.level}: improve ${o.name} ${o.from} → ${o.to}`
+                : `Move ${o.name} to ${o.level}`;
+            const sub =
+              o.kind === "improve"
+                ? `${o.marks !== null && o.marks !== undefined ? `+${o.marks} marks` : "Add your raw mark to see the marks"} · not certain`
+                : `Projected ${o.level} ${o.to} · opens now, no marks needed`;
+            const effect = `<span class="block text-emerald-300 font-semibold">Opens ${o.opens.length}: ${esc(fsbbOptNames(o.opens))}</span>${o.closes.length ? `<span class="block text-rose-300 font-semibold">Closes ${o.closes.length}: ${esc(fsbbOptNames(o.closes))}</span>` : '<span class="block text-slate-300">Closes none</span>'}`;
+            return `<button type="button" data-fsbb-opt="${esc(o.key)}" aria-pressed="false" class="text-left rounded-lg border-2 border-slate-600 bg-slate-900/50 p-3 text-sm hover:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-300 aria-pressed:border-cyan-400 aria-pressed:bg-cyan-900/40"><span class="block font-semibold text-slate-100">${esc(title)}</span><span class="block text-xs text-slate-300 mb-1">${esc(sub)}</span>${effect}</button>`;
+          };
+          return `<div id="fsbbOptions" class="mt-5 rounded-xl border border-slate-700 bg-slate-900/40 p-3"><p class="font-semibold text-slate-100">Quick options</p><p class="text-xs text-slate-400 mb-2">One change at a time. Tap an option to preview it on the table; tap it again to go back.</p>${groups.map((g) => `<div data-opt-group="${esc(g.subjectId)}" class="mb-3"><p class="text-xs uppercase tracking-wide text-slate-400 mb-1">${esc(g.name)}</p><div class="grid gap-2 sm:grid-cols-2">${g.options.map(card).join("")}</div></div>`).join("")}<div id="fsbbPreviewNote" class="hidden mt-1 rounded-lg border border-cyan-500/60 bg-cyan-900/30 p-3 text-sm text-slate-100"></div></div>`;
+        };
+
+        const fsbbPreviewData = () => {
+          if (!fsbbPreview.key) return null;
+          for (const g of fsbbPreview.list) {
+            const o = g.options.find((x) => x.key === fsbbPreview.key);
+            if (o) return o;
+          }
+          return null;
+        };
+
+        // Badges on the column headings, button state and the summary line.
+        function fsbbApplyPreview() {
+          const o = fsbbPreviewData();
+          resultsAdviceContainer
+            .querySelectorAll("[data-fsbb-opt]")
+            .forEach((b) =>
+              b.setAttribute(
+                "aria-pressed",
+                o && b.dataset.fsbbOpt === o.key ? "true" : "false",
+              ),
+            );
+          resultsAdviceContainer
+            .querySelectorAll("[data-col-delta]")
+            .forEach((n) => n.remove());
+          const note = resultsAdviceContainer.querySelector("#fsbbPreviewNote");
+          if (!o) {
+            if (note) {
+              note.classList.add("hidden");
+              note.innerHTML = "";
+            }
+            return;
+          }
+          const parts = [];
+          FSBB_COLS.forEach((c, i) => {
+            const opens = o.opens.filter((id) => c.ids.includes(id)).length;
+            const closes = o.closes.filter((id) => c.ids.includes(id)).length;
+            if (!opens && !closes) return;
+            const btn = resultsAdviceContainer.querySelector(
+              `[data-fsbb-col="${i}"]`,
+            );
+            if (btn)
+              btn.insertAdjacentHTML(
+                "beforeend",
+                `<span data-col-delta class="mt-1 flex flex-wrap justify-center gap-1">${opens ? `<span class="rounded bg-emerald-600 px-1.5 py-0.5 text-[11px] font-bold text-white">▲ +${opens}</span>` : ""}${closes ? `<span class="rounded bg-rose-600 px-1.5 py-0.5 text-[11px] font-bold text-white">▼ −${closes}</span>` : ""}</span>`,
+              );
+            const total = c.ids.length;
+            const before = c.ids.filter((id) => fsbbPreview.now.has(id)).length;
+            parts.push(
+              `${c.label}: ${before} → ${before + opens - closes} of ${total} courses`,
+            );
+          });
+          const what =
+            o.kind === "improve"
+              ? `${o.name} ${o.level} ${o.from} → ${o.to}`
+              : `${o.name} moved to ${o.level} (projected ${o.level} ${o.to})`;
+          if (note) {
+            note.classList.remove("hidden");
+            note.innerHTML = `<p data-opt-summary><span class="font-semibold">Previewing:</span> ${esc(what)}. ${esc(parts.join(" · "))}${o.closes.length ? "" : ". Nothing closes."}</p><button type="button" data-opt-clear class="mt-2 text-sm underline text-cyan-300">Show my current grades</button>`;
+          }
+        }
+
         function renderResultsAdvice() {
           if (studentSubjects.length === 0) {
             resultsAdviceSection.classList.add("hidden");
@@ -6418,11 +6695,15 @@
           const base = studentSubjects.map((s) => ({ ...s }));
           const grid = fsbbBuild(base, buildResultsAdvice(base));
           fsbbState.grid = grid;
+          const opts = fsbbOptions(base);
+          fsbbPreview.list = opts.groups;
+          fsbbPreview.now = opts.now;
+          if (!fsbbPreviewData()) fsbbPreview.key = null;
           const note =
             grid.r0 === null
               ? '<p data-fsbb-note class="text-sm text-amber-300 mb-3">Add at least 4 subjects to see which pathways each mix can reach.</p>'
               : "";
-          resultsAdviceContainer.innerHTML = `<div class="rounded-lg border border-cyan-700 bg-cyan-900/30 p-3 mb-4 text-sm sm:text-base text-slate-100"><strong>Aim for the highest level you can manage.</strong> Moving down a row closes the pathways on the right.</div>${note}${fsbbLegendHtml()}${fsbbTableHtml(grid)}${grid.rows.some((row) => row.some((c) => c.est)) ? '<p data-fsbb-est class="text-xs text-slate-300 mt-2">Dashed boxes marked EST. are estimates: we guess your grade if you took a subject at a higher level.</p>' : ""}<p class="text-xs text-slate-400 mt-2">${grid.r0 === null ? "" : "Tap any coloured box to see how. "}<span class="sm:hidden">Swipe the table sideways to see every pathway.</span></p><div id="fsbbDetails" class="hidden scroll-mt-4 mt-4 rounded-xl border border-cyan-500/60 bg-slate-900/60 p-4" role="region" aria-live="polite" aria-label="How to reach this pathway"></div>`;
+          resultsAdviceContainer.innerHTML = `<div class="rounded-lg border border-cyan-700 bg-cyan-900/30 p-3 mb-4 text-sm sm:text-base text-slate-100"><strong>Aim for the highest level you can manage.</strong> Moving down a row closes the pathways on the right.</div>${note}${fsbbLegendHtml()}${fsbbTableHtml(grid)}${grid.rows.some((row) => row.some((c) => c.est)) ? '<p data-fsbb-est class="text-xs text-slate-300 mt-2">Dashed boxes marked EST. are estimates: we guess your grade if you took a subject at a higher level.</p>' : ""}<p class="text-xs text-slate-400 mt-2">${grid.r0 === null ? "" : "Tap any coloured box to see how. "}<span class="sm:hidden">Swipe the table sideways to see every pathway.</span></p>${fsbbOptionsHtml(opts.groups)}<div id="fsbbDetails" class="hidden scroll-mt-4 mt-4 rounded-xl border border-cyan-500/60 bg-slate-900/60 p-4" role="region" aria-live="polite" aria-label="How to reach this pathway"></div>`;
           if (fsbbView.row !== null) {
             const c =
               grid.rows[fsbbView.row] && grid.rows[fsbbView.row][fsbbView.col];
@@ -6432,6 +6713,7 @@
             }
           }
           renderFsbbDetails();
+          fsbbApplyPreview();
           fsbbFillPending(grid);
         }
 
@@ -7043,6 +7325,20 @@
           // Single-grade improvements that open a closed pathway (live page state).
           quickWins: () => computeQuickWins(),
           fsbbRow: (subjects) => fsbbRowOf(subjects),
+          // Quick options: plain data (ids only), for tests.
+          options: (subjects, school) => {
+            if (school !== undefined) selectedSchool = school;
+            const o = fsbbOptions(subjects.map((x) => ({ ...x })));
+            return o.groups.map((g) => ({
+              subjectId: g.subjectId,
+              options: g.options.map((x) => ({
+                key: x.key,
+                kind: x.kind,
+                opens: x.opens,
+                closes: x.closes,
+              })),
+            }));
+          },
           // Plain-data copy of the table: rows[row][col] = cell.
           fsbb: (subjects, school) => {
             if (school !== undefined) selectedSchool = school;
