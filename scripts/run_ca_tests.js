@@ -278,6 +278,45 @@ async function getResult(page, nameSubstr) {
     );
   }
 
+  // ── CA-08 ─────────────────────────────────────────────────────────────────
+  // Same student as CA-01 (EL D7 fails MER, in range for CA). Nowhere may this
+  // read as a plain "You qualify": card, pathway-table box and track header.
+  await reset(page);
+  for (const [id, lv, gr] of [
+    ["EL", "G3", "D7"],
+    ["MATH", "G3", "A1"],
+    ["HIST", "G3", "A1"],
+    ["GEOG", "G3", "A1"],
+    ["MT", "G3", "A1"],
+  ])
+    await add(page, id, lv, gr);
+  {
+    await page.click("#eligShowAll");
+    await page.waitForTimeout(300);
+    const jc = await getResult(page, "Junior College");
+    ok(
+      jc.isCA && !jc.status.includes("You qualify"),
+      "CA-08",
+      `JC card says conditional admission only, not "You qualify" (${jc.status})`,
+    );
+    const ui = await page.evaluate(() => ({
+      cell: document.querySelector('[data-elig-cell="5"]')?.dataset.status,
+      cellText: document.querySelector('[data-elig-cell="5"]')?.textContent,
+      track: document.querySelector('[data-track="JC/MI"] [data-track-status]')
+        ?.textContent,
+    }));
+    ok(
+      ui.cell === "ca" && !/You qualify/.test(ui.cellText),
+      "CA-08",
+      `JC/MI table box is conditional (${ui.cell}: ${ui.cellText})`,
+    );
+    ok(
+      /Conditional admission only/.test(ui.track || ""),
+      "CA-08",
+      `JC/MI track header (${ui.track})`,
+    );
+  }
+
   await browser.close();
 
   console.log(

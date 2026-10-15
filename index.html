@@ -166,7 +166,8 @@
           grid-row: 1;
           justify-self: end;
         }
-        #studentSubjectsTableBody td:nth-child(n + 2):nth-child(-n + 4)::before {
+        #studentSubjectsTableBody
+          td:nth-child(n + 2):nth-child(-n + 4)::before {
           display: block;
           margin-bottom: 0.25rem;
           font-size: 0.7rem;
@@ -3103,6 +3104,11 @@
           };
         };
 
+        // A clean pass. Conditional admission (isCA) also sets isEligible, but
+        // the student does not meet every requirement, so the Action Plan and
+        // its routes treat it as not yet qualified.
+        const fullyEligible = (p) => !!p && p.isEligible && !p.isCA;
+
         const calculateAllPathwaysStatus = (subjects) => {
           const allPathwaysStatus = [];
 
@@ -3422,7 +3428,7 @@
         const evaluateRealistic = (subjects) => {
           const eligibleIds = (list) =>
             calculateAllPathwaysStatus(list)
-              .filter((p) => p.isEligible)
+              .filter((p) => fullyEligible(p))
               .map((p) => p.id);
           const eligible = new Set(eligibleIds(subjects));
           const realistic = new Set(eligible);
@@ -3524,7 +3530,7 @@
         const worthPushing = (subjects) => {
           const open = new Set(
             calculateAllPathwaysStatus(subjects)
-              .filter((p) => p.isEligible)
+              .filter((p) => fullyEligible(p))
               .map((p) => p.id),
           );
           const out = new Set();
@@ -3541,7 +3547,7 @@
                     }
                   : x,
               ),
-            ).some((p) => p.isEligible && !open.has(p.id));
+            ).some((p) => fullyEligible(p) && !open.has(p.id));
             if (opens || isWeakish(s)) out.add(s.subjectId);
           });
           return out;
@@ -4273,7 +4279,7 @@
           const eligibleSetOf = (list) =>
             new Set(
               calculateAllPathwaysStatus(list)
-                .filter((p) => p.isEligible)
+                .filter((p) => fullyEligible(p))
                 .map((p) => p.id),
             );
           const difficultyOf = (gap) =>
@@ -4682,7 +4688,7 @@
                   : req.netELR2B2;
             };
             const deficitOf = (pw) => {
-              if (pw.isEligible) return 0;
+              if (fullyEligible(pw)) return 0;
               const req = pw.requirements || {};
               const cut = cutOf(pw);
               const score =
@@ -4954,7 +4960,7 @@
               ),
             ).find((x) => x.id === pw.id);
             const blocker =
-              best && !best.isEligible
+              best && !fullyEligible(best)
                 ? unmetOf(best).slice(0, 2).join("; ") ||
                   "Top grades in your current subjects would still fall short"
                 : null;
@@ -5357,7 +5363,7 @@
             : pw.grossScore;
         const fsbbDeficit = (pw) => {
           if (!pw) return 99;
-          if (pw.isEligible) return 0;
+          if (fullyEligible(pw)) return 0;
           const cut = fsbbCut(pw);
           const score = fsbbScore(pw);
           const unmet = ((pw.merCheck && pw.merCheck.merDetails) || []).filter(
@@ -5464,7 +5470,7 @@
             if (!cfg.status) {
               cfg.status = calculateAllPathwaysStatus(cfg.subjects);
               cfg.elig = new Set(
-                cfg.status.filter((p) => p.isEligible).map((p) => p.id),
+                cfg.status.filter((p) => fullyEligible(p)).map((p) => p.id),
               );
             }
             return cfg;
@@ -5664,7 +5670,7 @@
           const eligOf = (subs) =>
             new Set(
               calculateAllPathwaysStatus(subs)
-                .filter((p) => p.isEligible)
+                .filter((p) => fullyEligible(p))
                 .map((p) => p.id),
             );
           const eligNow = eligOf(cur);
@@ -6885,7 +6891,7 @@
           const openIds = (list) =>
             new Set(
               calculateAllPathwaysStatus(list)
-                .filter((p) => p.isEligible)
+                .filter((p) => fullyEligible(p))
                 .map((p) => p.id),
             );
           const now = openIds(base);
@@ -7062,7 +7068,7 @@
         function computeQuickWins() {
           const openNow = new Set(
             calculateAllPathwaysStatus(studentSubjects)
-              .filter((p) => p.isEligible)
+              .filter((p) => fullyEligible(p))
               .map((p) => p.name.replace(/\.+$/, "")),
           );
           const wins = [];
@@ -7075,7 +7081,7 @@
               ),
             )
               .map((p) => ({ ...p, name: p.name.replace(/\.+$/, "") }))
-              .filter((p) => p.isEligible && !openNow.has(p.name))
+              .filter((p) => fullyEligible(p) && !openNow.has(p.name))
               .map((p) => p.name);
             if (unlocked.length)
               wins.push({
@@ -7263,7 +7269,8 @@
         const eligTableWrap = document.getElementById("eligTableWrap");
         const eligColStatus = (col, results) => {
           const ps = results.filter((p) => col.ids.includes(p.id));
-          const n = ps.filter((p) => p.isEligible || p.isCA).length;
+          const n = ps.filter((p) => p.isEligible && !p.isCA).length;
+          const ca = ps.filter((p) => p.isCA).length;
           const none =
             ps.length > 0 &&
             ps.every(
@@ -7271,8 +7278,10 @@
             );
           return {
             n,
+            ca,
             total: ps.length,
-            status: n > 0 ? "open" : none ? "impossible" : "further",
+            status:
+              n > 0 ? "open" : ca > 0 ? "ca" : none ? "impossible" : "further",
           };
         };
         function renderEligibilityTable(results) {
@@ -7290,14 +7299,23 @@
             const word =
               s.status === "open"
                 ? "You qualify"
-                : s.status === "impossible"
-                  ? "Not possible with your subjects"
-                  : "Not yet";
+                : s.status === "ca"
+                  ? "Conditional admission only"
+                  : s.status === "impossible"
+                    ? "Not possible with your subjects"
+                    : "Not yet";
             const count =
               s.status === "open" && s.total > 1
                 ? `${s.n} of ${s.total} courses`
-                : "";
-            return `<td class="p-0 h-px"><button type="button" data-elig-cell="${i}" data-status="${s.status}" aria-pressed="${sel === i}" aria-label="${esc(c.label)}: ${esc(word)} ${esc(count)}. Show details" class="${CELL_BOX} ${FSBB_STYLE[s.status]} flex flex-col items-center justify-center gap-1 text-center ${sel === i ? "ring-2 ring-cyan-300" : ""} focus:outline-none focus:ring-2 focus:ring-cyan-300"><span class="text-2xl font-black" aria-hidden="true">${FSBB_ICON[s.status]}</span><span class="text-[11px] sm:text-sm leading-tight font-semibold">${esc(word)}</span>${count ? `<span class="text-[11px] leading-tight">${count}</span>` : ""}</button></td>`;
+                : s.status === "ca"
+                  ? "A requirement is not met"
+                  : "";
+            const style =
+              s.status === "ca"
+                ? "bg-amber-700/40 border-amber-400 text-amber-50"
+                : FSBB_STYLE[s.status];
+            const icon = s.status === "ca" ? "!" : FSBB_ICON[s.status];
+            return `<td class="p-0 h-px"><button type="button" data-elig-cell="${i}" data-status="${s.status}" aria-pressed="${sel === i}" aria-label="${esc(c.label)}: ${esc(word)} ${esc(count)}. Show details" class="${CELL_BOX} ${style} flex flex-col items-center justify-center gap-1 text-center ${sel === i ? "ring-2 ring-cyan-300" : ""} focus:outline-none focus:ring-2 focus:ring-cyan-300"><span class="text-2xl font-black" aria-hidden="true">${icon}</span><span class="text-[11px] sm:text-sm leading-tight font-semibold">${esc(word)}</span>${count ? `<span class="text-[11px] leading-tight">${count}</span>` : ""}</button></td>`;
           }).join("");
           const hint =
             sel === null
@@ -7383,12 +7401,17 @@
                 "col-span-full mb-6 group [&:not([open])]:mb-3";
               groupSection.dataset.track = group;
               const eligibleInGroup = groupedPathways[group].filter(
-                (p) => p.isEligible || p.isCA,
+                (p) => p.isEligible && !p.isCA,
+              ).length;
+              const caInGroup = groupedPathways[group].filter(
+                (p) => p.isCA,
               ).length;
               {
                 const pref = eligibilityGroupPref[group];
                 groupSection.open =
-                  pref !== undefined ? pref : eligibleInGroup > 0;
+                  pref !== undefined
+                    ? pref
+                    : eligibleInGroup > 0 || caInGroup > 0;
               }
               let groupHeaderHtml = "";
               if (group === "JC/MI")
@@ -7404,7 +7427,7 @@
               // The header (track name + how many are open) stays visible; the
               // description and cards fold away with the track.
               groupSection.innerHTML =
-                `<summary class="flex items-center justify-between gap-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden border-b border-slate-700 pb-2 group-open:mb-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded"><span class="flex flex-wrap items-baseline gap-x-3 gap-y-1"><h3 class="text-xl font-semibold text-sky-300">${group}</h3><span data-track-status class="text-sm ${eligibleInGroup ? "text-emerald-300" : "text-slate-400"}">${eligibleInGroup ? `You qualify for ${eligibleInGroup} of ${groupedPathways[group].length}` : "Not yet"}</span></span><span class="shrink-0 text-2xl leading-none text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span></summary>` +
+                `<summary class="flex items-center justify-between gap-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden border-b border-slate-700 pb-2 group-open:mb-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded"><span class="flex flex-wrap items-baseline gap-x-3 gap-y-1"><h3 class="text-xl font-semibold text-sky-300">${group}</h3><span data-track-status class="text-sm ${eligibleInGroup ? "text-emerald-300" : caInGroup ? "text-amber-300" : "text-slate-400"}">${eligibleInGroup ? `You qualify for ${eligibleInGroup} of ${groupedPathways[group].length}` : caInGroup ? "Conditional admission only" : "Not yet"}</span></span><span class="shrink-0 text-2xl leading-none text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span></summary>` +
                 groupHeaderHtml;
               const cardsContainer = document.createElement("div");
               cardsContainer.className =
@@ -7526,7 +7549,7 @@
                         .join("")}</ul>`
                     : `<h5 class="text-sm font-semibold text-sky-300 mt-3 mb-1">Subjects considered for calculation:</h5><p class="text-slate-300 text-sm pl-2">No subjects met criteria or not applicable.</p>`;
 
-                card.innerHTML = `<h3 class="text-xl font-semibold mb-2 flex items-center [&>svg]:shrink-0">${isCA ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-amber-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg>' : isEligible ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-emerald-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-slate-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z"></path></svg>'} ${pathwayNameDisplay}</h3><p class="text-sm mb-1 font-medium ${isCA ? "text-amber-300" : isEligible ? "text-emerald-300" : "text-slate-400"}">Status: ${isCA ? 'You qualify <span class="tooltip">(Conditional Admission)<sup><small>i</small></sup><span class="tooltiptext">Score qualifies for Conditional Admission. You may still be considered even though MER is not fully met. Consider re-sitting to fulfil MER requirements.</span></span>' : isEligible ? 'You qualify <span class="tooltip">(subject to MER)<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span>' : notEligibleLabel}</p>${scoreText}<details class="text-xs mt-2"><summary class="cursor-pointer text-sky-400 hover:text-sky-300">Details & Reasons</summary><div class="mt-2"><h5 class="text-sm font-semibold text-sky-300 mb-1">Requirements:</h5><ul class="list-disc list-inside mt-1 pl-2 text-slate-300 space-y-1">${requirementsList}${descriptionItemHtml}</ul></div>${subjectsUsedHtml}</details>`;
+                card.innerHTML = `<h3 class="text-xl font-semibold mb-2 flex items-center [&>svg]:shrink-0">${isCA ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-amber-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg>' : isEligible ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-emerald-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20ZM16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-md mr-2 text-slate-400"><path d="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z"></path></svg>'} ${pathwayNameDisplay}</h3><p class="text-sm mb-1 font-medium ${isCA ? "text-amber-300" : isEligible ? "text-emerald-300" : "text-slate-400"}">Status: ${isCA ? 'Conditional admission only: you do not meet every entry requirement <span class="tooltip">(Conditional Admission)<sup><small>i</small></sup><span class="tooltiptext">Your score is within range, but a Minimum Entry Requirement (MER) is not met, for example English. You may be considered for conditional admission, but a place is not assured. Improving the grade that falls short would give you a full place.</span></span>' : isEligible ? 'You qualify <span class="tooltip">(subject to MER)<sup><small>i</small></sup><span class="tooltiptext">MER refers to the Minimum Entry Requirements.</span></span>' : notEligibleLabel}</p>${scoreText}<details class="text-xs mt-2"><summary class="cursor-pointer text-sky-400 hover:text-sky-300">Details & Reasons</summary><div class="mt-2"><h5 class="text-sm font-semibold text-sky-300 mb-1">Requirements:</h5><ul class="list-disc list-inside mt-1 pl-2 text-slate-300 space-y-1">${requirementsList}${descriptionItemHtml}</ul></div>${subjectsUsedHtml}</details>`;
                 cardsContainer.appendChild(card);
               });
               groupSection.appendChild(cardsContainer);
