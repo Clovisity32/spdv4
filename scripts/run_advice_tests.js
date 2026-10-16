@@ -1641,9 +1641,9 @@ async function advise(page, subjects) {
       ok(
         head.includes("You qualify") &&
           needs.length > 0 &&
-          needs.every((n) => n === "OK"),
+          needs.every((n) => n === "✓"),
         "P10-U18",
-        "An eligible box opens a table where every requirement reads OK (" +
+        "An eligible box opens a table where every requirement shows a tick (" +
           needs.length +
           " rows)",
       );
@@ -1658,7 +1658,7 @@ async function advise(page, subjects) {
         "#fsbbCourses [data-easiest] [data-slot-total]",
       );
       ok(
-        needs.some((n) => n !== "OK" && n !== "—") &&
+        needs.some((n) => n !== "✓" && n !== "—") &&
           /Total \+\d+ marks/.test(total),
         "P10-U19",
         "A course you do not qualify for yet shows the grade each slot needs, and a total of marks",
@@ -1709,14 +1709,15 @@ async function advise(page, subjects) {
           /Aggregate \((L1R4|ELR2B2|ELMAB3)\): (\d+|cannot be counted yet) \(cut-off ≤ \d+\)/.test(
             top.text,
           ) &&
-          top.icons >= 2,
+          top.icons >= 1,
         "P10-R1",
-        "Each course opens with Requirements above the table: score line and entry requirements (" +
+        "Each course opens with Requirements above the table: score line, plus only rules the table has no row for (" +
           top.text.slice(0, 90) +
           ")",
       );
       ok(
-        top.head.endsWith("Requirement") && /\(G\d(\/G\d)?\)/.test(top.elLevel || ""),
+        top.head.endsWith("Requirement") &&
+          /\(G\d(\/G\d)?\)/.test(top.elLevel || ""),
         "P10-R2",
         `Table header is 'Requirement' (not 'Slot') and EL shows its level (${top.head}, ${top.elLevel})`,
       );

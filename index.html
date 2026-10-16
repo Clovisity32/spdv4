@@ -6353,7 +6353,9 @@
           const tip = (label, text) =>
             `<span data-slot-tip tabindex="0" class="group/tip relative inline-block cursor-help border-b border-dotted border-slate-400 font-semibold text-slate-100 rounded focus:outline-none focus:ring-2 focus:ring-cyan-400">${esc(label)}<span role="tooltip" class="hidden group-hover/tip:block group-focus/tip:block absolute left-0 top-full z-30 mt-1 w-64 max-w-[70vw] rounded-lg border border-slate-500 bg-slate-950 p-2 text-xs font-normal normal-case text-slate-100 shadow-xl">${esc(text)}</span></span>`;
           const shortNeed = (n) =>
-            String(n).replace(/ \((\d+\+) marks\)/, " · $1");
+            String(n) === "OK"
+              ? "✓"
+              : String(n).replace(/ \((\d+\+) marks\)/, " · $1");
           const shortMarks = (m) => String(m).replace(/ marks?$/, "");
           const needCls = (n) =>
             n === "OK" ? "text-emerald-300" : "text-amber-300 font-semibold";
@@ -6368,7 +6370,7 @@
             const need = (pw.requirements || {}).min_total_subjects || 4;
             const n = subjects.length;
             rowsHtml.push(
-              `<tr data-slot-row data-role="SEC" class="border-t border-slate-700">${td(tip("All", `Complete the secondary school certificate by taking at least ${need} subjects.`))}${td("Subjects you take", "text-slate-100")}${td(String(n), "text-slate-200")}${td(n >= need ? "OK" : `${need - n} more`, needCls(n >= need ? "OK" : "x"))}${td("—", "text-slate-200")}</tr>`,
+              `<tr data-slot-row data-role="SEC" class="border-t border-slate-700">${td(tip("All", `Complete the secondary school certificate by taking at least ${need} subjects.`))}${td("Subjects you take", "text-slate-100")}${td(String(n), "text-slate-200")}${td(n >= need ? "✓" : `${need - n} more`, needCls(n >= need ? "OK" : "x"))}${td("—", "text-slate-200")}</tr>`,
             );
           }
           slots.forEach((sl) => {
@@ -6472,18 +6474,19 @@
                     text: `${aggLabel}: cannot be counted yet (cut-off ≤ ${cut})`,
                   },
             );
+          // Only rules the table below has no row for: the subject rows
+          // already show each EL / Math / relevant / B requirement, its level
+          // and whether it is met.
           lines
-            .filter(
-              (l) =>
-                !/^Aggregate/.test(l.text) &&
-                !/^Eligible by Conditional/.test(l.text),
+            .filter((l) =>
+              /^(Mother Tongue|Minimum of \d+ subjects)/.test(l.text),
             )
             .forEach((l) => items.push(l));
           if (!items.length && !pw.isCA) return "";
           const li = (l) =>
             `<li class="text-sm ${l.ok ? "text-emerald-300" : "text-rose-300"}"><span aria-hidden="true">${l.ok ? "✓" : "✗"}</span> ${esc(fsbbClip(l.text, 130))}</li>`;
           const caNote = pw.isCA
-            ? `<li data-ca-note class="text-sm text-amber-300"><span aria-hidden="true">!</span> Conditional admission only: your score is within range, but a requirement above is not met. A place is not assured.</li>`
+            ? `<li data-ca-note class="text-sm text-amber-300"><span aria-hidden="true">!</span> Conditional admission only: your score is within range, but an entry requirement is not met (see the amber row below). A place is not assured.</li>`
             : "";
           return `<div data-requirements class="mt-1 mb-2"><p class="text-sm font-semibold text-slate-100">Requirements</p><ul class="mt-1 space-y-1">${items.slice(0, 9).map(li).join("")}${caNote}</ul></div>`;
         };
