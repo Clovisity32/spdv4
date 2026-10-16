@@ -2063,7 +2063,9 @@ function ok(cond, id, msg) {
     await page.waitForTimeout(400);
     ok(
       (await page.getAttribute("#tabPlan", "aria-selected")) === "true" &&
-        !(await page.$eval("#panelPlan", (d) => d.classList.contains("hidden"))),
+        !(await page.$eval("#panelPlan", (d) =>
+          d.classList.contains("hidden"),
+        )),
       "TAB-02",
       "The chosen tab is remembered after a reload",
     );
@@ -2498,6 +2500,56 @@ function ok(cond, id, msg) {
           ),
         "PICK-12b",
         "At G2 a mark of 72 sets grade 2, with no 'Set grade' tag",
+      );
+      // PICK-12c: the grade follows the mark while typing (no need to leave
+      // the box), the box keeps focus, at G3 and at G2
+      await reset(page);
+      await pickTick(["MATH", "EL"]);
+      await page.click("#subjectMenuAdd");
+      await page.waitForTimeout(500);
+      await setRow("EL", "G2", "1");
+      const live = {};
+      for (const [id, mark] of [
+        ["MATH", "72"],
+        ["EL", "50"],
+      ]) {
+        const sel = `[data-subject-row="${id}"]`;
+        await page.click(sel + " [data-row-raw]");
+        await page.keyboard.type(mark, { delay: 60 });
+        await page.waitForTimeout(100);
+        live[id] = {
+          grade: await page.inputValue(sel + " [data-row-grade]"),
+          focused: await page.evaluate(
+            (s) =>
+              document.activeElement ===
+              document.querySelector(s + " [data-row-raw]"),
+            sel,
+          ),
+        };
+      }
+      ok(
+        live.MATH.grade === "A2" &&
+          live.MATH.focused &&
+          live.EL.grade === "5" &&
+          live.EL.focused,
+        "PICK-12c",
+        `Typing a mark updates the grade at once and keeps focus (G3 72 → ${live.MATH.grade}, G2 50 → ${live.EL.grade})`,
+      );
+    }
+    // ORDER-01: Your Subjects reads English, Chinese, Math, Science,
+    // Humanities, Others whatever order they were ticked in
+    {
+      await reset(page);
+      await pickTick(["ART", "GEOG", "PHY", "MATH", "CHI", "EL"]);
+      await page.click("#subjectMenuAdd");
+      await page.waitForTimeout(500);
+      const order = await page.$$eval("[data-subject-row]", (rs) =>
+        rs.map((r) => r.dataset.subjectRow),
+      );
+      ok(
+        order.join() === "EL,CHI,MATH,PHY,GEOG,ART",
+        "ORDER-01",
+        `Subjects are listed English, Chinese, Math, Science, Humanities, Others (${order.join(", ")})`,
       );
     }
     // PICK-13: ticks survive a school change

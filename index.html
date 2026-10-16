@@ -7198,108 +7198,156 @@
             return;
           }
           studentSubjectsTableContainer.classList.remove("hidden");
-          studentSubjects.forEach((s, index) => {
-            const row = studentSubjectsTableBody.insertRow();
-            row.className = "hover:bg-slate-700/50 transition-colors";
-            row.dataset.subjectRow = s.subjectId;
-            row.insertCell().outerHTML = `<td class="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm font-medium text-gray-100">${esc(getSubjectById(s.subjectId)?.name || s.subjectId)}</td>`;
-            const levelCell = row.insertCell();
-            levelCell.className =
-              "px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm text-gray-300";
-            const levelSelectEl = document.createElement("select");
-            levelSelectEl.className =
-              "w-full px-3 py-2 min-w-[64px] bg-slate-700 border border-slate-600 rounded-md shadow-sm focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100 text-sm";
-            const applicableLevelsForRow = getAllowedLevels(s.subjectId);
-            applicableLevelsForRow.forEach((levelOption) => {
-              const option = document.createElement("option");
-              option.value = levelOption;
-              option.textContent = levelOption;
-              if (levelOption === s.level) option.selected = true;
-              levelSelectEl.appendChild(option);
-            });
-            levelSelectEl.dataset.rowLevel = "";
-            levelSelectEl.onchange = (e) => {
-              const newLevel = e.target.value;
-              studentSubjects[index].level = newLevel;
-              let defaultNewGrade = "";
-              if (newLevel === "G3" && G3_GRADES_OPTIONS.length > 0)
-                defaultNewGrade = G3_GRADES_OPTIONS[0];
-              else if (newLevel === "G2" && G2_GRADES_OPTIONS.length > 0)
-                defaultNewGrade = G2_GRADES_OPTIONS[0];
-              else if (newLevel === "G1" && G1_GRADES_OPTIONS.length > 0)
-                defaultNewGrade = G1_GRADES_OPTIONS[0];
-              studentSubjects[index].grade = defaultNewGrade;
-              studentSubjects[index].rawMark = null;
-              const gradeSelectEl = row.querySelector(".grade-select");
-              populateRowGradeDropdown(
-                gradeSelectEl,
-                newLevel,
-                defaultNewGrade,
-              );
-              updateAllCalculationsAndRender();
-            };
-            levelCell.appendChild(levelSelectEl);
-            const gradeCell = row.insertCell();
-            gradeCell.className =
-              "px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm text-gray-300";
-            const gradeSelectEl = document.createElement("select");
-            gradeSelectEl.className =
-              "grade-select w-full px-3 py-2 min-w-[64px] bg-slate-700 border border-slate-600 rounded-md shadow-sm focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100 text-sm";
-            populateRowGradeDropdown(gradeSelectEl, s.level, s.grade);
-            gradeSelectEl.dataset.rowGrade = "";
-            gradeSelectEl.onchange = (e) => {
-              studentSubjects[index].grade = e.target.value;
-              updateAllCalculationsAndRender();
-            };
-            gradeCell.appendChild(gradeSelectEl);
-            const rawCell = row.insertCell();
-            rawCell.className =
-              "px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm text-gray-300";
-            if (s.level === "G1") {
-              rawCell.innerHTML =
-                '<span class="text-slate-500">n/a at G1</span>';
-            } else {
-              const rawInvalid = hasRawMark(s) && getValidRaw(s) === null;
-              const rawEl = document.createElement("input");
-              rawEl.type = "number";
-              rawEl.min = "0";
-              rawEl.max = "100";
-              rawEl.placeholder = "Optional";
-              rawEl.title = `Optional. ${s.grade} is ${bandText(s.level, s.grade)}`;
-              rawEl.setAttribute("aria-label", "Raw mark (optional)");
-              rawEl.dataset.rowRaw = "";
-              rawEl.value = hasRawMark(s) ? s.rawMark : "";
-              rawEl.className = `w-full px-3 py-2 min-w-[90px] bg-slate-700 border ${rawInvalid ? "border-red-500" : "border-slate-600"} rounded-md shadow-sm focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100 text-sm`;
-              rawEl.onchange = (e) => {
-                const v = e.target.value.trim();
-                const row = studentSubjects[index];
-                if (v === "") row.rawMark = null;
-                else {
-                  // The grade follows the mark: it moves to the band that holds it.
-                  row.rawMark = Math.floor(Number(v));
-                  const g = gradeFromRaw(row.level, row.rawMark);
-                  if (g) {
-                    row.grade = g;
-                  }
-                }
+          // Shown as English, Chinese (Mother Tongue), Math, Science,
+          // Humanities, then the rest. Only the display order: the list itself
+          // (and the `index` each row's handlers use) is untouched.
+          const rankOf = (s) => {
+            const c = getSubjectById(s.subjectId)?.category;
+            if (c === "EL") return 0;
+            if (["MT", "MT_LANG", "HMT", "HMT_LANG"].includes(c)) return 1;
+            if (c === "MATH_PURE") return 2;
+            if (["SCIENCE_PURE", "SCIENCE_COMBINED"].includes(c)) return 3;
+            if (["HUMANITIES_PURE", "HUMANITIES_COMBINED"].includes(c))
+              return 4;
+            return 5;
+          };
+          studentSubjects
+            .map((s, index) => ({ s, index }))
+            .sort((a, b) => rankOf(a.s) - rankOf(b.s) || a.index - b.index)
+            .forEach(({ s, index }) => {
+              const row = studentSubjectsTableBody.insertRow();
+              row.className = "hover:bg-slate-700/50 transition-colors";
+              row.dataset.subjectRow = s.subjectId;
+              row.insertCell().outerHTML = `<td class="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm font-medium text-gray-100">${esc(getSubjectById(s.subjectId)?.name || s.subjectId)}</td>`;
+              const levelCell = row.insertCell();
+              levelCell.className =
+                "px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm text-gray-300";
+              const levelSelectEl = document.createElement("select");
+              levelSelectEl.className =
+                "w-full px-3 py-2 min-w-[64px] bg-slate-700 border border-slate-600 rounded-md shadow-sm focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100 text-sm";
+              const applicableLevelsForRow = getAllowedLevels(s.subjectId);
+              applicableLevelsForRow.forEach((levelOption) => {
+                const option = document.createElement("option");
+                option.value = levelOption;
+                option.textContent = levelOption;
+                if (levelOption === s.level) option.selected = true;
+                levelSelectEl.appendChild(option);
+              });
+              levelSelectEl.dataset.rowLevel = "";
+              levelSelectEl.onchange = (e) => {
+                const newLevel = e.target.value;
+                studentSubjects[index].level = newLevel;
+                let defaultNewGrade = "";
+                if (newLevel === "G3" && G3_GRADES_OPTIONS.length > 0)
+                  defaultNewGrade = G3_GRADES_OPTIONS[0];
+                else if (newLevel === "G2" && G2_GRADES_OPTIONS.length > 0)
+                  defaultNewGrade = G2_GRADES_OPTIONS[0];
+                else if (newLevel === "G1" && G1_GRADES_OPTIONS.length > 0)
+                  defaultNewGrade = G1_GRADES_OPTIONS[0];
+                studentSubjects[index].grade = defaultNewGrade;
+                studentSubjects[index].rawMark = null;
+                const gradeSelectEl = row.querySelector(".grade-select");
+                populateRowGradeDropdown(
+                  gradeSelectEl,
+                  newLevel,
+                  defaultNewGrade,
+                );
                 updateAllCalculationsAndRender();
               };
-              rawCell.appendChild(rawEl);
-              if (rawInvalid) {
-                const hint = document.createElement("p");
-                hint.className = "text-xs text-red-400 mt-1";
-                hint.textContent =
-                  Number(s.rawMark) < 0 || Number(s.rawMark) > 100
-                    ? "Enter a mark from 0 to 100. Mark ignored."
-                    : `${s.grade} is ${bandText(s.level, s.grade)}. Mark ignored.`;
-                rawCell.appendChild(hint);
+              levelCell.appendChild(levelSelectEl);
+              const gradeCell = row.insertCell();
+              gradeCell.className =
+                "px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm text-gray-300";
+              const gradeSelectEl = document.createElement("select");
+              gradeSelectEl.className =
+                "grade-select w-full px-3 py-2 min-w-[64px] bg-slate-700 border border-slate-600 rounded-md shadow-sm focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100 text-sm";
+              populateRowGradeDropdown(gradeSelectEl, s.level, s.grade);
+              gradeSelectEl.dataset.rowGrade = "";
+              gradeSelectEl.onchange = (e) => {
+                studentSubjects[index].grade = e.target.value;
+                updateAllCalculationsAndRender();
+              };
+              gradeCell.appendChild(gradeSelectEl);
+              const rawCell = row.insertCell();
+              rawCell.className =
+                "px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm text-gray-300";
+              if (s.level === "G1") {
+                rawCell.innerHTML =
+                  '<span class="text-slate-500">n/a at G1</span>';
+              } else {
+                const rawInvalid = hasRawMark(s) && getValidRaw(s) === null;
+                const rawEl = document.createElement("input");
+                rawEl.type = "number";
+                rawEl.min = "0";
+                rawEl.max = "100";
+                rawEl.placeholder = "Optional";
+                rawEl.title = `Optional. ${s.grade} is ${bandText(s.level, s.grade)}`;
+                rawEl.setAttribute("aria-label", "Raw mark (optional)");
+                rawEl.dataset.rowRaw = "";
+                rawEl.value = hasRawMark(s) ? s.rawMark : "";
+                rawEl.className = `w-full px-3 py-2 min-w-[90px] bg-slate-700 border ${rawInvalid ? "border-red-500" : "border-slate-600"} rounded-md shadow-sm focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 text-gray-100 text-sm`;
+                // While typing: the grade follows the mark straight away. Only
+                // the results are refreshed (the table is not rebuilt, so the
+                // cursor stays put); leaving the box runs the full update below.
+                let rawTimer = null;
+                rawEl.oninput = (e) => {
+                  const v = e.target.value.trim();
+                  if (v === "") return;
+                  const n = Math.floor(Number(v));
+                  const g = gradeFromRaw(studentSubjects[index].level, n);
+                  if (!g) return;
+                  studentSubjects[index].rawMark = n;
+                  studentSubjects[index].grade = g;
+                  gradeSelectEl.value = g;
+                  rawEl.title = `Optional. ${g} is ${bandText(studentSubjects[index].level, g)}`;
+                  clearTimeout(rawTimer);
+                  rawTimer = setTimeout(refreshResultsOnly, 120);
+                };
+                rawEl.onchange = (e) => {
+                  clearTimeout(rawTimer);
+                  const v = e.target.value.trim();
+                  const row = studentSubjects[index];
+                  // Typing already applied a valid mark (or the box was
+                  // cleared) and nothing needs redrawing in the table: skip the
+                  // rebuild, or the box the student just clicked into would be
+                  // destroyed and lose focus.
+                  const typed = Math.floor(Number(v));
+                  if (
+                    !rawInvalid &&
+                    (v === "" ||
+                      (gradeFromRaw(row.level, typed) && row.rawMark === typed))
+                  ) {
+                    if (v === "") row.rawMark = null;
+                    refreshResultsOnly();
+                    return;
+                  }
+                  if (v === "") row.rawMark = null;
+                  else {
+                    // The grade follows the mark: it moves to the band that holds it.
+                    row.rawMark = Math.floor(Number(v));
+                    const g = gradeFromRaw(row.level, row.rawMark);
+                    if (g) {
+                      row.grade = g;
+                    }
+                  }
+                  updateAllCalculationsAndRender();
+                };
+                rawCell.appendChild(rawEl);
+                if (rawInvalid) {
+                  const hint = document.createElement("p");
+                  hint.className = "text-xs text-red-400 mt-1";
+                  hint.textContent =
+                    Number(s.rawMark) < 0 || Number(s.rawMark) > 100
+                      ? "Enter a mark from 0 to 100. Mark ignored."
+                      : `${s.grade} is ${bandText(s.level, s.grade)}. Mark ignored.`;
+                  rawCell.appendChild(hint);
+                }
               }
-            }
-            const actionsCell = row.insertCell();
-            actionsCell.className =
-              "px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm font-medium text-right";
-            actionsCell.innerHTML = `<button onclick="handleDeleteSubjectWrapper(${index})" class="text-red-400 hover:text-red-300 transition-colors" aria-label="Delete subject"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-sm"><path d="M6 7H18V20C18 20.552 17.552 21 17 21H7C6.448 21 6 20.552 6 20V7Z"></path><path d="M19 4H15V3C15 2.448 14.552 2 14 2H10C9.448 2 9 2.448 9 3V4H5V6H19V4Z"></path></svg></button>`;
-          });
+              const actionsCell = row.insertCell();
+              actionsCell.className =
+                "px-3 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm font-medium text-right";
+              actionsCell.innerHTML = `<button onclick="handleDeleteSubjectWrapper(${index})" class="text-red-400 hover:text-red-300 transition-colors" aria-label="Delete subject"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="icon-sm"><path d="M6 7H18V20C18 20.552 17.552 21 17 21H7C6.448 21 6 20.552 6 20V7Z"></path><path d="M19 4H15V3C15 2.448 14.552 2 14 2H10C9.448 2 9 2.448 9 3V4H5V6H19V4Z"></path></svg></button>`;
+            });
         }
 
         // Which tracks (JC/MI, PFP, ...) the student opened or closed by hand;
@@ -7767,6 +7815,13 @@
           renderStudentSubjectsTable();
           renderResultsAdvice();
           renderSubjectMenu();
+        }
+
+        // Everything except the Your Subjects table, which a keystroke in a
+        // raw-mark box must not rebuild.
+        function refreshResultsOnly() {
+          checkEligibility();
+          renderResultsAdvice();
         }
 
         document.addEventListener("DOMContentLoaded", () => {
