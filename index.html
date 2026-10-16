@@ -438,9 +438,6 @@
           class="min-h-[56px] px-3 py-2 rounded-lg border text-left focus:outline-none focus:ring-2 focus:ring-cyan-300"
         >
           <span class="block font-semibold">Explore pathways</span>
-          <span class="block text-xs opacity-80"
-            >Sec 1–2 · Discover your options</span
-          >
         </button>
         <button
           type="button"
@@ -451,9 +448,6 @@
           class="min-h-[56px] px-3 py-2 rounded-lg border text-left focus:outline-none focus:ring-2 focus:ring-cyan-300"
         >
           <span class="block font-semibold">Plan my subjects</span>
-          <span class="block text-xs opacity-80"
-            >Sec 3–4 · Shape your route</span
-          >
         </button>
       </div>
       <div id="panelExplore" role="tabpanel" aria-labelledby="tabExplore">
@@ -6363,6 +6357,12 @@
           const shortMarks = (m) => String(m).replace(/ marks?$/, "");
           const needCls = (n) =>
             n === "OK" ? "text-emerald-300" : "text-amber-300 font-semibold";
+          // "EL (G3)": the level the requirement is counted at. ITE courses
+          // accept any level, so they show the bare name.
+          const slotLevel = (def) =>
+            def.levels.length < 3
+              ? `<span data-slot-level class="block text-[10px] sm:text-xs font-normal text-slate-400">(${esc(def.levels.join("/"))})</span>`
+              : "";
           const rowsHtml = [];
           if (completed) {
             const need = (pw.requirements || {}).min_total_subjects || 4;
@@ -6389,7 +6389,7 @@
                     ? { need: "—", marks: "—" }
                     : needFor(p, pn);
             rowsHtml.push(
-              `<tr data-slot-row data-role="${esc(sl.def.role)}" class="border-t border-slate-700">${td(tip(sl.def.label.split(" · ")[0], `${sl.def.label}. ${sl.def.rule}${p ? "" : fitNames(sl.def)}`))}${td(p ? esc(nameOf(p)) : '<span class="text-slate-400">No subject yet</span>', "text-slate-100")}${td(p ? esc(nowText(p, sl.g1, sl.def)) : "—", "text-slate-200")}${td(esc(shortNeed(eqNeed(nd.need, p, sl.def))), needCls(nd.need))}${td(esc(shortMarks(nd.marks)), "text-slate-200 whitespace-nowrap")}</tr>`,
+              `<tr data-slot-row data-role="${esc(sl.def.role)}" class="border-t border-slate-700">${td(tip(sl.def.label.split(" · ")[0], `${sl.def.label}. ${sl.def.rule}${p ? "" : fitNames(sl.def)}`) + slotLevel(sl.def))}${td(p ? esc(nameOf(p)) : '<span class="text-slate-400">No subject yet</span>', "text-slate-100")}${td(p ? esc(nowText(p, sl.g1, sl.def)) : "—", "text-slate-200")}${td(esc(shortNeed(eqNeed(nd.need, p, sl.def))), needCls(nd.need))}${td(esc(shortMarks(nd.marks)), "text-slate-200 whitespace-nowrap")}</tr>`,
             );
             sl.alts.forEach((a) => {
               const an = noRoute ? { need: "—", marks: "—" } : altNeed(a, pn);
@@ -6416,7 +6416,7 @@
                         .join(
                           ", ",
                         )}, so it can step in if a counted subject changes or is moved down. This table is not a reason to drop it.`
-                    : "No slot in this course accepts this subject at its current level, so it does not affect this course.",
+                    : "No requirement in this course accepts this subject at its current level, so it does not affect this course.",
                 ),
                 "",
               )}${td(esc(nameOf(s)))}${td(esc(nowText(s)))}${td("—")}${td("—")}</tr>`,
@@ -6431,16 +6431,61 @@
           const aggMissing = emptyNames.length
             ? `Aggregate not counted: no subject fits ${emptyNames.join(", ")}`
             : "Aggregate not counted yet: raise the amber rows first";
-          const totalBits = [sum, scoreLine].filter(Boolean);
-          const needed = lines
+          // The score and every entry requirement now sit above the table
+          // (`fsbbRequirementsHtml`); only the marks summary stays below, plus
+          // a note when the aggregate cannot be counted yet.
+          const totalBits = [
+            sum,
+            /^Aggregate cannot be counted yet/.test(scoreLine || "")
+              ? scoreLine
+              : "",
+          ].filter(Boolean);
+          const needed = [];
+          return `<div data-slot-table class="mt-2"><table class="w-full table-fixed text-left"><colgroup><col style="width:17%"><col style="width:28%"><col style="width:16%"><col style="width:24%"><col style="width:15%"></colgroup><thead><tr class="text-[11px] uppercase tracking-wide text-slate-400"><th class="px-1 sm:px-2 py-1"><span class="sm:hidden" aria-hidden="true">Req.</span><span class="sr-only sm:not-sr-only">Requirement</span></th><th class="px-1 sm:px-2 py-1">Your subject</th><th class="px-1 sm:px-2 py-1">Now</th><th class="px-1 sm:px-2 py-1">Need</th><th class="px-1 sm:px-2 py-1">Marks</th></tr></thead><tbody>${rowsHtml.join("")}</tbody></table>${totalBits.length ? `<p data-slot-total class="text-xs text-slate-300 mt-2">${totalBits.map((t) => esc(fsbbClip(t.replace(/^Aggregate cannot be counted yet.*$/, aggMissing), 140))).join(" · ")}</p>` : ""}${noRoute && step.blocker ? `<p class="text-sm text-slate-300 mt-2">Not possible with your subjects. Even top grades would still leave: ${esc(fsbbPlainReason(step.blocker))}.</p>` : ""}${needed.length ? `<ul class="mt-2 space-y-1">${needed.map((l) => `<li class="text-xs text-rose-300"><span aria-hidden="true">✗</span> ${esc(fsbbClip(l.text, 130))}</li>`).join("")}</ul>` : ""}</div>`;
+        };
+
+        // Top of every course: the score line and each entry requirement with
+        // ✓ / ✗, worded as on the Explore cards. Shown whether or not the
+        // student qualifies. `lines` is `reasonLines(pw)`.
+        const fsbbRequirementsHtml = (pw, lines) => {
+          const req = pw.requirements || {};
+          const aggLabel =
+            req.grossL1R4 !== undefined
+              ? "Gross Aggregate (L1R4)"
+              : req.netELR2B2 !== undefined
+                ? "Net Aggregate (ELR2B2)"
+                : req.grossELMAB3 !== undefined
+                  ? "Gross Aggregate (ELMAB3)"
+                  : null;
+          const cut = fsbbCut(pw);
+          const score = fsbbScore(pw);
+          const items = [];
+          if (aggLabel && cut !== undefined)
+            items.push(
+              Number.isFinite(score)
+                ? {
+                    ok: score <= cut,
+                    text: `${aggLabel}: ${score} (cut-off ≤ ${cut})`,
+                  }
+                : {
+                    ok: false,
+                    text: `${aggLabel}: cannot be counted yet (cut-off ≤ ${cut})`,
+                  },
+            );
+          lines
             .filter(
               (l) =>
-                !l.ok &&
                 !/^Aggregate/.test(l.text) &&
-                (isIteCourse || /Mother Tongue/.test(l.text)),
+                !/^Eligible by Conditional/.test(l.text),
             )
-            .slice(0, 5);
-          return `<div data-slot-table class="mt-2"><table class="w-full table-fixed text-left"><colgroup><col style="width:13%"><col style="width:31%"><col style="width:17%"><col style="width:24%"><col style="width:15%"></colgroup><thead><tr class="text-[11px] uppercase tracking-wide text-slate-400"><th class="px-1 sm:px-2 py-1">Slot</th><th class="px-1 sm:px-2 py-1">Your subject</th><th class="px-1 sm:px-2 py-1">Now</th><th class="px-1 sm:px-2 py-1">Need</th><th class="px-1 sm:px-2 py-1">Marks</th></tr></thead><tbody>${rowsHtml.join("")}</tbody></table>${totalBits.length ? `<p data-slot-total class="text-xs text-slate-300 mt-2">${totalBits.map((t) => esc(fsbbClip(t.replace(/^Aggregate cannot be counted yet.*$/, aggMissing), 140))).join(" · ")}</p>` : ""}${noRoute && step.blocker ? `<p class="text-sm text-slate-300 mt-2">Not possible with your subjects. Even top grades would still leave: ${esc(fsbbPlainReason(step.blocker))}.</p>` : ""}${needed.length ? `<ul class="mt-2 space-y-1">${needed.map((l) => `<li class="text-xs text-rose-300"><span aria-hidden="true">✗</span> ${esc(fsbbClip(l.text, 130))}</li>`).join("")}</ul>` : ""}</div>`;
+            .forEach((l) => items.push(l));
+          if (!items.length && !pw.isCA) return "";
+          const li = (l) =>
+            `<li class="text-sm ${l.ok ? "text-emerald-300" : "text-rose-300"}"><span aria-hidden="true">${l.ok ? "✓" : "✗"}</span> ${esc(fsbbClip(l.text, 130))}</li>`;
+          const caNote = pw.isCA
+            ? `<li data-ca-note class="text-sm text-amber-300"><span aria-hidden="true">!</span> Conditional admission only: your score is within range, but a requirement above is not met. A place is not assured.</li>`
+            : "";
+          return `<div data-requirements class="mt-1 mb-2"><p class="text-sm font-semibold text-slate-100">Requirements</p><ul class="mt-1 space-y-1">${items.slice(0, 9).map(li).join("")}${caNote}</ul></div>`;
         };
 
         // The expandable course rows for one table column.
@@ -6568,6 +6613,7 @@
                 )
               : "";
             if (!html) return "";
+            const lead0 = fsbbRequirementsHtml(pw, reasonLines(pw));
             const lead =
               s.tier === 1
                 ? `<p class="text-sm text-slate-200 mt-1">${esc(
@@ -6584,7 +6630,7 @@
                         ),
                   )}</p>`
                 : "";
-            return lead + html;
+            return lead0 + lead + html;
           };
           const bodyOfSlots = (s) =>
             winsFor(s)
@@ -6785,7 +6831,7 @@
         });
         // "See where you can go": jump from the subject list to the table,
         // and move keyboard focus with it.
-        // Two views: Explore pathways (Sec 1-2) and Plan my subjects (Sec 3-4).
+        // Two views: Explore pathways and Plan my subjects.
         const VIEW_TABS = ["Explore", "Plan"];
         const setView = (name, opts = {}) => {
           if (!VIEW_TABS.includes(name)) name = "Explore";

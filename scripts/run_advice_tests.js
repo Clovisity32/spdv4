@@ -1681,6 +1681,53 @@ async function advise(page, subjects) {
         "P10-T1",
         "Slot rows are named by requirement (" + labels.join(", ") + ")",
       );
+      // Requirements and score sit above the table; levels show beside names
+      const top = await page.$eval("#fsbbCourses [data-easiest]", (d) => {
+        const req = d.querySelector("[data-requirements]");
+        const table = d.querySelector("[data-slot-table]");
+        const el = d.querySelector('[data-slot-row][data-role="EL"]');
+        return {
+          has: !!req,
+          above:
+            !!req &&
+            !!table &&
+            !!(
+              req.compareDocumentPosition(table) &
+              Node.DOCUMENT_POSITION_FOLLOWING
+            ),
+          text: req ? req.textContent : "",
+          icons: req ? req.querySelectorAll("li").length : 0,
+          head: table ? table.querySelector("th").textContent.trim() : "",
+          elLevel: el
+            ? (el.querySelector("[data-slot-level]") || {}).textContent
+            : null,
+        };
+      });
+      ok(
+        top.has &&
+          top.above &&
+          /Aggregate \((L1R4|ELR2B2|ELMAB3)\): (\d+|cannot be counted yet) \(cut-off ≤ \d+\)/.test(
+            top.text,
+          ) &&
+          top.icons >= 2,
+        "P10-R1",
+        "Each course opens with Requirements above the table: score line and entry requirements (" +
+          top.text.slice(0, 90) +
+          ")",
+      );
+      ok(
+        top.head.endsWith("Requirement") && /\(G\d(\/G\d)?\)/.test(top.elLevel || ""),
+        "P10-R2",
+        `Table header is 'Requirement' (not 'Slot') and EL shows its level (${top.head}, ${top.elLevel})`,
+      );
+      const tabs = await page.$$eval('[role="tab"]', (t) =>
+        t.map((x) => x.textContent.replace(/\s+/g, " ").trim()),
+      );
+      ok(
+        tabs.join("|") === "Explore pathways|Plan my subjects",
+        "P10-R3",
+        `Tabs carry no Sec 1-2 / Sec 3-4 sub-lines (${tabs.join(" | ")})`,
+      );
       await page.hover(
         "#fsbbCourses [data-easiest] [data-slot-row] [data-slot-tip]",
       );
